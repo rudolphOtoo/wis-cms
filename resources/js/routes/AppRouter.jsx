@@ -4,6 +4,8 @@ import ProtectedRoute from './ProtectedRoute'
 import AppLayout      from '../components/layout/AppLayout'
 import Login          from '../pages/auth/Login'
 import Dashboard      from '../pages/dashboard/Dashboard'
+import MembersPage    from '../pages/members/index'
+import MemberForm     from '../pages/members/MemberForm'
 
 export default function AppRouter() {
   return (
@@ -12,8 +14,11 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/"          element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/"                    element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard"           element={<Dashboard />} />
+            <Route path="/members"             element={<MembersPage />} />
+            <Route path="/members/new"         element={<MemberForm />} />
+            <Route path="/members/:id/edit"    element={<MemberForm />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
