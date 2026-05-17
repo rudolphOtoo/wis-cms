@@ -3,6 +3,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\VisitorController;
+use App\Http\Controllers\Api\DepartmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -26,4 +27,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Visitors
     Route::get('visitors/stats', [VisitorController::class, 'stats']);
     Route::apiResource('visitors', VisitorController::class);
+
+    // Departments
+    Route::get('departments/stats',                       [DepartmentController::class, 'stats']);
+    Route::get('departments/{id}/members',                [DepartmentController::class, 'departmentMembers']);
+    Route::post('departments/{id}/members',               [DepartmentController::class, 'addMember']);
+    Route::delete('departments/{id}/members/{memberId}',  [DepartmentController::class, 'removeMember']);
+    Route::apiResource('departments', DepartmentController::class);
 });
