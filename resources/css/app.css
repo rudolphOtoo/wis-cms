@@ -1,11 +1,85 @@
-@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+@import "tailwindcss";
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+  --color-navy:        #1B3A6B;
+  --color-navy-light:  #243F7A;
+  --color-navy-dark:   #122850;
+  --color-navy-deeper: #0D1F3C;
+  --color-gold:        #C9A84C;
+  --color-gold-light:  #E2C06A;
+  --color-gold-dark:   #A8863C;
+  --color-surface:         #F8F9FC;
+  --color-surface-card:    #FFFFFF;
+  --color-surface-border:  #E5E9F2;
+  --font-sans:    'Nunito', sans-serif;
+  --font-display: 'Playfair Display', serif;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: #1f2937;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-display); }
+
+@utility btn-primary {
+  background-color: var(--color-navy);
+  color: white;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 150ms;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  &:hover { background-color: var(--color-navy-light); }
+  &:active { background-color: var(--color-navy-dark); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+@utility input-field {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-surface-border);
+  background-color: white;
+  font-size: 0.875rem;
+  transition: all 150ms;
+  outline: none;
+  &::placeholder { color: #9ca3af; }
+  &:focus {
+    border-color: var(--color-navy);
+    box-shadow: 0 0 0 3px rgba(27,58,107,.1);
+  }
+}
+
+@utility card {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,.06);
+  border: 1px solid var(--color-surface-border);
+  padding: 1.5rem;
+}
+
+@utility sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.7);
+  transition: all 150ms;
+  cursor: pointer;
+  text-decoration: none;
+  &:hover { color: white; background-color: rgba(255,255,255,0.1); }
+  &.active { color: white; background-color: rgba(255,255,255,0.15); }
 }
