@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\VisitorController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\FinanceController;
+use App\Http\Controllers\Api\ChildrenController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -22,61 +23,55 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index']);
 
-    // ===== MEMBERS =====
+    // MEMBERS
     Route::middleware('permission:view members')->group(function () {
         Route::get('members/stats',  [MemberController::class, 'stats']);
         Route::get('members',        [MemberController::class, 'index']);
         Route::get('members/{id}',   [MemberController::class, 'show']);
     });
-    Route::middleware('permission:create members')->group(function () {
-        Route::post('members',       [MemberController::class, 'store']);
-    });
-    Route::middleware('permission:edit members')->group(function () {
-        Route::put('members/{id}',   [MemberController::class, 'update']);
-    });
-    Route::middleware('permission:delete members')->group(function () {
-        Route::delete('members/{id}',[MemberController::class, 'destroy']);
-    });
+    Route::middleware('permission:create members')->post('members', [MemberController::class, 'store']);
+    Route::middleware('permission:edit members')->put('members/{id}', [MemberController::class, 'update']);
+    Route::middleware('permission:delete members')->delete('members/{id}', [MemberController::class, 'destroy']);
 
-    // ===== VISITORS =====
+    // VISITORS
     Route::middleware('permission:view visitors')->group(function () {
         Route::get('visitors/stats', [VisitorController::class, 'stats']);
         Route::get('visitors',       [VisitorController::class, 'index']);
         Route::get('visitors/{id}',  [VisitorController::class, 'show']);
     });
     Route::middleware('permission:create visitors')->group(function () {
-        Route::post('visitors',                      [VisitorController::class, 'store']);
-        Route::post('visitors/{id}/convert',         [VisitorController::class, 'convertToMember']);
+        Route::post('visitors',              [VisitorController::class, 'store']);
+        Route::post('visitors/{id}/convert', [VisitorController::class, 'convertToMember']);
     });
-    Route::middleware('permission:edit visitors')->group(function () {
-        Route::put('visitors/{id}',  [VisitorController::class, 'update']);
-    });
-    Route::middleware('permission:delete visitors')->group(function () {
-        Route::delete('visitors/{id}',[VisitorController::class, 'destroy']);
-    });
+    Route::middleware('permission:edit visitors')->put('visitors/{id}', [VisitorController::class, 'update']);
+    Route::middleware('permission:delete visitors')->delete('visitors/{id}', [VisitorController::class, 'destroy']);
 
-    // ===== DEPARTMENTS =====
+    // CHILDREN
+    Route::middleware('permission:view children')->group(function () {
+        Route::get('children/stats',  [ChildrenController::class, 'stats']);
+        Route::get('children',        [ChildrenController::class, 'index']);
+        Route::get('children/{id}',   [ChildrenController::class, 'show']);
+    });
+    Route::middleware('permission:create children')->post('children', [ChildrenController::class, 'store']);
+    Route::middleware('permission:edit children')->put('children/{id}', [ChildrenController::class, 'update']);
+    Route::middleware('permission:delete children')->delete('children/{id}', [ChildrenController::class, 'destroy']);
+
+    // DEPARTMENTS
     Route::middleware('permission:view departments')->group(function () {
         Route::get('departments/stats',         [DepartmentController::class, 'stats']);
         Route::get('departments',               [DepartmentController::class, 'index']);
         Route::get('departments/{id}',          [DepartmentController::class, 'show']);
         Route::get('departments/{id}/members',  [DepartmentController::class, 'departmentMembers']);
     });
-    Route::middleware('permission:create departments')->group(function () {
-        Route::post('departments',              [DepartmentController::class, 'store']);
-    });
-    Route::middleware('permission:edit departments')->group(function () {
-        Route::put('departments/{id}',          [DepartmentController::class, 'update']);
-    });
-    Route::middleware('permission:delete departments')->group(function () {
-        Route::delete('departments/{id}',       [DepartmentController::class, 'destroy']);
-    });
+    Route::middleware('permission:create departments')->post('departments', [DepartmentController::class, 'store']);
+    Route::middleware('permission:edit departments')->put('departments/{id}', [DepartmentController::class, 'update']);
+    Route::middleware('permission:delete departments')->delete('departments/{id}', [DepartmentController::class, 'destroy']);
     Route::middleware('permission:manage department members')->group(function () {
         Route::post('departments/{id}/members',              [DepartmentController::class, 'addMember']);
         Route::delete('departments/{id}/members/{memberId}', [DepartmentController::class, 'removeMember']);
     });
 
-    // ===== ATTENDANCE =====
+    // ATTENDANCE
     Route::middleware('permission:view attendance')->group(function () {
         Route::get('attendance/stats',         [AttendanceController::class, 'stats']);
         Route::get('attendance/service-types', [AttendanceController::class, 'serviceTypes']);
@@ -84,24 +79,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('attendance/sessions/{id}', [AttendanceController::class, 'showSession']);
     });
     Route::middleware('permission:create attendance')->group(function () {
-        Route::post('attendance/sessions',             [AttendanceController::class, 'createSession']);
-        Route::post('attendance/sessions/{id}/mark',   [AttendanceController::class, 'markAttendance']);
+        Route::post('attendance/sessions',           [AttendanceController::class, 'createSession']);
+        Route::post('attendance/sessions/{id}/mark', [AttendanceController::class, 'markAttendance']);
     });
 
-    // ===== FINANCE =====
+    // FINANCE
     Route::middleware('permission:view finance')->group(function () {
         Route::get('finance/stats',             [FinanceController::class, 'stats']);
         Route::get('finance/categories',        [FinanceController::class, 'categories']);
         Route::get('finance/transactions',      [FinanceController::class, 'index']);
         Route::get('finance/transactions/{id}', [FinanceController::class, 'show']);
     });
-    Route::middleware('permission:create transactions')->group(function () {
-        Route::post('finance/transactions',     [FinanceController::class, 'store']);
-    });
-    Route::middleware('permission:edit transactions')->group(function () {
-        Route::put('finance/transactions/{id}', [FinanceController::class, 'update']);
-    });
-    Route::middleware('permission:delete transactions')->group(function () {
-        Route::delete('finance/transactions/{id}', [FinanceController::class, 'destroy']);
-    });
+    Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
+    Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
+    Route::middleware('permission:delete transactions')->delete('finance/transactions/{id}', [FinanceController::class, 'destroy']);
 });

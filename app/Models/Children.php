@@ -10,7 +10,8 @@ class Children extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $keyType    = 'string';
+    protected $table        = 'children';   // explicit — Laravel can't pluralise "children"
+    protected $keyType      = 'string';
     public    $incrementing = false;
 
     protected $fillable = [

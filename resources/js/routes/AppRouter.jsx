@@ -16,6 +16,8 @@ import NewSession        from '../pages/attendance/NewSession'
 import TakeAttendance    from '../pages/attendance/TakeAttendance'
 import FinancePage       from '../pages/finance/index'
 import TransactionForm   from '../pages/finance/TransactionForm'
+import ChildrenPage      from '../pages/children/index'
+import ChildForm         from '../pages/children/ChildForm'
 
 export default function AppRouter() {
   return (
@@ -24,24 +26,27 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/"                        element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard"               element={<Dashboard />} />
-            <Route path="/members"                 element={<MembersPage />} />
-            <Route path="/members/new"             element={<MemberForm />} />
-            <Route path="/members/:id/edit"        element={<MemberForm />} />
-            <Route path="/visitors"                element={<VisitorsPage />} />
-            <Route path="/visitors/new"            element={<VisitorForm />} />
-            <Route path="/visitors/:id/edit"       element={<VisitorForm />} />
-            <Route path="/departments"             element={<DepartmentsPage />} />
-            <Route path="/departments/new"         element={<DepartmentForm />} />
-            <Route path="/departments/:id"         element={<DepartmentDetail />} />
-            <Route path="/departments/:id/edit"    element={<DepartmentForm />} />
-            <Route path="/attendance"              element={<AttendancePage />} />
-            <Route path="/attendance/new"          element={<NewSession />} />
-            <Route path="/attendance/:id"          element={<TakeAttendance />} />
-            <Route path="/finance"                 element={<FinancePage />} />
-            <Route path="/finance/new"             element={<TransactionForm />} />
-            <Route path="/finance/:id/edit"        element={<TransactionForm />} />
+            <Route path="/"                     element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard"            element={<Dashboard />} />
+            <Route path="/members"              element={<MembersPage />} />
+            <Route path="/members/new"          element={<MemberForm />} />
+            <Route path="/members/:id/edit"     element={<MemberForm />} />
+            <Route path="/visitors"             element={<VisitorsPage />} />
+            <Route path="/visitors/new"         element={<VisitorForm />} />
+            <Route path="/visitors/:id/edit"    element={<VisitorForm />} />
+            <Route path="/departments"          element={<DepartmentsPage />} />
+            <Route path="/departments/new"      element={<DepartmentForm />} />
+            <Route path="/departments/:id"      element={<DepartmentDetail />} />
+            <Route path="/departments/:id/edit" element={<DepartmentForm />} />
+            <Route path="/attendance"           element={<AttendancePage />} />
+            <Route path="/attendance/new"       element={<NewSession />} />
+            <Route path="/attendance/:id"       element={<TakeAttendance />} />
+            <Route path="/finance"              element={<FinancePage />} />
+            <Route path="/finance/new"          element={<TransactionForm />} />
+            <Route path="/finance/:id/edit"     element={<TransactionForm />} />
+            <Route path="/children"             element={<ChildrenPage />} />
+            <Route path="/children/new"         element={<ChildForm />} />
+            <Route path="/children/:id/edit"    element={<ChildForm />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

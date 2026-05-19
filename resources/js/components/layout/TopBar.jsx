@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 const titles = {
   '/dashboard':     'Dashboard',
   '/members':       'Member Management',
+  '/children':      "Children's Register",
   '/attendance':    'Attendance',
   '/finance':       'Finance',
   '/departments':   'Departments',
