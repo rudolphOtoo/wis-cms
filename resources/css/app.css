@@ -26,7 +26,9 @@ body {
 
 h1, h2, h3 { font-family: var(--font-display); }
 
-@utility btn-primary {
+/* ===== Components — plain CSS for reliability ===== */
+
+.btn-primary {
   background-color: var(--color-navy);
   color: white;
   padding: 0.625rem 1rem;
@@ -39,12 +41,12 @@ h1, h2, h3 { font-family: var(--font-display); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  &:hover { background-color: var(--color-navy-light); }
-  &:active { background-color: var(--color-navy-dark); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
+.btn-primary:hover    { background-color: var(--color-navy-light); }
+.btn-primary:active   { background-color: var(--color-navy-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-@utility input-field {
+.input-field {
   width: 100%;
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
@@ -53,14 +55,14 @@ h1, h2, h3 { font-family: var(--font-display); }
   font-size: 0.875rem;
   transition: all 150ms;
   outline: none;
-  &::placeholder { color: #9ca3af; }
-  &:focus {
-    border-color: var(--color-navy);
-    box-shadow: 0 0 0 3px rgba(27,58,107,.1);
-  }
+}
+.input-field::placeholder { color: #9ca3af; }
+.input-field:focus {
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 3px rgba(27,58,107,.1);
 }
 
-@utility card {
+.card {
   background-color: white;
   border-radius: 1rem;
   box-shadow: 0 1px 3px 0 rgba(0,0,0,.06);
@@ -68,18 +70,29 @@ h1, h2, h3 { font-family: var(--font-display); }
   padding: 1.5rem;
 }
 
-@utility sidebar-link {
+.sidebar-link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.7);
+  color: #CBD5E1;
   transition: all 150ms;
   cursor: pointer;
   text-decoration: none;
-  &:hover { color: white; background-color: rgba(255,255,255,0.1); }
-  &.active { color: white; background-color: rgba(255,255,255,0.15); }
+}
+.sidebar-link:hover {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.sidebar-link.active {
+  color: #0D1F3C;
+  background-color: #C9A84C;
+  font-weight: 700;
+}
+.sidebar-link.active:hover {
+  background-color: #E2C06A;
+  color: #0D1F3C;
 }
