@@ -11,6 +11,8 @@ const titles = {
   '/departments':   'Departments',
   '/visitors':      'Visitors',
   '/communication': 'Communication',
+  '/admin/users':   'User Management',
+  '/admin/audit':   'Audit Log',
 }
 
 export default function TopBar() {

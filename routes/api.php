@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\ChildrenController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AuditController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -93,4 +95,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
     Route::middleware('permission:delete transactions')->delete('finance/transactions/{id}', [FinanceController::class, 'destroy']);
+
+    // USERS — super admin only (manage users permission)
+    Route::middleware('permission:manage users')->group(function () {
+        Route::get('users/roles',     [UserController::class, 'roles']);
+        Route::get('users',           [UserController::class, 'index']);
+        Route::post('users',          [UserController::class, 'store']);
+        Route::get('users/{id}',      [UserController::class, 'show']);
+        Route::put('users/{id}',      [UserController::class, 'update']);
+        Route::delete('users/{id}',   [UserController::class, 'destroy']);
+    });
+
+    // AUDIT LOG
+    Route::middleware('permission:view audit log')->group(function () {
+        Route::get('audit', [AuditController::class, 'index']);
+    });
 });
