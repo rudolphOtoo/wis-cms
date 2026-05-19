@@ -11,6 +11,11 @@ import VisitorForm       from '../pages/visitors/VisitorForm'
 import DepartmentsPage   from '../pages/departments/index'
 import DepartmentForm    from '../pages/departments/DepartmentForm'
 import DepartmentDetail  from '../pages/departments/DepartmentDetail'
+import AttendancePage    from '../pages/attendance/index'
+import NewSession        from '../pages/attendance/NewSession'
+import TakeAttendance    from '../pages/attendance/TakeAttendance'
+import FinancePage       from '../pages/finance/index'
+import TransactionForm   from '../pages/finance/TransactionForm'
 
 export default function AppRouter() {
   return (
@@ -31,6 +36,12 @@ export default function AppRouter() {
             <Route path="/departments/new"         element={<DepartmentForm />} />
             <Route path="/departments/:id"         element={<DepartmentDetail />} />
             <Route path="/departments/:id/edit"    element={<DepartmentForm />} />
+            <Route path="/attendance"              element={<AttendancePage />} />
+            <Route path="/attendance/new"          element={<NewSession />} />
+            <Route path="/attendance/:id"          element={<TakeAttendance />} />
+            <Route path="/finance"                 element={<FinancePage />} />
+            <Route path="/finance/new"             element={<TransactionForm />} />
+            <Route path="/finance/:id/edit"        element={<TransactionForm />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

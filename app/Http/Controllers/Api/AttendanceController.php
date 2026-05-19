@@ -1,0 +1,219 @@
+<?php
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\AttendanceSessionResource;
+use App\Models\AttendanceSession;
+use App\Models\AttendanceRecord;
+use App\Models\Member;
+use App\Models\Children;
+use App\Models\ServiceType;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class AttendanceController extends Controller
+{
+    // GET /api/attendance
+    public function index(Request $request): JsonResponse
+    {
+        $sessions = AttendanceSession::query()
+            ->where('branch_id', $request->user()->branch_id)
+            ->with(['serviceType', 'recorder'])
+            ->orderByDesc('service_date')
+            ->paginate($request->get('per_page', 20));
+
+        return response()->json([
+            'data' => AttendanceSessionResource::collection($sessions->items()),
+            'meta' => [
+                'total'        => $sessions->total(),
+                'per_page'     => $sessions->perPage(),
+                'current_page' => $sessions->currentPage(),
+                'last_page'    => $sessions->lastPage(),
+            ],
+        ]);
+    }
+
+    // GET /api/attendance/service-types
+    public function serviceTypes(): JsonResponse
+    {
+        $types = ServiceType::where('is_active', true)->get();
+        return response()->json(['data' => $types]);
+    }
+
+    // POST /api/attendance/sessions
+    public function createSession(Request $request): JsonResponse
+    {
+        $request->validate([
+            'service_type_id' => ['required', 'uuid', 'exists:service_types,id'],
+            'service_date'    => ['required', 'date'],
+            'notes'           => ['nullable', 'string'],
+        ]);
+
+        // Prevent duplicate session
+        $existing = AttendanceSession::where('branch_id', $request->user()->branch_id)
+            ->where('service_type_id', $request->service_type_id)
+            ->whereDate('service_date', $request->service_date)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message'    => 'A session already exists for this service on this date.',
+                'session_id' => $existing->id,
+            ], 422);
+        }
+
+        $session = AttendanceSession::create([
+            'branch_id'       => $request->user()->branch_id,
+            'service_type_id' => $request->service_type_id,
+            'service_date'    => $request->service_date,
+            'notes'           => $request->notes,
+            'recorded_by'     => $request->user()->id,
+        ]);
+
+        activity()->causedBy($request->user())
+                  ->performedOn($session)
+                  ->log("Opened attendance session for {$request->service_date}");
+
+        return response()->json([
+            'message' => 'Attendance session created.',
+            'data'    => new AttendanceSessionResource($session->load('serviceType', 'recorder')),
+        ], 201);
+    }
+
+    // GET /api/attendance/sessions/{id}
+    public function showSession(Request $request, string $id): JsonResponse
+    {
+        $session = AttendanceSession::where('branch_id', $request->user()->branch_id)
+            ->with(['serviceType', 'recorder', 'records'])
+            ->findOrFail($id);
+
+        // Get all members/children with their attendance status
+        $serviceType = $session->serviceType;
+
+        if ($serviceType->type === 'children') {
+            $people = Children::where('branch_id', $request->user()->branch_id)
+                ->where('is_active', true)
+                ->orderBy('first_name')
+                ->get()
+                ->map(fn($c) => [
+                    'id'        => $c->id,
+                    'name'      => $c->full_name,
+                    'type'      => 'child',
+                    'class'     => $c->class_group,
+                    'is_present'=> $session->records->where('child_id', $c->id)->first()?->is_present ?? false,
+                ]);
+        } else {
+            $people = Member::where('branch_id', $request->user()->branch_id)
+                ->where('status', 'active')
+                ->orderBy('first_name')
+                ->get()
+                ->map(fn($m) => [
+                    'id'           => $m->id,
+                    'name'         => $m->full_name,
+                    'type'         => 'member',
+                    'member_number'=> $m->member_number,
+                    'is_present'   => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
+                ]);
+        }
+
+        return response()->json([
+            'data' => [
+                'session' => new AttendanceSessionResource($session),
+                'people'  => $people,
+            ],
+        ]);
+    }
+
+    // POST /api/attendance/sessions/{id}/mark
+    public function markAttendance(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'records'              => ['required', 'array'],
+            'records.*.person_id'  => ['required', 'uuid'],
+            'records.*.type'       => ['required', 'in:member,child'],
+            'records.*.is_present' => ['required', 'boolean'],
+        ]);
+
+        $session = AttendanceSession::where('branch_id', $request->user()->branch_id)
+            ->findOrFail($id);
+
+        foreach ($request->records as $record) {
+            $data = [
+                'session_id' => $session->id,
+                'is_present' => $record['is_present'],
+            ];
+
+            if ($record['type'] === 'member') {
+                $data['member_id'] = $record['person_id'];
+                $data['child_id']  = null;
+                AttendanceRecord::updateOrCreate(
+                    ['session_id' => $session->id, 'member_id' => $record['person_id']],
+                    $data
+                );
+            } else {
+                $data['child_id']  = $record['person_id'];
+                $data['member_id'] = null;
+                AttendanceRecord::updateOrCreate(
+                    ['session_id' => $session->id, 'child_id' => $record['person_id']],
+                    $data
+                );
+            }
+        }
+
+        activity()->causedBy($request->user())
+                  ->performedOn($session)
+                  ->log("Marked attendance for session {$session->service_date}");
+
+        return response()->json(['message' => 'Attendance saved successfully.']);
+    }
+
+    // GET /api/attendance/stats
+    public function stats(Request $request): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+
+        $lastSession = AttendanceSession::where('branch_id', $branchId)
+            ->whereHas('serviceType', fn($q) => $q->where('type', '!=', 'children'))
+            ->with('records')
+            ->latest('service_date')
+            ->first();
+
+        $lastSunday  = $lastSession?->adult_count ?? 0;
+        $totalSessions = AttendanceSession::where('branch_id', $branchId)->count();
+
+        // Average adult attendance last 4 sessions
+        $recentSessions = AttendanceSession::where('branch_id', $branchId)
+            ->whereHas('serviceType', fn($q) => $q->where('type', 'adult'))
+            ->with('records')
+            ->latest('service_date')
+            ->take(4)
+            ->get();
+
+        $avgAttendance = $recentSessions->count() > 0
+            ? round($recentSessions->avg(fn($s) => $s->adult_count))
+            : 0;
+
+        // Last 8 sessions for chart
+        $chartData = AttendanceSession::where('branch_id', $branchId)
+            ->whereHas('serviceType', fn($q) => $q->where('type', 'adult'))
+            ->with(['serviceType', 'records'])
+            ->latest('service_date')
+            ->take(8)
+            ->get()
+            ->reverse()
+            ->map(fn($s) => [
+                'date'  => $s->service_date->format('d M'),
+                'count' => $s->adult_count,
+            ])
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'last_sunday'    => $lastSunday,
+                'average'        => $avgAttendance,
+                'total_sessions' => $totalSessions,
+                'chart'          => $chartData,
+            ],
+        ]);
+    }
+}
