@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAttendance, getAttendanceStats } from '../../api/attendance'
+import { usePermission } from '../../hooks/usePermission'
 
 export default function AttendancePage() {
   const navigate  = useNavigate()
+  const { can }   = usePermission()
   const [sessions, setSessions] = useState([])
   const [stats,    setStats]    = useState(null)
   const [loading,  setLoading]  = useState(true)
@@ -31,8 +33,6 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Last Sunday Attendance', value: stats?.last_sunday    ?? '—' },
@@ -49,7 +49,6 @@ export default function AttendancePage() {
         ))}
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold"
@@ -60,24 +59,23 @@ export default function AttendancePage() {
             Track Sunday and weekday service attendance
           </p>
         </div>
-        <button onClick={() => navigate('/attendance/new')} className="btn-primary gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-          </svg>
-          Take Attendance
-        </button>
+        {can('create attendance') && (
+          <button onClick={() => navigate('/attendance/new')} className="btn-primary gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            Take Attendance
+          </button>
+        )}
       </div>
 
-      {/* Sessions Table */}
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr style={{borderBottom:'1px solid var(--color-surface-border)',
-                          backgroundColor:'#f9fafb'}}>
+              <tr style={{borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f9fafb'}}>
                 {['Date','Service','Adults','Children','Total','Recorded By','Action'].map(h => (
-                  <th key={h}
-                      className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
                       style={{color:'#6b7280'}}>
                     {h}
                   </th>
@@ -87,16 +85,7 @@ export default function AttendancePage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12" style={{color:'#9ca3af'}}>
-                    <svg className="animate-spin w-6 h-6 mx-auto mb-2"
-                         fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10"
-                              stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    Loading sessions...
-                  </td>
+                  <td colSpan={7} className="text-center py-12" style={{color:'#9ca3af'}}>Loading...</td>
                 </tr>
               ) : sessions.length === 0 ? (
                 <tr>
@@ -120,8 +109,7 @@ export default function AttendancePage() {
                   <td className="px-4 py-3 text-sm" style={{color:'#374151'}}>
                     {session.service_type?.name ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold"
-                      style={{color:'var(--color-navy)'}}>
+                  <td className="px-4 py-3 text-sm font-semibold" style={{color:'var(--color-navy)'}}>
                     {session.adult_count}
                   </td>
                   <td className="px-4 py-3 text-sm font-semibold" style={{color:'#7c3aed'}}>
@@ -136,8 +124,7 @@ export default function AttendancePage() {
                   <td className="px-4 py-3">
                     <button onClick={() => navigate(`/attendance/${session.id}`)}
                             className="text-xs px-2 py-1 rounded font-medium"
-                            style={{color:'var(--color-navy)',
-                                    backgroundColor:'rgba(27,58,107,0.08)'}}>
+                            style={{color:'var(--color-navy)',backgroundColor:'rgba(27,58,107,0.08)'}}>
                       View
                     </button>
                   </td>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDepartments, deleteDepartment, getDepartmentStats } from '../../api/departments'
+import { usePermission } from '../../hooks/usePermission'
 
 export default function DepartmentsPage() {
   const navigate = useNavigate()
+  const { can }  = usePermission()
   const [departments, setDepartments] = useState([])
   const [stats,       setStats]       = useState(null)
   const [loading,     setLoading]     = useState(true)
@@ -42,8 +44,6 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Total Departments',   value: stats?.total                  ?? '—' },
@@ -60,34 +60,30 @@ export default function DepartmentsPage() {
         ))}
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold"
               style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
             Departments & Groups
           </h2>
-          <p className="text-sm" style={{color:'#6b7280'}}>
-            {departments.length} departments
-          </p>
+          <p className="text-sm" style={{color:'#6b7280'}}>{departments.length} departments</p>
         </div>
-        <button onClick={() => navigate('/departments/new')} className="btn-primary gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-          </svg>
-          New Department
-        </button>
+        {can('create departments') && (
+          <button onClick={() => navigate('/departments/new')} className="btn-primary gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            New Department
+          </button>
+        )}
       </div>
 
-      {/* Department Cards */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
                fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10"
-                    stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
         </div>
       ) : departments.length === 0 ? (
@@ -100,9 +96,11 @@ export default function DepartmentsPage() {
           <p className="text-sm mb-6" style={{color:'#6b7280'}}>
             Create your first department to organise members into groups
           </p>
-          <button onClick={() => navigate('/departments/new')} className="btn-primary">
-            Create First Department
-          </button>
+          {can('create departments') && (
+            <button onClick={() => navigate('/departments/new')} className="btn-primary">
+              Create First Department
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -117,9 +115,7 @@ export default function DepartmentsPage() {
                   <div>
                     <h3 className="font-bold text-sm" style={{color:'#111827'}}>{dept.name}</h3>
                     {dept.leader && (
-                      <p className="text-xs" style={{color:'#9ca3af'}}>
-                        Leader: {dept.leader.name}
-                      </p>
+                      <p className="text-xs" style={{color:'#9ca3af'}}>Leader: {dept.leader.name}</p>
                     )}
                   </div>
                 </div>
@@ -133,9 +129,7 @@ export default function DepartmentsPage() {
               </div>
 
               {dept.description && (
-                <p className="text-sm mb-4 line-clamp-2" style={{color:'#6b7280'}}>
-                  {dept.description}
-                </p>
+                <p className="text-sm mb-4 line-clamp-2" style={{color:'#6b7280'}}>{dept.description}</p>
               )}
 
               <div className="flex items-center justify-between pt-4"
@@ -157,17 +151,21 @@ export default function DepartmentsPage() {
                           style={{color:'var(--color-navy)',backgroundColor:'rgba(27,58,107,0.08)'}}>
                     Manage
                   </button>
-                  <button onClick={() => navigate(`/departments/${dept.id}/edit`)}
-                          className="text-xs px-2 py-1 rounded font-medium"
-                          style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
-                    Edit
-                  </button>
-                  <button onClick={() => handleDelete(dept)}
-                          disabled={deleting === dept.id}
-                          className="text-xs px-2 py-1 rounded font-medium"
-                          style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                    {deleting === dept.id ? '...' : 'Delete'}
-                  </button>
+                  {can('edit departments') && (
+                    <button onClick={() => navigate(`/departments/${dept.id}/edit`)}
+                            className="text-xs px-2 py-1 rounded font-medium"
+                            style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
+                      Edit
+                    </button>
+                  )}
+                  {can('delete departments') && (
+                    <button onClick={() => handleDelete(dept)}
+                            disabled={deleting === dept.id}
+                            className="text-xs px-2 py-1 rounded font-medium"
+                            style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                      {deleting === dept.id ? '...' : 'Delete'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

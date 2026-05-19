@@ -5,12 +5,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Member extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $keyType    = 'string';
+    protected $keyType      = 'string';
     public    $incrementing = false;
 
     protected $fillable = [
@@ -30,14 +31,30 @@ class Member extends Model
         ];
     }
 
-    // Auto-generate member number
+    /**
+     * Auto-generate member number atomically.
+     * Uses pessimistic row-level lock to prevent race conditions
+     * when multiple members are created simultaneously.
+     */
     protected static function booted(): void
     {
         static::creating(function (Member $member) {
             if (empty($member->member_number)) {
-                $year  = now()->format('Y');
-                $count = static::whereYear('created_at', $year)->count() + 1;
-                $member->member_number = 'WIS-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $year = now()->format('Y');
+
+                DB::transaction(function () use ($member, $year) {
+                    // Acquire row lock on the highest-numbered member this year
+                    $last = static::where('member_number', 'like', "WIS-{$year}-%")
+                        ->orderByDesc('member_number')
+                        ->lockForUpdate()
+                        ->first();
+
+                    $nextNumber = $last
+                        ? ((int) substr($last->member_number, -4)) + 1
+                        : 1;
+
+                    $member->member_number = 'WIS-' . $year . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+                });
             }
         });
     }

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTransactions, getFinanceStats, getFinanceCategories, deleteTransaction } from '../../api/finance'
+import { usePermission } from '../../hooks/usePermission'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function FinancePage() {
   const navigate = useNavigate()
+  const { can }  = usePermission()
   const [transactions, setTxns]    = useState([])
   const [categories,   setCats]    = useState([])
   const [stats,        setStats]   = useState(null)
@@ -58,8 +60,6 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-6">
-
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card py-5" style={{background:'linear-gradient(135deg,#dcfce7,#bbf7d0)',border:'none'}}>
           <div className="flex items-center justify-between mb-2">
@@ -106,7 +106,6 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold"
@@ -117,15 +116,16 @@ export default function FinancePage() {
             {meta ? `${meta.total} transactions recorded` : 'Loading...'}
           </p>
         </div>
-        <button onClick={() => navigate('/finance/new')} className="btn-primary gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-          </svg>
-          Record Transaction
-        </button>
+        {can('create transactions') && (
+          <button onClick={() => navigate('/finance/new')} className="btn-primary gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            Record Transaction
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
       <div className="card py-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -156,16 +156,13 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr style={{borderBottom:'1px solid var(--color-surface-border)',
-                          backgroundColor:'#f9fafb'}}>
+              <tr style={{borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f9fafb'}}>
                 {['Date','Category','Member','Amount','Reference','Action'].map(h => (
-                  <th key={h}
-                      className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
                       style={{color:'#6b7280'}}>
                     {h}
                   </th>
@@ -175,16 +172,7 @@ export default function FinancePage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12" style={{color:'#9ca3af'}}>
-                    <svg className="animate-spin w-6 h-6 mx-auto mb-2"
-                         fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10"
-                              stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    Loading transactions...
-                  </td>
+                  <td colSpan={6} className="text-center py-12" style={{color:'#9ca3af'}}>Loading...</td>
                 </tr>
               ) : transactions.length === 0 ? (
                 <tr>
@@ -202,9 +190,7 @@ export default function FinancePage() {
                 <tr key={txn.id}
                     style={{borderBottom:'1px solid var(--color-surface-border)',
                             backgroundColor: i % 2 === 0 ? 'white' : '#fafafa'}}>
-                  <td className="px-4 py-3 text-sm" style={{color:'#111827'}}>
-                    {txn.transaction_date}
-                  </td>
+                  <td className="px-4 py-3 text-sm" style={{color:'#111827'}}>{txn.transaction_date}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full"
@@ -226,17 +212,21 @@ export default function FinancePage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => navigate(`/finance/${txn.id}/edit`)}
-                              className="text-xs px-2 py-1 rounded font-medium"
-                              style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(txn)}
-                              disabled={deleting === txn.id}
-                              className="text-xs px-2 py-1 rounded font-medium"
-                              style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                        {deleting === txn.id ? '...' : 'Delete'}
-                      </button>
+                      {can('edit transactions') && (
+                        <button onClick={() => navigate(`/finance/${txn.id}/edit`)}
+                                className="text-xs px-2 py-1 rounded font-medium"
+                                style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
+                          Edit
+                        </button>
+                      )}
+                      {can('delete transactions') && (
+                        <button onClick={() => handleDelete(txn)}
+                                disabled={deleting === txn.id}
+                                className="text-xs px-2 py-1 rounded font-medium"
+                                style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                          {deleting === txn.id ? '...' : 'Delete'}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

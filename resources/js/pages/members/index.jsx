@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMembers, deleteMember, getMemberStats } from '../../api/members'
+import { usePermission } from '../../hooks/usePermission'
 
 const STATUS_COLORS = {
   active:      { bg: '#dcfce7', text: '#16a34a' },
@@ -11,6 +12,7 @@ const STATUS_COLORS = {
 
 export default function MembersPage() {
   const navigate = useNavigate()
+  const { can }  = usePermission()
   const [members,    setMembers]    = useState([])
   const [stats,      setStats]      = useState(null)
   const [loading,    setLoading]    = useState(true)
@@ -40,7 +42,6 @@ export default function MembersPage() {
 
   useEffect(() => { fetchMembers() }, [fetchMembers])
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => fetchMembers(), 400)
     return () => clearTimeout(timer)
@@ -62,7 +63,6 @@ export default function MembersPage() {
   return (
     <div className="space-y-6">
 
-      {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Members',     value: stats?.total        ?? '—' },
@@ -79,7 +79,6 @@ export default function MembersPage() {
         ))}
       </div>
 
-      {/* Header + actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
@@ -89,15 +88,16 @@ export default function MembersPage() {
             {meta ? `${meta.total} registered members` : 'Loading...'}
           </p>
         </div>
-        <button onClick={() => navigate('/members/new')} className="btn-primary gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-          </svg>
-          Add Member
-        </button>
+        {can('create members') && (
+          <button onClick={() => navigate('/members/new')} className="btn-primary gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Member
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
       <div className="card py-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -106,14 +106,9 @@ export default function MembersPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
-            <input
-              type="text"
-              placeholder="Search by name, phone, or member number..."
-              className="input-field"
-              style={{paddingLeft:'2.5rem'}}
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }}
-            />
+            <input type="text" placeholder="Search by name, phone, or member number..."
+                   className="input-field" style={{paddingLeft:'2.5rem'}}
+                   value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}/>
           </div>
           <select className="input-field" style={{width:'auto'}}
                   value={statusFilter} onChange={e => { setStatus(e.target.value); setPage(1) }}>
@@ -132,7 +127,6 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -211,17 +205,21 @@ export default function MembersPage() {
                               style={{color:'var(--color-navy)',backgroundColor:'rgba(27,58,107,0.08)'}}>
                         View
                       </button>
-                      <button onClick={() => navigate(`/members/${member.id}/edit`)}
-                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                              style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(member)}
-                              disabled={deleting === member.id}
-                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                              style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                        {deleting === member.id ? '...' : 'Delete'}
-                      </button>
+                      {can('edit members') && (
+                        <button onClick={() => navigate(`/members/${member.id}/edit`)}
+                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                                style={{color:'#d97706',backgroundColor:'rgba(217,119,6,0.08)'}}>
+                          Edit
+                        </button>
+                      )}
+                      {can('delete members') && (
+                        <button onClick={() => handleDelete(member)}
+                                disabled={deleting === member.id}
+                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                                style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                          {deleting === member.id ? '...' : 'Delete'}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -230,7 +228,6 @@ export default function MembersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {meta && meta.last_page > 1 && (
           <div className="px-4 py-3 flex items-center justify-between"
                style={{borderTop:'1px solid var(--color-surface-border)'}}>
