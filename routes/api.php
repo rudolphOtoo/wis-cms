@@ -8,15 +8,12 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\FinanceController;
 use Illuminate\Support\Facades\Route;
 
-// Public — login (rate-limited at controller level)
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
 
-// All authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Self-management — any authenticated user
     Route::prefix('auth')->group(function () {
         Route::post('logout',          [AuthController::class, 'logout']);
         Route::get('me',               [AuthController::class, 'me']);
@@ -48,7 +45,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('visitors/{id}',  [VisitorController::class, 'show']);
     });
     Route::middleware('permission:create visitors')->group(function () {
-        Route::post('visitors',      [VisitorController::class, 'store']);
+        Route::post('visitors',                      [VisitorController::class, 'store']);
+        Route::post('visitors/{id}/convert',         [VisitorController::class, 'convertToMember']);
     });
     Route::middleware('permission:edit visitors')->group(function () {
         Route::put('visitors/{id}',  [VisitorController::class, 'update']);

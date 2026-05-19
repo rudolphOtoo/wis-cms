@@ -5,9 +5,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Visitor\StoreVisitorRequest;
 use App\Http\Requests\Visitor\UpdateVisitorRequest;
 use App\Http\Resources\VisitorResource;
+use App\Http\Resources\MemberResource;
 use App\Models\Visitor;
+use App\Models\Member;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VisitorController extends Controller
 {
@@ -118,5 +121,70 @@ class VisitorController extends Controller
                                           ->count(),
             ],
         ]);
+    }
+
+    /**
+     * Convert a visitor into a full member.
+     * Creates the member, links visitor.converted_member_id, sets status to 'joined'.
+     * Wrapped in a transaction so both records succeed or neither does.
+     */
+    public function convertToMember(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'gender'        => ['required', 'in:male,female'],
+            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'occupation'    => ['nullable', 'string', 'max:100'],
+            'marital_status'=> ['nullable', 'in:single,married,widowed,divorced'],
+            'is_baptised'   => ['boolean'],
+            'baptism_date'  => ['nullable', 'date'],
+            'notes'         => ['nullable', 'string'],
+        ]);
+
+        $visitor = Visitor::where('branch_id', $request->user()->branch_id)
+                          ->findOrFail($id);
+
+        if ($visitor->converted_member_id) {
+            return response()->json([
+                'message' => 'This visitor has already been converted to a member.',
+            ], 422);
+        }
+
+        $member = DB::transaction(function () use ($request, $visitor) {
+            // Create member from visitor data
+            $member = Member::create([
+                'branch_id'      => $visitor->branch_id,
+                'first_name'     => $visitor->first_name,
+                'last_name'      => $visitor->last_name,
+                'phone'          => $visitor->phone,
+                'email'          => $visitor->email,
+                'address'        => $visitor->address,
+                'gender'         => $request->gender,
+                'date_of_birth'  => $request->date_of_birth,
+                'occupation'     => $request->occupation,
+                'marital_status' => $request->marital_status,
+                'is_baptised'    => $request->boolean('is_baptised'),
+                'baptism_date'   => $request->baptism_date,
+                'join_date'      => now()->toDateString(),
+                'status'         => 'active',
+                'notes'          => $request->notes ?? "Converted from visitor on " . now()->format('Y-m-d'),
+            ]);
+
+            // Link visitor to new member
+            $visitor->update([
+                'converted_member_id' => $member->id,
+                'follow_up_status'    => 'joined',
+            ]);
+
+            return $member;
+        });
+
+        activity()->causedBy($request->user())
+                  ->performedOn($member)
+                  ->log("Converted visitor {$visitor->full_name} to member {$member->member_number}");
+
+        return response()->json([
+            'message' => "{$visitor->full_name} is now a member with ID {$member->member_number}.",
+            'data'    => new MemberResource($member),
+        ], 201);
     }
 }
