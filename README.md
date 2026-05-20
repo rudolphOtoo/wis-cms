@@ -4,6 +4,7 @@
 
 WIS-CMS replaces paper-based church administration with a secure, branch-scoped platform for member records, visitors, departments, and (planned) attendance, finance, and communications.
 
+[![CI](https://github.com/rudolphOtoo/wis-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/rudolphOtoo/wis-cms/actions/workflows/ci.yml)
 ![Laravel](https://img.shields.io/badge/Laravel-13-red?style=flat-square&logo=laravel)
 ![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?style=flat-square&logo=postgresql)
