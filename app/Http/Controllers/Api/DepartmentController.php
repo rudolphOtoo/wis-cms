@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -35,12 +36,12 @@ class DepartmentController extends Controller
         ]);
 
         activity()->causedBy($request->user())
-                  ->performedOn($department)
-                  ->log("Created department: {$department->name}");
+            ->performedOn($department)
+            ->log("Created department: {$department->name}");
 
         return response()->json([
             'message' => 'Department created successfully.',
-            'data'    => new DepartmentResource($department->load('leader')),
+            'data' => new DepartmentResource($department->load('leader')),
         ], 201);
     }
 
@@ -62,12 +63,12 @@ class DepartmentController extends Controller
         $department->update($request->validated());
 
         activity()->causedBy($request->user())
-                  ->performedOn($department)
-                  ->log("Updated department: {$department->name}");
+            ->performedOn($department)
+            ->log("Updated department: {$department->name}");
 
         return response()->json([
             'message' => 'Department updated successfully.',
-            'data'    => new DepartmentResource($department->load('leader')),
+            'data' => new DepartmentResource($department->load('leader')),
         ]);
     }
 
@@ -80,7 +81,7 @@ class DepartmentController extends Controller
         $department->delete();
 
         activity()->causedBy($request->user())
-                  ->log("Deleted department: {$name}");
+            ->log("Deleted department: {$name}");
 
         return response()->json(['message' => 'Department deleted successfully.']);
     }
@@ -94,13 +95,13 @@ class DepartmentController extends Controller
         $members = $department->members()
             ->orderBy('first_name')
             ->get()
-            ->map(fn($m) => [
-                'id'          => $m->id,
-                'full_name'   => $m->full_name,
+            ->map(fn ($m) => [
+                'id' => $m->id,
+                'full_name' => $m->full_name,
                 'member_number' => $m->member_number,
-                'phone'       => $m->phone,
-                'role'        => $m->pivot->role,
-                'joined_at'   => $m->pivot->joined_at,
+                'phone' => $m->phone,
+                'role' => $m->pivot->role,
+                'joined_at' => $m->pivot->joined_at,
             ]);
 
         return response()->json(['data' => $members]);
@@ -111,7 +112,7 @@ class DepartmentController extends Controller
     {
         $request->validate([
             'member_id' => ['required', 'uuid', 'exists:members,id'],
-            'role'      => ['nullable', 'string', 'max:50'],
+            'role' => ['nullable', 'string', 'max:50'],
         ]);
 
         $department = Department::where('branch_id', $request->user()->branch_id)
@@ -123,14 +124,14 @@ class DepartmentController extends Controller
         }
 
         $department->members()->attach($request->member_id, [
-            'role'      => $request->get('role', 'member'),
+            'role' => $request->get('role', 'member'),
             'joined_at' => now()->toDateString(),
         ]);
 
         $member = Member::find($request->member_id);
 
         activity()->causedBy($request->user())
-                  ->log("Added {$member->full_name} to {$department->name}");
+            ->log("Added {$member->full_name} to {$department->name}");
 
         return response()->json(['message' => 'Member added to department successfully.']);
     }
@@ -144,7 +145,7 @@ class DepartmentController extends Controller
         $department->members()->detach($memberId);
 
         activity()->causedBy($request->user())
-                  ->log("Removed member from {$department->name}");
+            ->log("Removed member from {$department->name}");
 
         return response()->json(['message' => 'Member removed from department.']);
     }
@@ -159,7 +160,7 @@ class DepartmentController extends Controller
 
         return response()->json([
             'data' => [
-                'total'  => $departments->count(),
+                'total' => $departments->count(),
                 'active' => $departments->where('is_active', true)->count(),
                 'total_members_assigned' => $departments->sum('members_count'),
             ],

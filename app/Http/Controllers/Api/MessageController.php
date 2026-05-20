@@ -1,9 +1,9 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendBroadcastMessageJob;
-use App\Models\Department;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
@@ -18,31 +18,31 @@ class MessageController extends Controller
         $messages = Message::where('branch_id', $request->user()->branch_id)
             ->with('sender')
             ->withCount(['recipients',
-                         'recipients as delivered_count' => fn($q) => $q->where('delivery_status','delivered'),
-                         'recipients as failed_count'    => fn($q) => $q->where('delivery_status','failed')])
+                'recipients as delivered_count' => fn ($q) => $q->where('delivery_status', 'delivered'),
+                'recipients as failed_count' => fn ($q) => $q->where('delivery_status', 'failed')])
             ->latest()
             ->paginate($request->get('per_page', 15));
 
         return response()->json([
-            'data' => collect($messages->items())->map(fn($m) => [
-                'id'              => $m->id,
-                'subject'         => $m->subject,
-                'body_preview'    => mb_substr($m->body, 0, 140) . (mb_strlen($m->body) > 140 ? '…' : ''),
-                'channel'         => $m->channel,
-                'status'          => $m->status,
+            'data' => collect($messages->items())->map(fn ($m) => [
+                'id' => $m->id,
+                'subject' => $m->subject,
+                'body_preview' => mb_substr($m->body, 0, 140).(mb_strlen($m->body) > 140 ? '…' : ''),
+                'channel' => $m->channel,
+                'status' => $m->status,
                 'recipient_group' => $m->recipient_group,
-                'sender'          => $m->sender?->name,
-                'total_recipients'=> $m->recipients_count,
+                'sender' => $m->sender?->name,
+                'total_recipients' => $m->recipients_count,
                 'delivered_count' => $m->delivered_count,
-                'failed_count'    => $m->failed_count,
-                'sent_at'         => $m->sent_at?->diffForHumans(),
-                'created_at'      => $m->created_at->format('Y-m-d H:i'),
+                'failed_count' => $m->failed_count,
+                'sent_at' => $m->sent_at?->diffForHumans(),
+                'created_at' => $m->created_at->format('Y-m-d H:i'),
             ]),
             'meta' => [
-                'total'        => $messages->total(),
-                'per_page'     => $messages->perPage(),
+                'total' => $messages->total(),
+                'per_page' => $messages->perPage(),
                 'current_page' => $messages->currentPage(),
-                'last_page'    => $messages->lastPage(),
+                'last_page' => $messages->lastPage(),
             ],
         ]);
     }
@@ -55,26 +55,26 @@ class MessageController extends Controller
 
         return response()->json([
             'data' => [
-                'id'              => $message->id,
-                'subject'         => $message->subject,
-                'body'            => $message->body,
-                'channel'         => $message->channel,
-                'status'          => $message->status,
+                'id' => $message->id,
+                'subject' => $message->subject,
+                'body' => $message->body,
+                'channel' => $message->channel,
+                'status' => $message->status,
                 'recipient_group' => $message->recipient_group,
-                'sender'          => $message->sender?->name,
-                'sent_at'         => $message->sent_at?->format('Y-m-d H:i'),
-                'created_at'      => $message->created_at->format('Y-m-d H:i'),
-                'total_recipients'=> $message->total_recipients,
+                'sender' => $message->sender?->name,
+                'sent_at' => $message->sent_at?->format('Y-m-d H:i'),
+                'created_at' => $message->created_at->format('Y-m-d H:i'),
+                'total_recipients' => $message->total_recipients,
                 'delivered_count' => $message->delivered_count,
-                'failed_count'    => $message->failed_count,
-                'recipients'      => $message->recipients->map(fn($r) => [
-                    'id'              => $r->id,
-                    'name'            => $r->member?->full_name ?? '—',
-                    'email'           => $r->email,
-                    'phone'           => $r->phone,
+                'failed_count' => $message->failed_count,
+                'recipients' => $message->recipients->map(fn ($r) => [
+                    'id' => $r->id,
+                    'name' => $r->member?->full_name ?? '—',
+                    'email' => $r->email,
+                    'phone' => $r->phone,
                     'delivery_status' => $r->delivery_status,
-                    'delivered_at'    => $r->delivered_at?->diffForHumans(),
-                    'failure_reason'  => $r->failure_reason,
+                    'delivered_at' => $r->delivered_at?->diffForHumans(),
+                    'failure_reason' => $r->failure_reason,
                 ]),
             ],
         ]);
@@ -84,11 +84,11 @@ class MessageController extends Controller
     {
         $request->validate([
             'recipient_group' => ['required', 'in:all,department,gender,status,individual'],
-            'department_id'   => ['nullable', 'uuid'],
-            'gender'          => ['nullable', 'in:male,female'],
-            'status'          => ['nullable', 'in:active,inactive,transferred,deceased'],
-            'member_ids'      => ['nullable', 'array'],
-            'channel'         => ['required', 'in:sms,email,both'],
+            'department_id' => ['nullable', 'uuid'],
+            'gender' => ['nullable', 'in:male,female'],
+            'status' => ['nullable', 'in:active,inactive,transferred,deceased'],
+            'member_ids' => ['nullable', 'array'],
+            'channel' => ['required', 'in:sms,email,both'],
         ]);
 
         $count = $this->resolveRecipients($request)->count();
@@ -99,14 +99,14 @@ class MessageController extends Controller
     public function send(Request $request): JsonResponse
     {
         $request->validate([
-            'subject'         => ['nullable', 'string', 'max:200'],
-            'body'            => ['required', 'string'],
-            'channel'         => ['required', 'in:sms,email,both'],
+            'subject' => ['nullable', 'string', 'max:200'],
+            'body' => ['required', 'string'],
+            'channel' => ['required', 'in:sms,email,both'],
             'recipient_group' => ['required', 'in:all,department,gender,status,individual'],
-            'department_id'   => ['nullable', 'uuid'],
-            'gender'          => ['nullable', 'in:male,female'],
-            'status'          => ['nullable', 'in:active,inactive,transferred,deceased'],
-            'member_ids'      => ['nullable', 'array'],
+            'department_id' => ['nullable', 'uuid'],
+            'gender' => ['nullable', 'in:male,female'],
+            'status' => ['nullable', 'in:active,inactive,transferred,deceased'],
+            'member_ids' => ['nullable', 'array'],
         ]);
 
         $recipients = $this->resolveRecipients($request)->get();
@@ -119,23 +119,23 @@ class MessageController extends Controller
 
         $message = DB::transaction(function () use ($request, $recipients) {
             $msg = Message::create([
-                'branch_id'       => $request->user()->branch_id,
-                'sender_id'       => $request->user()->id,
-                'subject'         => $request->subject,
-                'body'            => $request->body,
-                'channel'         => $request->channel,
-                'status'          => 'sending',
+                'branch_id' => $request->user()->branch_id,
+                'sender_id' => $request->user()->id,
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'channel' => $request->channel,
+                'status' => 'sending',
                 'recipient_group' => $request->recipient_group,
-                'department_id'   => $request->department_id,
-                'sent_at'         => now(),
+                'department_id' => $request->department_id,
+                'sent_at' => now(),
             ]);
 
             foreach ($recipients as $member) {
                 $recipient = MessageRecipient::create([
                     'message_id' => $msg->id,
-                    'member_id'  => $member->id,
-                    'phone'      => $member->phone,
-                    'email'      => $member->email,
+                    'member_id' => $member->id,
+                    'phone' => $member->phone,
+                    'email' => $member->email,
                     'delivery_status' => 'pending',
                 ]);
 
@@ -144,33 +144,34 @@ class MessageController extends Controller
             }
 
             $msg->update(['status' => 'sent']);
+
             return $msg;
         });
 
         activity()->causedBy($request->user())
-                  ->performedOn($message)
-                  ->log("Sent {$request->channel} message to {$recipients->count()} recipients");
+            ->performedOn($message)
+            ->log("Sent {$request->channel} message to {$recipients->count()} recipients");
 
         return response()->json([
             'message' => "Message sent to {$recipients->count()} recipients.",
-            'data'    => ['id' => $message->id],
+            'data' => ['id' => $message->id],
         ], 201);
     }
 
     public function stats(Request $request): JsonResponse
     {
         $branchId = $request->user()->branch_id;
-        $now      = now();
+        $now = now();
 
         return response()->json([
             'data' => [
-                'total_sent'  => Message::where('branch_id', $branchId)->where('status','sent')->count(),
-                'this_month'  => Message::where('branch_id', $branchId)
-                                        ->whereMonth('created_at', $now->month)
-                                        ->whereYear('created_at', $now->year)
-                                        ->count(),
+                'total_sent' => Message::where('branch_id', $branchId)->where('status', 'sent')->count(),
+                'this_month' => Message::where('branch_id', $branchId)
+                    ->whereMonth('created_at', $now->month)
+                    ->whereYear('created_at', $now->year)
+                    ->count(),
                 'total_recipients' => MessageRecipient::whereHas('message',
-                                          fn($q) => $q->where('branch_id', $branchId))->count(),
+                    fn ($q) => $q->where('branch_id', $branchId))->count(),
             ],
         ]);
     }
@@ -181,7 +182,7 @@ class MessageController extends Controller
     protected function resolveRecipients(Request $request)
     {
         $branchId = $request->user()->branch_id;
-        $query    = Member::where('branch_id', $branchId);
+        $query = Member::where('branch_id', $branchId);
 
         // Filter to recipients with valid contact info
         if ($request->channel === 'email') {
@@ -191,7 +192,7 @@ class MessageController extends Controller
         } else {
             $query->where(function ($q) {
                 $q->whereNotNull('email')->where('email', '!=', '')
-                  ->orWhereNotNull('phone')->where('phone', '!=', '');
+                    ->orWhereNotNull('phone')->where('phone', '!=', '');
             });
         }
 
@@ -201,8 +202,7 @@ class MessageController extends Controller
                 break;
             case 'department':
                 if ($request->department_id) {
-                    $query->whereHas('departments', fn($q) =>
-                        $q->where('departments.id', $request->department_id));
+                    $query->whereHas('departments', fn ($q) => $q->where('departments.id', $request->department_id));
                 }
                 break;
             case 'gender':

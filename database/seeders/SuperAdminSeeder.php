@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use App\Models\User;
@@ -13,9 +14,9 @@ class SuperAdminSeeder extends Seeder
 
         $admin = User::create([
             'branch_id' => $branch->id,
-            'name'      => 'System Administrator',
-            'email'     => 'admin@wis-cms.local',
-            'password'  => bcrypt('Admin@12345'),
+            'name' => 'System Administrator',
+            'email' => 'admin@wis-cms.local',
+            'password' => bcrypt('Admin@12345'),
             'is_active' => true,
         ]);
 

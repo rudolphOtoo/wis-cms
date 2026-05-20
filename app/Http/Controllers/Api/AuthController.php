@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -54,8 +55,8 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful.',
-            'token'   => $token,
-            'user'    => new UserResource($user),
+            'token' => $token,
+            'user' => new UserResource($user),
         ]);
     }
 
@@ -80,7 +81,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'current_password' => ['required', 'string'],
-            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         if (! Hash::check($request->current_password, $request->user()->password)) {
@@ -104,6 +105,6 @@ class AuthController extends Controller
      */
     protected function throttleKey(Request $request): string
     {
-        return Str::lower($request->input('email')) . '|' . $request->ip();
+        return Str::lower($request->input('email')).'|'.$request->ip();
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -8,8 +9,9 @@ class AttendanceRecord extends Model
 {
     use HasUuids;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'session_id', 'member_id', 'child_id', 'is_present',

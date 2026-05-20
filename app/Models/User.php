@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,9 +11,10 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, HasUuids, HasRoles, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -25,9 +27,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'last_login_at'     => 'datetime',
-            'is_active'         => 'boolean',
-            'password'          => 'hashed',
+            'last_login_at' => 'datetime',
+            'is_active' => 'boolean',
+            'password' => 'hashed',
         ];
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,9 +11,11 @@ class Children extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $table        = 'children';   // explicit — Laravel can't pluralise "children"
-    protected $keyType      = 'string';
-    public    $incrementing = false;
+    protected $table = 'children';   // explicit — Laravel can't pluralise "children"
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'guardian_member_id', 'first_name', 'last_name',
@@ -23,7 +26,7 @@ class Children extends Model
     {
         return [
             'date_of_birth' => 'date',
-            'is_active'     => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

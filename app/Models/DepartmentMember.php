@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -8,9 +9,11 @@ class DepartmentMember extends Model
 {
     use HasUuids;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
-    protected $table      = 'department_members';
+    protected $keyType = 'string';
+
+    public $incrementing = false;
+
+    protected $table = 'department_members';
 
     protected $fillable = [
         'department_id', 'member_id', 'role', 'joined_at',

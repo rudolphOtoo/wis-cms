@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -8,8 +9,9 @@ class MessageRecipient extends Model
 {
     use HasUuids;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'message_id', 'member_id', 'phone', 'email',

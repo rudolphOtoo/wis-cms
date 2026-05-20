@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Models\Branch;
@@ -15,9 +16,9 @@ class AuthTest extends TestCase
     {
         return User::create(array_merge([
             'branch_id' => Branch::factory()->create()->id,
-            'name'      => 'Test User',
-            'email'     => 'test@wis-cms.local',
-            'password'  => Hash::make('Password@123'),
+            'name' => 'Test User',
+            'email' => 'test@wis-cms.local',
+            'password' => Hash::make('Password@123'),
             'is_active' => true,
         ], $attrs));
     }
@@ -27,12 +28,12 @@ class AuthTest extends TestCase
         $this->makeUser();
 
         $response = $this->postJson('/api/auth/login', [
-            'email'    => 'test@wis-cms.local',
+            'email' => 'test@wis-cms.local',
             'password' => 'Password@123',
         ]);
 
         $response->assertOk()
-                 ->assertJsonStructure(['message', 'token', 'user']);
+            ->assertJsonStructure(['message', 'token', 'user']);
     }
 
     public function test_user_cannot_login_with_wrong_password(): void
@@ -40,7 +41,7 @@ class AuthTest extends TestCase
         $this->makeUser();
 
         $response = $this->postJson('/api/auth/login', [
-            'email'    => 'test@wis-cms.local',
+            'email' => 'test@wis-cms.local',
             'password' => 'WrongPassword',
         ]);
 
@@ -52,12 +53,12 @@ class AuthTest extends TestCase
         $this->makeUser(['is_active' => false]);
 
         $response = $this->postJson('/api/auth/login', [
-            'email'    => 'test@wis-cms.local',
+            'email' => 'test@wis-cms.local',
             'password' => 'Password@123',
         ]);
 
         $response->assertStatus(422)
-                 ->assertJsonPath('errors.email.0', 'Your account has been deactivated. Please contact the administrator.');
+            ->assertJsonPath('errors.email.0', 'Your account has been deactivated. Please contact the administrator.');
     }
 
     public function test_login_is_throttled_after_five_attempts(): void
@@ -67,14 +68,14 @@ class AuthTest extends TestCase
         // 5 failed attempts
         for ($i = 0; $i < 5; $i++) {
             $this->postJson('/api/auth/login', [
-                'email'    => 'test@wis-cms.local',
+                'email' => 'test@wis-cms.local',
                 'password' => 'WrongPassword',
             ]);
         }
 
         // 6th attempt should be throttled
         $response = $this->postJson('/api/auth/login', [
-            'email'    => 'test@wis-cms.local',
+            'email' => 'test@wis-cms.local',
             'password' => 'WrongPassword',
         ]);
 
@@ -87,9 +88,9 @@ class AuthTest extends TestCase
         $token = $user->createToken('test')->plainTextToken;
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-                         ->getJson('/api/auth/me');
+            ->getJson('/api/auth/me');
 
         $response->assertOk()
-                 ->assertJsonPath('user.email', 'test@wis-cms.local');
+            ->assertJsonPath('user.email', 'test@wis-cms.local');
     }
 }

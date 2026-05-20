@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Models\Branch;
@@ -27,20 +28,21 @@ class FinanceTest extends TestCase
     {
         $user = User::create([
             'branch_id' => $this->branch->id,
-            'name'      => 'Finance',
-            'email'     => 'finance@test.local',
-            'password'  => Hash::make('Password@123'),
+            'name' => 'Finance',
+            'email' => 'finance@test.local',
+            'password' => Hash::make('Password@123'),
             'is_active' => true,
         ]);
         $user->assignRole('finance_officer');
+
         return $user->createToken('test')->plainTextToken;
     }
 
     public function test_finance_stats_aggregate_income_and_expenses(): void
     {
-        $token    = $this->financeToken();
-        $income   = FinanceCategory::factory()->create(['type' => 'income']);
-        $expense  = FinanceCategory::factory()->create(['type' => 'expense']);
+        $token = $this->financeToken();
+        $income = FinanceCategory::factory()->create(['type' => 'income']);
+        $expense = FinanceCategory::factory()->create(['type' => 'expense']);
         $recorder = User::first();
 
         // Two income transactions this month
@@ -62,7 +64,7 @@ class FinanceTest extends TestCase
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-                         ->getJson('/api/finance/stats');
+            ->getJson('/api/finance/stats');
 
         $response->assertOk();
         $data = $response->json('data');
@@ -74,14 +76,14 @@ class FinanceTest extends TestCase
 
     public function test_finance_officer_can_create_transaction(): void
     {
-        $token    = $this->financeToken();
+        $token = $this->financeToken();
         $category = FinanceCategory::factory()->create(['type' => 'income']);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/finance/transactions', [
-                'category_id'      => $category->id,
-                'type'             => 'income',
-                'amount'           => 150.50,
+                'category_id' => $category->id,
+                'type' => 'income',
+                'amount' => 150.50,
                 'transaction_date' => now()->toDateString(),
             ]);
 

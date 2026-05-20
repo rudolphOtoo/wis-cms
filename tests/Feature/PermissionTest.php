@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Models\Branch;
@@ -26,12 +27,13 @@ class PermissionTest extends TestCase
     {
         $user = User::create([
             'branch_id' => $this->branch->id,
-            'name'      => ucfirst($role),
-            'email'     => "{$role}@wis-cms.local",
-            'password'  => Hash::make('Password@123'),
+            'name' => ucfirst($role),
+            'email' => "{$role}@wis-cms.local",
+            'password' => Hash::make('Password@123'),
             'is_active' => true,
         ]);
         $user->assignRole($role);
+
         return $user;
     }
 
@@ -45,18 +47,18 @@ class PermissionTest extends TestCase
         $token = $this->tokenFor($this->userWithRole('super_admin'));
 
         $this->withHeader('Authorization', "Bearer {$token}")
-             ->getJson('/api/members/stats')
-             ->assertOk();
+            ->getJson('/api/members/stats')
+            ->assertOk();
     }
 
     public function test_usher_cannot_delete_members(): void
     {
         $member = Member::factory()->create(['branch_id' => $this->branch->id]);
-        $token  = $this->tokenFor($this->userWithRole('usher'));
+        $token = $this->tokenFor($this->userWithRole('usher'));
 
         $this->withHeader('Authorization', "Bearer {$token}")
-             ->deleteJson("/api/members/{$member->id}")
-             ->assertStatus(403);
+            ->deleteJson("/api/members/{$member->id}")
+            ->assertStatus(403);
     }
 
     public function test_usher_cannot_access_finance(): void
@@ -64,8 +66,8 @@ class PermissionTest extends TestCase
         $token = $this->tokenFor($this->userWithRole('usher'));
 
         $this->withHeader('Authorization', "Bearer {$token}")
-             ->getJson('/api/finance/stats')
-             ->assertStatus(403);
+            ->getJson('/api/finance/stats')
+            ->assertStatus(403);
     }
 
     public function test_finance_officer_can_view_finance(): void
@@ -73,8 +75,8 @@ class PermissionTest extends TestCase
         $token = $this->tokenFor($this->userWithRole('finance_officer'));
 
         $this->withHeader('Authorization', "Bearer {$token}")
-             ->getJson('/api/finance/stats')
-             ->assertOk();
+            ->getJson('/api/finance/stats')
+            ->assertOk();
     }
 
     public function test_secretary_can_create_members(): void
@@ -82,17 +84,17 @@ class PermissionTest extends TestCase
         $token = $this->tokenFor($this->userWithRole('secretary'));
 
         $this->withHeader('Authorization', "Bearer {$token}")
-             ->postJson('/api/members', [
-                 'first_name' => 'New',
-                 'last_name'  => 'Member',
-                 'gender'     => 'male',
-             ])
-             ->assertStatus(201);
+            ->postJson('/api/members', [
+                'first_name' => 'New',
+                'last_name' => 'Member',
+                'gender' => 'male',
+            ])
+            ->assertStatus(201);
     }
 
     public function test_unauthenticated_request_is_rejected(): void
     {
         $this->getJson('/api/members')
-             ->assertStatus(401);
+            ->assertStatus(401);
     }
 }

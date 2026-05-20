@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Models\Branch;
@@ -14,10 +15,10 @@ class MemberTest extends TestCase
     {
         $branch = Branch::factory()->create();
         $member = Member::create([
-            'branch_id'  => $branch->id,
+            'branch_id' => $branch->id,
             'first_name' => 'Kofi',
-            'last_name'  => 'Mensah',
-            'gender'     => 'male',
+            'last_name' => 'Mensah',
+            'gender' => 'male',
         ]);
 
         $year = now()->format('Y');
@@ -43,9 +44,9 @@ class MemberTest extends TestCase
     public function test_member_full_name_accessor(): void
     {
         $member = Member::factory()->make([
-            'first_name'  => 'Ama',
+            'first_name' => 'Ama',
             'other_names' => 'Serwaa',
-            'last_name'   => 'Owusu',
+            'last_name' => 'Owusu',
         ]);
 
         $this->assertEquals('Ama Serwaa Owusu', $member->full_name);
@@ -55,11 +56,11 @@ class MemberTest extends TestCase
     {
         $branch = Branch::factory()->create();
         $member = Member::create([
-            'branch_id'     => $branch->id,
+            'branch_id' => $branch->id,
             'member_number' => 'CUSTOM-001',
-            'first_name'    => 'Custom',
-            'last_name'     => 'Number',
-            'gender'        => 'male',
+            'first_name' => 'Custom',
+            'last_name' => 'Number',
+            'gender' => 'male',
         ]);
 
         $this->assertEquals('CUSTOM-001', $member->member_number);

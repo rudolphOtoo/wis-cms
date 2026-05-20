@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,8 +11,9 @@ class Transaction extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'category_id', 'member_id', 'type', 'amount',
@@ -21,7 +23,7 @@ class Transaction extends Model
     protected function casts(): array
     {
         return [
-            'amount'           => 'decimal:2',
+            'amount' => 'decimal:2',
             'transaction_date' => 'date',
         ];
     }

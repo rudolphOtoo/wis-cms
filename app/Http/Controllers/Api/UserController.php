@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -20,24 +21,24 @@ class UserController extends Controller
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name',  'ilike', "%{$search}%")
-                  ->orWhere('email','ilike', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('email', 'ilike', "%{$search}%");
             });
         }
 
         if ($role = $request->get('role')) {
-            $query->whereHas('roles', fn($q) => $q->where('name', $role));
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role));
         }
 
         $users = $query->orderBy('name')->paginate($request->get('per_page', 15));
 
         return response()->json([
-            'data' => collect($users->items())->map(fn($u) => $this->transform($u)),
+            'data' => collect($users->items())->map(fn ($u) => $this->transform($u)),
             'meta' => [
-                'total'        => $users->total(),
-                'per_page'     => $users->perPage(),
+                'total' => $users->total(),
+                'per_page' => $users->perPage(),
                 'current_page' => $users->currentPage(),
-                'last_page'    => $users->lastPage(),
+                'last_page' => $users->lastPage(),
             ],
         ]);
     }
@@ -45,9 +46,9 @@ class UserController extends Controller
     public function roles(): JsonResponse
     {
         return response()->json([
-            'data' => Role::orderBy('name')->get()->map(fn($r) => [
-                'name'        => $r->name,
-                'label'       => ucwords(str_replace('_', ' ', $r->name)),
+            'data' => Role::orderBy('name')->get()->map(fn ($r) => [
+                'name' => $r->name,
+                'label' => ucwords(str_replace('_', ' ', $r->name)),
                 'permissions' => $r->permissions->pluck('name'),
             ]),
         ]);
@@ -57,21 +58,21 @@ class UserController extends Controller
     {
         $user = User::create([
             'branch_id' => $request->user()->branch_id,
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'password'  => Hash::make($request->password),
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
             'is_active' => $request->boolean('is_active', true),
         ]);
 
         $user->assignRole($request->role);
 
         activity()->causedBy($request->user())
-                  ->performedOn($user)
-                  ->log("Created user: {$user->name} with role {$request->role}");
+            ->performedOn($user)
+            ->log("Created user: {$user->name} with role {$request->role}");
 
         return response()->json([
             'message' => 'User created successfully.',
-            'data'    => $this->transform($user->load('roles')),
+            'data' => $this->transform($user->load('roles')),
         ], 201);
     }
 
@@ -90,7 +91,7 @@ class UserController extends Controller
             ->findOrFail($id);
 
         // Prevent admin from disabling their own account
-        if ($user->id === $request->user()->id && $request->has('is_active') && !$request->boolean('is_active')) {
+        if ($user->id === $request->user()->id && $request->has('is_active') && ! $request->boolean('is_active')) {
             return response()->json([
                 'message' => 'You cannot deactivate your own account.',
             ], 422);
@@ -108,12 +109,12 @@ class UserController extends Controller
         }
 
         activity()->causedBy($request->user())
-                  ->performedOn($user)
-                  ->log("Updated user: {$user->name}");
+            ->performedOn($user)
+            ->log("Updated user: {$user->name}");
 
         return response()->json([
             'message' => 'User updated successfully.',
-            'data'    => $this->transform($user->fresh('roles')),
+            'data' => $this->transform($user->fresh('roles')),
         ]);
     }
 
@@ -132,7 +133,7 @@ class UserController extends Controller
         $user->delete();
 
         activity()->causedBy($request->user())
-                  ->log("Deleted user: {$name}");
+            ->log("Deleted user: {$name}");
 
         return response()->json(['message' => 'User deleted successfully.']);
     }
@@ -140,14 +141,14 @@ class UserController extends Controller
     protected function transform(User $user): array
     {
         return [
-            'id'            => $user->id,
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'is_active'     => $user->is_active,
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'is_active' => $user->is_active,
             'last_login_at' => $user->last_login_at?->diffForHumans(),
-            'role'          => $user->roles->first()?->name,
-            'role_label'    => $user->roles->first() ? ucwords(str_replace('_', ' ', $user->roles->first()->name)) : null,
-            'created_at'    => $user->created_at->format('Y-m-d'),
+            'role' => $user->roles->first()?->name,
+            'role_label' => $user->roles->first() ? ucwords(str_replace('_', ' ', $user->roles->first()->name)) : null,
+            'created_at' => $user->created_at->format('Y-m-d'),
         ];
     }
 }

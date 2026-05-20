@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -9,8 +10,9 @@ class Department extends Model
 {
     use HasFactory, HasUuids;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'name', 'description', 'leader_user_id', 'is_active',
@@ -34,8 +36,8 @@ class Department extends Model
     public function members()
     {
         return $this->belongsToMany(Member::class, 'department_members')
-                    ->withPivot('role', 'joined_at')
-                    ->withTimestamps();
+            ->withPivot('role', 'joined_at')
+            ->withTimestamps();
     }
 
     public function getMembersCountAttribute(): int

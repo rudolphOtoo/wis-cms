@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -20,11 +21,11 @@ class MemberController extends Controller
         // Search
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('first_name',    'ilike', "%{$search}%")
-                  ->orWhere('last_name',   'ilike', "%{$search}%")
-                  ->orWhere('other_names', 'ilike', "%{$search}%")
-                  ->orWhere('phone',       'ilike', "%{$search}%")
-                  ->orWhere('member_number', 'ilike', "%{$search}%");
+                $q->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                    ->orWhere('other_names', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'ilike', "%{$search}%")
+                    ->orWhere('member_number', 'ilike', "%{$search}%");
             });
         }
 
@@ -44,10 +45,10 @@ class MemberController extends Controller
         return response()->json([
             'data' => MemberResource::collection($members->items()),
             'meta' => [
-                'total'        => $members->total(),
-                'per_page'     => $members->perPage(),
+                'total' => $members->total(),
+                'per_page' => $members->perPage(),
                 'current_page' => $members->currentPage(),
-                'last_page'    => $members->lastPage(),
+                'last_page' => $members->lastPage(),
             ],
         ]);
     }
@@ -58,17 +59,17 @@ class MemberController extends Controller
         $member = Member::create([
             ...$request->validated(),
             'branch_id' => $request->user()->branch_id,
-            'status'    => $request->get('status', 'active'),
+            'status' => $request->get('status', 'active'),
             'is_baptised' => $request->boolean('is_baptised'),
         ]);
 
         activity()->causedBy($request->user())
-                  ->performedOn($member)
-                  ->log("Registered new member: {$member->full_name}");
+            ->performedOn($member)
+            ->log("Registered new member: {$member->full_name}");
 
         return response()->json([
             'message' => 'Member registered successfully.',
-            'data'    => new MemberResource($member),
+            'data' => new MemberResource($member),
         ], 201);
     }
 
@@ -76,7 +77,7 @@ class MemberController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $member = Member::where('branch_id', $request->user()->branch_id)
-                        ->findOrFail($id);
+            ->findOrFail($id);
 
         return response()->json(['data' => new MemberResource($member)]);
     }
@@ -85,17 +86,17 @@ class MemberController extends Controller
     public function update(UpdateMemberRequest $request, string $id): JsonResponse
     {
         $member = Member::where('branch_id', $request->user()->branch_id)
-                        ->findOrFail($id);
+            ->findOrFail($id);
 
         $member->update($request->validated());
 
         activity()->causedBy($request->user())
-                  ->performedOn($member)
-                  ->log("Updated member: {$member->full_name}");
+            ->performedOn($member)
+            ->log("Updated member: {$member->full_name}");
 
         return response()->json([
             'message' => 'Member updated successfully.',
-            'data'    => new MemberResource($member),
+            'data' => new MemberResource($member),
         ]);
     }
 
@@ -103,13 +104,13 @@ class MemberController extends Controller
     public function destroy(Request $request, string $id): JsonResponse
     {
         $member = Member::where('branch_id', $request->user()->branch_id)
-                        ->findOrFail($id);
+            ->findOrFail($id);
 
         $name = $member->full_name;
         $member->delete();
 
         activity()->causedBy($request->user())
-                  ->log("Deleted member: {$name}");
+            ->log("Deleted member: {$name}");
 
         return response()->json(['message' => 'Member deleted successfully.']);
     }
@@ -121,16 +122,16 @@ class MemberController extends Controller
 
         return response()->json([
             'data' => [
-                'total'       => Member::where('branch_id', $branchId)->count(),
-                'active'      => Member::where('branch_id', $branchId)->where('status', 'active')->count(),
-                'inactive'    => Member::where('branch_id', $branchId)->where('status', 'inactive')->count(),
+                'total' => Member::where('branch_id', $branchId)->count(),
+                'active' => Member::where('branch_id', $branchId)->where('status', 'active')->count(),
+                'inactive' => Member::where('branch_id', $branchId)->where('status', 'inactive')->count(),
                 'transferred' => Member::where('branch_id', $branchId)->where('status', 'transferred')->count(),
-                'male'        => Member::where('branch_id', $branchId)->where('gender', 'male')->count(),
-                'female'      => Member::where('branch_id', $branchId)->where('gender', 'female')->count(),
+                'male' => Member::where('branch_id', $branchId)->where('gender', 'male')->count(),
+                'female' => Member::where('branch_id', $branchId)->where('gender', 'female')->count(),
                 'new_this_month' => Member::where('branch_id', $branchId)
-                                          ->whereMonth('created_at', now()->month)
-                                          ->whereYear('created_at', now()->year)
-                                          ->count(),
+                    ->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year)
+                    ->count(),
             ],
         ]);
     }

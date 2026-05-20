@@ -1,9 +1,9 @@
 <?php
 
-use Spatie\Activitylog\Actions\CleanActivityLogAction;
-use Spatie\Activitylog\Actions\LogActivityAction;
-// use Spatie\Activitylog\Models\Activity;
 use App\Models\Activity;
+use Spatie\Activitylog\Actions\CleanActivityLogAction;
+// use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Actions\LogActivityAction;
 
 return [
 

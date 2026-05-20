@@ -1,16 +1,16 @@
 <?php
+
 namespace App\Jobs;
 
 use App\Mail\BroadcastMessage;
-use App\Models\Message;
 use App\Models\MessageRecipient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SendBroadcastMessageJob implements ShouldQueue
 {
@@ -22,18 +22,20 @@ class SendBroadcastMessageJob implements ShouldQueue
     {
         $recipient = MessageRecipient::with(['message.sender', 'member'])->find($this->recipientId);
 
-        if (!$recipient) return;
+        if (! $recipient) {
+            return;
+        }
 
-        $message    = $recipient->message;
+        $message = $recipient->message;
         $branchName = $message->sender?->name ? 'Wesleyan International Society' : 'WIS-CMS';
 
         try {
             if (in_array($message->channel, ['email', 'both']) && $recipient->email) {
                 Mail::to($recipient->email)->send(new BroadcastMessage(
-                    subjectLine:   $message->subject ?? 'Church Announcement',
-                    messageBody:   $message->body,
+                    subjectLine: $message->subject ?? 'Church Announcement',
+                    messageBody: $message->body,
                     recipientName: $recipient->member?->full_name ?? 'Member',
-                    branchName:    $branchName,
+                    branchName: $branchName,
                 ));
             }
 
@@ -45,15 +47,15 @@ class SendBroadcastMessageJob implements ShouldQueue
 
             $recipient->update([
                 'delivery_status' => 'delivered',
-                'delivered_at'    => now(),
+                'delivered_at' => now(),
             ]);
 
         } catch (\Throwable $e) {
             $recipient->update([
                 'delivery_status' => 'failed',
-                'failure_reason'  => $e->getMessage(),
+                'failure_reason' => $e->getMessage(),
             ]);
-            Log::error("Message delivery failed: " . $e->getMessage());
+            Log::error('Message delivery failed: '.$e->getMessage());
         }
     }
 }

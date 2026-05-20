@@ -1,4 +1,5 @@
 <?php
+
 namespace Tests\Feature;
 
 use App\Models\Branch;
@@ -24,23 +25,24 @@ class VisitorConversionTest extends TestCase
     {
         $user = User::create([
             'branch_id' => $branch->id,
-            'name'      => 'Admin',
-            'email'     => 'admin@test.local',
-            'password'  => Hash::make('Password@123'),
+            'name' => 'Admin',
+            'email' => 'admin@test.local',
+            'password' => Hash::make('Password@123'),
             'is_active' => true,
         ]);
         $user->assignRole('super_admin');
+
         return $user->createToken('test')->plainTextToken;
     }
 
     public function test_visitor_can_be_converted_to_member(): void
     {
-        $branch  = Branch::factory()->create();
-        $token   = $this->adminToken($branch);
+        $branch = Branch::factory()->create();
+        $token = $this->adminToken($branch);
         $visitor = Visitor::factory()->create([
-            'branch_id'  => $branch->id,
+            'branch_id' => $branch->id,
             'first_name' => 'Yaw',
-            'last_name'  => 'Boateng',
+            'last_name' => 'Boateng',
         ]);
 
         $response = $this->withHeader('Authorization', "Bearer {$token}")
@@ -53,7 +55,7 @@ class VisitorConversionTest extends TestCase
         // A member now exists with the visitor's name
         $this->assertDatabaseHas('members', [
             'first_name' => 'Yaw',
-            'last_name'  => 'Boateng',
+            'last_name' => 'Boateng',
         ]);
 
         // Visitor is linked and marked joined
@@ -64,11 +66,11 @@ class VisitorConversionTest extends TestCase
 
     public function test_visitor_cannot_be_converted_twice(): void
     {
-        $branch  = Branch::factory()->create();
-        $token   = $this->adminToken($branch);
-        $member  = Member::factory()->create(['branch_id' => $branch->id]);
+        $branch = Branch::factory()->create();
+        $token = $this->adminToken($branch);
+        $member = Member::factory()->create(['branch_id' => $branch->id]);
         $visitor = Visitor::factory()->create([
-            'branch_id'           => $branch->id,
+            'branch_id' => $branch->id,
             'converted_member_id' => $member->id,
         ]);
 

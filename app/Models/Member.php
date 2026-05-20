@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -11,8 +12,9 @@ class Member extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $keyType      = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'member_number', 'first_name', 'last_name',
@@ -25,9 +27,9 @@ class Member extends Model
     {
         return [
             'date_of_birth' => 'date',
-            'join_date'     => 'date',
-            'baptism_date'  => 'date',
-            'is_baptised'   => 'boolean',
+            'join_date' => 'date',
+            'baptism_date' => 'date',
+            'is_baptised' => 'boolean',
         ];
     }
 
@@ -53,7 +55,7 @@ class Member extends Model
                         ? ((int) substr($last->member_number, -4)) + 1
                         : 1;
 
-                    $member->member_number = 'WIS-' . $year . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+                    $member->member_number = 'WIS-'.$year.'-'.str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
                 });
             }
         });
@@ -72,8 +74,8 @@ class Member extends Model
     public function departments()
     {
         return $this->belongsToMany(Department::class, 'department_members')
-                    ->withPivot('role', 'joined_at')
-                    ->withTimestamps();
+            ->withPivot('role', 'joined_at')
+            ->withTimestamps();
     }
 
     public function getFullNameAttribute(): string

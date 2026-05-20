@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -33,13 +34,13 @@ class FinanceCategorySeeder extends Seeder
 
         foreach ($categories as $category) {
             DB::table('finance_categories')->insert([
-                'id'          => Str::uuid(),
-                'name'        => $category['name'],
-                'type'        => $category['type'],
+                'id' => Str::uuid(),
+                'name' => $category['name'],
+                'type' => $category['type'],
                 'description' => $category['description'],
-                'is_active'   => true,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
     }

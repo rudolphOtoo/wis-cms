@@ -1,11 +1,12 @@
 <?php
+
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
 
 class BroadcastMessage extends Mailable
 {
@@ -28,10 +29,10 @@ class BroadcastMessage extends Mailable
         return new Content(
             view: 'emails.broadcast',
             with: [
-                'subjectLine'   => $this->subjectLine,
-                'messageBody'   => $this->messageBody,
+                'subjectLine' => $this->subjectLine,
+                'messageBody' => $this->messageBody,
                 'recipientName' => $this->recipientName,
-                'branchName'    => $this->branchName,
+                'branchName' => $this->branchName,
             ],
         );
     }

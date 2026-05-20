@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -8,8 +9,9 @@ class AttendanceSession extends Model
 {
     use HasUuids;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'service_type_id', 'service_date', 'notes', 'recorded_by',
