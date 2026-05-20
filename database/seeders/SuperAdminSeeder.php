@@ -15,11 +15,11 @@ class SuperAdminSeeder extends Seeder
         // 1. Ensure a branch exists — create a fallback if none does.
         //    Prevents the "read property id on null" crash.
         $branch = Branch::first() ?? Branch::create([
-            'name'      => 'Wesleyan International Society',
-            'location'  => 'Accra',
-            'address'   => 'Accra, Ghana',
-            'phone'     => '0000000000',
-            'email'     => 'info@wis-cms.local',
+            'name' => 'Wesleyan International Society',
+            'location' => 'Accra',
+            'address' => 'Accra, Ghana',
+            'phone' => '0000000000',
+            'email' => 'info@wis-cms.local',
             'is_active' => true,
         ]);
 
@@ -35,8 +35,8 @@ class SuperAdminSeeder extends Seeder
             ['email' => 'admin@wis-cms.local'],
             [
                 'branch_id' => $branch->id,
-                'name'      => 'System Administrator',
-                'password'  => Hash::make('Admin@12345'),
+                'name' => 'System Administrator',
+                'password' => Hash::make('Admin@12345'),
                 'is_active' => true,
             ]
         );
