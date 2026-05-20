@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuditController;
+use App\Http\Controllers\Api\MessageController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -96,7 +97,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
     Route::middleware('permission:delete transactions')->delete('finance/transactions/{id}', [FinanceController::class, 'destroy']);
 
-    // USERS — super admin only (manage users permission)
+    // MESSAGES
+    Route::middleware('permission:view messages')->group(function () {
+        Route::get('messages/stats',           [MessageController::class, 'stats']);
+        Route::get('messages',                 [MessageController::class, 'index']);
+        Route::get('messages/{id}',            [MessageController::class, 'show']);
+    });
+    Route::middleware('permission:send messages')->group(function () {
+        Route::post('messages/recipient-count',[MessageController::class, 'recipientCount']);
+        Route::post('messages/send',           [MessageController::class, 'send']);
+    });
+
+    // USERS
     Route::middleware('permission:manage users')->group(function () {
         Route::get('users/roles',     [UserController::class, 'roles']);
         Route::get('users',           [UserController::class, 'index']);
@@ -106,7 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('users/{id}',   [UserController::class, 'destroy']);
     });
 
-    // AUDIT LOG
+    // AUDIT
     Route::middleware('permission:view audit log')->group(function () {
         Route::get('audit', [AuditController::class, 'index']);
     });

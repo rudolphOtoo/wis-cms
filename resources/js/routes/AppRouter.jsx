@@ -20,6 +20,9 @@ import ChildrenPage      from '../pages/children/index'
 import ChildForm         from '../pages/children/ChildForm'
 import UsersPage         from '../pages/admin/Users'
 import AuditLog          from '../pages/admin/AuditLog'
+import CommunicationPage from '../pages/communication/index'
+import Compose           from '../pages/communication/Compose'
+import MessageDetail     from '../pages/communication/MessageDetail'
 
 export default function AppRouter() {
   return (
@@ -49,6 +52,9 @@ export default function AppRouter() {
             <Route path="/children"             element={<ChildrenPage />} />
             <Route path="/children/new"         element={<ChildForm />} />
             <Route path="/children/:id/edit"    element={<ChildForm />} />
+            <Route path="/communication"          element={<CommunicationPage />} />
+            <Route path="/communication/compose"  element={<Compose />} />
+            <Route path="/communication/:id"      element={<MessageDetail />} />
             <Route path="/admin/users"          element={<UsersPage />} />
             <Route path="/admin/audit"          element={<AuditLog />} />
           </Route>
