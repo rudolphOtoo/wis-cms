@@ -78,6 +78,11 @@ class Member extends Model
             ->withTimestamps();
     }
 
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class, 'member_id');
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->other_names} {$this->last_name}");

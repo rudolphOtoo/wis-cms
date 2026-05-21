@@ -30,6 +30,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // MEMBERS
     Route::middleware('permission:view members')->group(function () {
         Route::get('members/stats', [MemberController::class, 'stats']);
+        Route::get('members/{id}/giving', [MemberController::class, 'giving']);
+        Route::get('members/{id}/giving-statement', [MemberController::class, 'givingStatement']);
         Route::get('members', [MemberController::class, 'index']);
         Route::get('members/{id}', [MemberController::class, 'show']);
     });

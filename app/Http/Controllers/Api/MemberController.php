@@ -7,6 +7,7 @@ use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
 use App\Models\Member;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -134,5 +135,86 @@ class MemberController extends Controller
                     ->count(),
             ],
         ]);
+    }
+
+    public function giving(Request $request, string $id): JsonResponse
+    {
+        $member = Member::where('branch_id', $request->user()->branch_id)->findOrFail($id);
+        $year = $request->get('year', now()->format('Y'));
+
+        $transactions = $member->transactions()
+            ->where('type', 'income')
+            ->whereYear('transaction_date', $year)
+            ->with('category')
+            ->orderByDesc('transaction_date')
+            ->get();
+
+        $byCategory = $transactions
+            ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
+            ->map(fn ($group) => [
+                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'count' => $group->count(),
+                'total' => round($group->sum('amount'), 2),
+            ])->values();
+
+        $availableYears = $member->transactions()
+            ->where('type', 'income')
+            ->selectRaw('EXTRACT(YEAR FROM transaction_date) as yr')
+            ->distinct()->orderByDesc('yr')
+            ->pluck('yr')->map(fn ($y) => (int) $y);
+
+        return response()->json([
+            'data' => [
+                'member' => [
+                    'id' => $member->id,
+                    'full_name' => $member->full_name,
+                    'member_number' => $member->member_number,
+                ],
+                'year' => (int) $year,
+                'available_years' => $availableYears,
+                'total' => round($transactions->sum('amount'), 2),
+                'by_category' => $byCategory,
+                'transactions' => $transactions->map(fn ($t) => [
+                    'id' => $t->id,
+                    'date' => $t->transaction_date->format('Y-m-d'),
+                    'category' => $t->category?->name ?? 'Uncategorised',
+                    'amount' => round($t->amount, 2),
+                    'reference' => $t->reference,
+                ]),
+            ],
+        ]);
+    }
+
+    public function givingStatement(Request $request, string $id)
+    {
+        $member = Member::where('branch_id', $request->user()->branch_id)
+            ->with('branch')->findOrFail($id);
+        $year = $request->get('year', now()->format('Y'));
+
+        $transactions = $member->transactions()
+            ->where('type', 'income')
+            ->whereYear('transaction_date', $year)
+            ->with('category')
+            ->orderBy('transaction_date')
+            ->get();
+
+        $byCategory = $transactions
+            ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
+            ->map(fn ($group) => [
+                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'total' => round($group->sum('amount'), 2),
+            ])->values();
+
+        $pdf = Pdf::loadView('pdf.giving-statement', [
+            'member' => $member,
+            'year' => $year,
+            'transactions' => $transactions,
+            'byCategory' => $byCategory,
+            'total' => round($transactions->sum('amount'), 2),
+            'branchName' => $member->branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y'),
+        ]);
+
+        return $pdf->download("giving-statement-{$member->member_number}-{$year}.pdf");
     }
 }
