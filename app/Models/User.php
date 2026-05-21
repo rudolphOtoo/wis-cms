@@ -18,7 +18,7 @@ class User extends Authenticatable
     public $incrementing = false;
 
     protected $fillable = [
-        'name', 'email', 'password', 'branch_id', 'is_active',
+        'name', 'email', 'password', 'branch_id', 'member_id', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -31,5 +31,15 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    public function member()
+    {
+        return $this->belongsTo(Member::class);
+    }
+
+    public function isMember(): bool
+    {
+        return $this->member_id !== null;
     }
 }

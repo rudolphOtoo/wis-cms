@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
 use Illuminate\Support\Facades\Route;
@@ -124,5 +125,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // AUDIT
     Route::middleware('permission:view audit log')->group(function () {
         Route::get('audit', [AuditController::class, 'index']);
+    });
+
+    // MEMBER PORTAL — scoped to the authenticated member's own data
+    Route::middleware('permission:access portal')->prefix('portal')->group(function () {
+        Route::get('profile', [PortalController::class, 'profile']);
+        Route::get('giving', [PortalController::class, 'giving']);
+        Route::get('attendance', [PortalController::class, 'attendance']);
     });
 });

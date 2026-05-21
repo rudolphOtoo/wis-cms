@@ -25,6 +25,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view reports', 'export reports',
             'manage users', 'manage roles', 'manage branches', 'manage service types',
             'manage finance categories', 'view audit log',
+            'access portal',
         ];
 
         foreach ($permissions as $permission) {
@@ -70,5 +71,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $usher->syncPermissions([
             'view members', 'view children', 'create attendance', 'view attendance',
         ]);
+
+        $member = Role::firstOrCreate(['name' => 'member']);
+        $member->syncPermissions(['access portal']);
     }
 }

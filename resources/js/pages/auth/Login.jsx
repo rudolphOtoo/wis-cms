@@ -3,20 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Login() {
-  const { login, loading, error, isAuthenticated } = useAuth()
+  const { login, loading, error, isAuthenticated, hasRole } = useAuth()
   const navigate = useNavigate()
   const [form, setForm]     = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true })
+    if (isAuthenticated) navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
   }, [isAuthenticated])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       await login(form.email, form.password)
-      navigate('/dashboard', { replace: true })
+      navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
     } catch (_) {}
   }
 
