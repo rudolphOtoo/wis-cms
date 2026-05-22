@@ -3,10 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { getMessages, getMessageStats } from '../../api/messages'
 import { usePermission } from '../../hooks/usePermission'
 
-const CHANNEL_BADGES = {
-  sms:   { bg: '#dbeafe', text: '#1d4ed8', icon: '📱', label: 'SMS' },
-  email: { bg: '#dcfce7', text: '#15803d', icon: '📧', label: 'Email' },
-  both:  { bg: '#fef3c7', text: '#92400e', icon: '📨', label: 'SMS + Email' },
+const cardBase = {
+  backgroundColor: '#fff',
+  border: '1px solid var(--color-surface-border)',
+  borderRadius: '16px',
+  boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
+}
+
+const Icon = ({ d, size = 22 }) => (
+  <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8}
+       viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+)
+const ICONS = {
+  outbox:  <><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></>,
+  calendar:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+  groups:  <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></>,
+  mail:    <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 5L2 7"/></>,
+  sms:     <><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></>,
+}
+
+const CHANNELS = {
+  sms:   { icons: ['sms'],          label: 'SMS' },
+  email: { icons: ['mail'],         label: 'Email' },
+  both:  { icons: ['mail', 'sms'],  label: 'Email + SMS' },
 }
 
 export default function CommunicationPage() {
@@ -37,123 +56,134 @@ export default function CommunicationPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  const statCards = [
+    { label:'Total Messages Sent', value: stats?.total_sent       ?? '—', icon: ICONS.outbox,   sub:'All-time record' },
+    { label:'Sent This Month',     value: stats?.this_month       ?? '—', icon: ICONS.calendar, sub:'Current period' },
+    { label:'Recipients Reached',  value: stats?.total_recipients ?? '—', icon: ICONS.groups,   sub:'Across all channels' },
+  ]
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{maxWidth:'1440px'}}>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Total Sent',         value: stats?.total_sent       ?? '—' },
-          { label: 'This Month',         value: stats?.this_month       ?? '—' },
-          { label: 'Total Recipients',   value: stats?.total_recipients ?? '—' },
-        ].map(s => (
-          <div key={s.label} className="card py-4">
-            <div className="text-2xl font-bold"
-                 style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-              {s.value}
-            </div>
-            <div className="text-xs mt-1" style={{color:'#6b7280'}}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold"
-              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-            Communication
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
+            Communications
           </h2>
-          <p className="text-sm" style={{color:'#6b7280'}}>
-            Send announcements and reach your members
-          </p>
+          <p style={{color:'#44474f'}}>Review and manage sent messages to your congregation.</p>
         </div>
         {can('send messages') && (
-          <button onClick={() => navigate('/communication/compose')} className="btn-primary gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          <button onClick={() => navigate('/communication/compose')} className="btn-primary gap-2" style={{padding:'12px 24px'}}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
             </svg>
             Compose Message
           </button>
         )}
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-12" style={{color:'#9ca3af'}}>Loading...</div>
-        ) : messages.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-3">💌</div>
-            <div className="font-semibold" style={{color:'var(--color-navy)'}}>No messages sent yet</div>
-            <div className="text-sm mt-1" style={{color:'#9ca3af'}}>
-              Compose your first message to broadcast to members
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {statCards.map(s => (
+          <div key={s.label} style={{...cardBase, padding:'24px'}}>
+            <div className="flex items-center gap-2 mb-3" style={{color:'var(--color-navy)'}}>
+              <Icon d={s.icon} size={20} />
+              <span className="uppercase tracking-wider" style={{fontSize:'11px',fontWeight:700}}>{s.label}</span>
             </div>
+            <div style={{fontFamily:'var(--font-display)',fontSize:'40px',fontWeight:700,color:'var(--color-navy)',lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:'12px',color:'#747780',marginTop:'4px'}}>{s.sub}</div>
           </div>
-        ) : (
-          <div className="divide-y" style={{borderColor:'var(--color-surface-border)'}}>
-            {messages.map(msg => {
-              const badge = CHANNEL_BADGES[msg.channel]
-              return (
-                <div key={msg.id}
-                     onClick={() => navigate(`/communication/${msg.id}`)}
-                     className="px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center
-                                    flex-shrink-0 text-xl"
-                         style={{backgroundColor: badge.bg}}>
-                      {badge.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-3 mb-1">
-                        <h3 className="text-sm font-bold truncate" style={{color:'#111827'}}>
-                          {msg.subject ?? <em style={{color:'#9ca3af'}}>No subject</em>}
-                        </h3>
-                        <span className="text-xs flex-shrink-0" style={{color:'#9ca3af'}}>
-                          {msg.sent_at}
-                        </span>
+        ))}
+      </div>
+
+      {/* History table */}
+      <div style={{...cardBase, overflow:'hidden'}}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr style={{backgroundColor:'#f2f3f6'}}>
+                {[['Channel'],['Subject'],['Preview'],['Sender'],['Recipients','center'],['Delivery'],['','right']].map(([h, align], idx) => (
+                  <th key={idx} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'11px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
+              ) : messages.length === 0 ? (
+                <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
+                  <div className="text-4xl mb-3">💌</div>
+                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No messages sent yet</div>
+                  <div className="text-sm mt-1" style={{color:'#9ca3af'}}>Compose your first message to broadcast to members</div>
+                </td></tr>
+              ) : messages.map(msg => {
+                const ch = CHANNELS[msg.channel] ?? CHANNELS.email
+                const total = msg.total_recipients || 0
+                const delivered = msg.delivered_count || 0
+                const failed = msg.failed_count || 0
+                const pct = total > 0 ? Math.round((delivered / total) * 100) : 0
+                return (
+                  <tr key={msg.id} className="transition-colors cursor-pointer" style={{borderTop:'1px solid var(--color-surface-border)'}}
+                      onClick={() => navigate(`/communication/${msg.id}`)}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                    <td style={{padding:'16px 24px'}}>
+                      <div className="flex gap-1">
+                        {ch.icons.map(ic => (
+                          <div key={ic} className="rounded flex items-center justify-center" style={{padding:'6px',backgroundColor:'rgba(199,215,253,0.4)',color:'var(--color-navy)'}} title={ic}>
+                            <Icon d={ICONS[ic]} size={16} />
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-xs mb-2 line-clamp-1" style={{color:'#6b7280'}}>
-                        {msg.body_preview}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap text-xs">
-                        <span className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{backgroundColor: badge.bg, color: badge.text}}>
-                          {badge.label}
-                        </span>
-                        <span style={{color:'#9ca3af'}}>
-                          {msg.sender} · sent to {msg.total_recipients}
-                        </span>
-                        {msg.delivered_count > 0 && (
-                          <span style={{color:'#15803d'}}>· {msg.delivered_count} delivered</span>
-                        )}
-                        {msg.failed_count > 0 && (
-                          <span style={{color:'#dc2626'}}>· {msg.failed_count} failed</span>
-                        )}
+                    </td>
+                    <td style={{padding:'16px 24px'}}>
+                      <p style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>{msg.subject ?? <em style={{color:'#9ca3af'}}>No subject</em>}</p>
+                      <p style={{fontSize:'11px',color:'#747780'}}>{msg.sent_at ?? msg.created_at}</p>
+                    </td>
+                    <td style={{padding:'16px 24px',maxWidth:'240px'}}>
+                      <p className="truncate" style={{fontSize:'14px',color:'#44474f'}}>{msg.body_preview}</p>
+                    </td>
+                    <td style={{padding:'16px 24px'}}>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{fontSize:'10px',fontWeight:700,backgroundColor:'var(--color-primary-fixed,#d7e2ff)',color:'var(--color-navy)'}}>
+                          {(msg.sender ?? '?').charAt(0)}
+                        </div>
+                        <span style={{fontSize:'14px',color:'#191c1e'}}>{msg.sender ?? '—'}</span>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                    </td>
+                    <td style={{padding:'16px 24px',textAlign:'center',fontSize:'14px',fontWeight:600,color:'#191c1e'}}>{total}</td>
+                    <td style={{padding:'16px 24px',minWidth:'140px'}}>
+                      <div className="flex flex-col gap-1">
+                        <div className="rounded-full overflow-hidden" style={{height:'4px',backgroundColor:'#e1e2e5'}}>
+                          <div style={{width:`${pct}%`,height:'100%',backgroundColor:'#2e7d32'}}/>
+                        </div>
+                        <div className="flex justify-between" style={{fontSize:'10px'}}>
+                          <span style={{color:'#2e7d32',fontWeight:700}}>{delivered} delivered</span>
+                          {failed > 0
+                            ? <span style={{color:'#ba1a1a',fontWeight:700}}>{failed} failed</span>
+                            : <span style={{color:'#747780'}}>0 failed</span>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:'16px 24px',textAlign:'right'}}>
+                      <span className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>View Details</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
 
         {meta && meta.last_page > 1 && (
-          <div className="px-4 py-3 flex items-center justify-between"
-               style={{borderTop:'1px solid var(--color-surface-border)'}}>
-            <span className="text-sm" style={{color:'#6b7280'}}>
-              Page {meta.current_page} of {meta.last_page}
-            </span>
+          <div className="flex items-center justify-between" style={{padding:'16px 24px',borderTop:'1px solid var(--color-surface-border)'}}>
+            <span style={{fontSize:'14px',color:'#747780'}}>Page {meta.current_page} of {meta.last_page} · {meta.total} messages</span>
             <div className="flex gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="px-3 py-1 text-sm rounded border disabled:opacity-50"
-                      style={{borderColor:'var(--color-surface-border)'}}>
-                Previous
-              </button>
+                      className="px-4 py-2 rounded-lg disabled:opacity-50" style={{border:'1px solid var(--color-surface-border)',fontSize:'14px',color:'var(--color-navy)'}}>Previous</button>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="px-3 py-1 text-sm rounded border disabled:opacity-50"
-                      style={{borderColor:'var(--color-surface-border)'}}>
-                Next
-              </button>
+                      className="px-4 py-2 rounded-lg text-white" style={{backgroundColor:'var(--color-navy)',fontSize:'14px'}}>Next</button>
             </div>
           </div>
         )}

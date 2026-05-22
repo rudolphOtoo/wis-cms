@@ -3,16 +3,35 @@ import { useNavigate } from 'react-router-dom'
 import { sendMessage, previewRecipients } from '../../api/messages'
 import { getDepartments } from '../../api/departments'
 
+const cardBase = {
+  backgroundColor: '#fff',
+  border: '1px solid var(--color-surface-border)',
+  borderRadius: '16px',
+  boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
+}
+
+const Icon = ({ d, size = 22 }) => (
+  <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8}
+       viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+)
+const ICONS = {
+  mail: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 5L2 7"/></>,
+  sms:  <><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></>,
+  both: <><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></>,
+  groups: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></>,
+}
+
+const CHANNEL_OPTS = [
+  { v:'email', label:'Email',       desc:'Formal notices & newsletters', icon:'mail' },
+  { v:'sms',   label:'SMS',         desc:'Urgent alerts & reminders',    icon:'sms'  },
+  { v:'both',  label:'Email & SMS', desc:'Maximum visibility outreach',  icon:'both' },
+]
+
 export default function Compose() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    channel:         'email',
-    subject:         '',
-    body:            '',
-    recipient_group: 'all',
-    department_id:   '',
-    gender:          '',
-    status:          'active',
+    channel:'email', subject:'', body:'',
+    recipient_group:'all', department_id:'', gender:'', status:'active',
   })
   const [departments, setDepartments] = useState([])
   const [count,       setCount]       = useState(null)
@@ -23,12 +42,8 @@ export default function Compose() {
     getDepartments().then(res => setDepartments(res.data.data))
   }, [])
 
-  // Recompute recipient count whenever filters change
   useEffect(() => {
-    if (form.recipient_group === 'individual') {
-      setCount(null)
-      return
-    }
+    if (form.recipient_group === 'individual') { setCount(null); return }
     setCount('loading')
     const t = setTimeout(() => {
       previewRecipients(form)
@@ -46,7 +61,6 @@ export default function Compose() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!confirm(`Send this message to ${count} recipient(s)?`)) return
-
     setLoading(true)
     setErrors({})
     try {
@@ -56,9 +70,7 @@ export default function Compose() {
     } catch (err) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
-        if (err.response.data.message && !err.response.data.errors) {
-          alert(err.response.data.message)
-        }
+        if (err.response.data.message && !err.response.data.errors) alert(err.response.data.message)
       } else {
         alert('Failed to send. Please try again.')
       }
@@ -67,194 +79,168 @@ export default function Compose() {
     }
   }
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
+  const showSubject = form.channel === 'email' || form.channel === 'both'
 
+  return (
+    <div style={{maxWidth:'1440px'}} className="space-y-6">
+
+      {/* Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/communication')}
-                className="p-2 rounded-lg"
-                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                className="w-10 h-10 flex items-center justify-center rounded-full"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
-          <h2 className="text-xl font-bold"
-              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-            Compose Message
-          </h2>
-          <p className="text-sm" style={{color:'#6b7280'}}>
-            Send an announcement to members of the church
-          </p>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'28px',color:'var(--color-navy)'}}>Broadcast Message</h2>
+          <p style={{color:'#44474f'}}>Reach out to your congregation via multi-channel communications.</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Channel */}
-        <div className="card">
-          <label className="block text-sm font-semibold mb-3" style={{color:'#374151'}}>
-            Delivery Channel *
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { v: 'email', label: '📧 Email',     desc: 'Send via email' },
-              { v: 'sms',   label: '📱 SMS',       desc: 'Send via SMS' },
-              { v: 'both',  label: '📨 Both',      desc: 'Email + SMS' },
-            ].map(opt => (
-              <button key={opt.v} type="button"
-                      onClick={() => setForm(f => ({ ...f, channel: opt.v }))}
-                      className="p-3 rounded-xl text-left transition-all"
-                      style={{
-                        backgroundColor: form.channel === opt.v ? 'rgba(27,58,107,0.08)' : 'white',
-                        border: form.channel === opt.v
-                          ? '2px solid var(--color-navy)'
-                          : '2px solid var(--color-surface-border)',
-                      }}>
-                <div className="text-sm font-bold mb-0.5"
-                     style={{color: form.channel === opt.v ? 'var(--color-navy)' : '#374151'}}>
-                  {opt.label}
+          {/* LEFT: config */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Channel selector */}
+            <div>
+              <h3 className="uppercase tracking-wider mb-4 flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
+                <Icon d={ICONS.groups} size={18} /> Select Communication Channel
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {CHANNEL_OPTS.map(opt => {
+                  const active = form.channel === opt.v
+                  return (
+                    <button key={opt.v} type="button"
+                            onClick={() => setForm(f => ({ ...f, channel: opt.v }))}
+                            className="flex flex-col items-center text-center transition-all"
+                            style={{...cardBase, padding:'24px',
+                                    border: active ? '2px solid var(--color-navy)' : '1px solid var(--color-surface-border)',
+                                    backgroundColor: active ? '#f0f4f9' : '#fff'}}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+                           style={{backgroundColor: active ? 'var(--color-navy)' : '#edeef1', color: active ? '#fff' : '#44474f'}}>
+                        <Icon d={ICONS[opt.icon]} size={22} />
+                      </div>
+                      <span style={{fontFamily:'var(--font-display)',fontSize:'18px',fontWeight:600,color:'var(--color-navy)'}}>{opt.label}</span>
+                      <p style={{fontSize:'12px',color:'#747780',marginTop:'4px'}}>{opt.desc}</p>
+                      {active && (
+                        <svg className="w-5 h-5 mt-2" style={{color:'var(--color-gold)'}} fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              {form.channel !== 'email' && (
+                <div className="mt-3 p-3 rounded-lg" style={{backgroundColor:'#fffbeb',border:'1px solid #fde68a'}}>
+                  <p style={{fontSize:'12px',color:'#92400e'}}>
+                    <strong>⚠️ SMS delivery is in dry-run mode.</strong> Messages will be logged but not actually sent until Arkesel SMS credentials are added in production.
+                  </p>
                 </div>
-                <div className="text-xs" style={{color:'#6b7280'}}>{opt.desc}</div>
-              </button>
-            ))}
-          </div>
-          {form.channel !== 'email' && (
-            <div className="mt-3 p-3 rounded-lg"
-                 style={{backgroundColor:'#fffbeb',border:'1px solid #fde68a'}}>
-              <p className="text-xs" style={{color:'#92400e'}}>
-                <strong>⚠️ SMS delivery is in dry-run mode.</strong> Messages will be logged but not actually sent until Arkesel SMS credentials are added in production.
-              </p>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Recipients */}
-        <div className="card space-y-4">
-          <h3 className="font-semibold text-sm uppercase tracking-wider"
-              style={{color:'var(--color-navy)'}}>
-            Recipients
-          </h3>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-              Who should receive this?
-            </label>
-            <select className="input-field" value={form.recipient_group}
-                    onChange={set('recipient_group')} required>
-              <option value="all">All active members</option>
-              <option value="department">A specific department</option>
-              <option value="gender">By gender</option>
-              <option value="status">By membership status</option>
-            </select>
-          </div>
-
-          {form.recipient_group === 'department' && (
-            <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-                Department
-              </label>
-              <select className="input-field" value={form.department_id} onChange={set('department_id')}>
-                <option value="">Select a department</option>
-                {departments.map(d => (
-                  <option key={d.id} value={d.id}>{d.name} ({d.members_count} members)</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {form.recipient_group === 'gender' && (
-            <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-                Gender
-              </label>
-              <select className="input-field" value={form.gender} onChange={set('gender')}>
-                <option value="">Select</option>
-                <option value="male">Males</option>
-                <option value="female">Females</option>
-              </select>
-            </div>
-          )}
-
-          {form.recipient_group === 'status' && (
-            <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-                Member Status
-              </label>
-              <select className="input-field" value={form.status} onChange={set('status')}>
-                <option value="active">Active members</option>
-                <option value="inactive">Inactive members</option>
-              </select>
-            </div>
-          )}
-
-          {/* Recipient count */}
-          <div className="rounded-lg p-3 flex items-center gap-3"
-               style={{backgroundColor:'#f0f9ff',border:'1px solid #bae6fd'}}>
-            <div className="text-2xl">👥</div>
-            <div>
-              <div className="text-sm font-semibold" style={{color:'#0c4a6e'}}>
-                {count === 'loading' ? 'Counting...'
-                  : count === null ? 'Set recipient filters above'
-                  : count === 0 ? 'No recipients match these filters'
-                  : `${count} recipient${count === 1 ? '' : 's'} will receive this message`}
-              </div>
-              <div className="text-xs mt-0.5" style={{color:'#075985'}}>
-                Only members with valid contact info for the chosen channel are counted
+            {/* Message fields */}
+            <div style={{...cardBase, padding:'24px'}} className="space-y-4">
+              {showSubject && (
+                <div>
+                  <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Email Subject</label>
+                  <input type="text" className="input-field" value={form.subject} onChange={set('subject')}
+                         placeholder="e.g. Sunday Service Reminder"/>
+                  {errors.subject && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.subject[0]}</p>}
+                </div>
+              )}
+              <div>
+                <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Message Content *</label>
+                <textarea className="input-field" value={form.body} onChange={set('body')} rows={8} required
+                          placeholder="Type your message here..." style={{resize:'vertical',minHeight:'150px'}}/>
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs" style={{color:'#9ca3af'}}>
+                    {form.channel !== 'email' && form.body.length > 160 && (
+                      <span style={{color:'#dc2626'}}>⚠️ SMS over 160 chars will split into multiple messages</span>
+                    )}
+                  </p>
+                  <p className="text-xs" style={{color:'#9ca3af'}}>{form.body.length} chars</p>
+                </div>
+                {errors.body && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.body[0]}</p>}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Message */}
-        <div className="card space-y-4">
-          <h3 className="font-semibold text-sm uppercase tracking-wider"
-              style={{color:'var(--color-navy)'}}>
-            Message
-          </h3>
+          {/* RIGHT: recipients + send (sticky) */}
+          <div className="lg:col-span-1">
+            <div style={{...cardBase, padding:'24px', position:'sticky', top:'24px'}} className="space-y-4">
+              <h3 className="uppercase tracking-wider flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
+                <Icon d={ICONS.groups} size={18} /> Recipients
+              </h3>
 
-          {(form.channel === 'email' || form.channel === 'both') && (
-            <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-                Subject (email only)
-              </label>
-              <input type="text" className="input-field" value={form.subject}
-                     onChange={set('subject')}
-                     placeholder="e.g. Sunday Service Reminder"/>
-              {errors.subject && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.subject[0]}</p>}
+              <div>
+                <label className="block mb-2 uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>Audience Target</label>
+                <select className="input-field" value={form.recipient_group} onChange={set('recipient_group')} required>
+                  <option value="all">All active members</option>
+                  <option value="department">A specific department</option>
+                  <option value="gender">By gender</option>
+                  <option value="status">By membership status</option>
+                </select>
+              </div>
+
+              {form.recipient_group === 'department' && (
+                <select className="input-field" value={form.department_id} onChange={set('department_id')}>
+                  <option value="">Select a department</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.members_count} members)</option>)}
+                </select>
+              )}
+              {form.recipient_group === 'gender' && (
+                <select className="input-field" value={form.gender} onChange={set('gender')}>
+                  <option value="">Select</option>
+                  <option value="male">Males</option>
+                  <option value="female">Females</option>
+                </select>
+              )}
+              {form.recipient_group === 'status' && (
+                <select className="input-field" value={form.status} onChange={set('status')}>
+                  <option value="active">Active members</option>
+                  <option value="inactive">Inactive members</option>
+                </select>
+              )}
+
+              {/* Live count */}
+              <div className="rounded-xl p-4 flex items-center gap-3" style={{backgroundColor:'rgba(215,226,255,0.4)',border:'1px solid var(--color-primary-fixed-dim,#acc7ff)'}}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor:'var(--color-navy)',color:'#fff'}}>
+                  <Icon d={ICONS.groups} size={22} />
+                </div>
+                <div>
+                  <p style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>
+                    {count === 'loading' ? '...' : count === null ? '—' : count}
+                    {typeof count === 'number' && <span style={{fontSize:'14px',fontWeight:400}}> recipient{count === 1 ? '' : 's'}</span>}
+                  </p>
+                  <p style={{fontSize:'12px',color:'#747780'}}>
+                    {count === 'loading' ? 'Counting...'
+                      : count === null ? 'Set recipient filters'
+                      : count === 0 ? 'No recipients match' : 'will receive this message'}
+                  </p>
+                </div>
+              </div>
+              <p style={{fontSize:'11px',color:'#9ca3af'}}>Only members with valid contact info for the chosen channel are counted.</p>
+
+              <div className="pt-4 space-y-3" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+                <button type="submit" disabled={loading || !count || count === 'loading'}
+                        className="btn-primary w-full gap-2" style={{padding:'14px',fontSize:'16px'}}>
+                  {loading ? 'Sending...' : (
+                    <>Send to {count ?? '...'} <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg></>
+                  )}
+                </button>
+                <button type="button" onClick={() => navigate('/communication')}
+                        className="w-full py-3 rounded-xl transition-colors" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
+                  Cancel
+                </button>
+              </div>
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-              Message Body *
-            </label>
-            <textarea className="input-field" value={form.body} onChange={set('body')}
-                      rows={8} required
-                      placeholder="Type your message here..."
-                      style={{resize:'vertical', minHeight:'150px'}}/>
-            <div className="flex justify-between mt-1">
-              <p className="text-xs" style={{color:'#9ca3af'}}>
-                {form.channel !== 'email' && form.body.length > 160 && (
-                  <span style={{color:'#dc2626'}}>⚠️ SMS messages over 160 chars will split into multiple messages</span>
-                )}
-              </p>
-              <p className="text-xs" style={{color:'#9ca3af'}}>{form.body.length} chars</p>
-            </div>
-            {errors.body && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.body[0]}</p>}
           </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={() => navigate('/communication')}
-                  className="px-6 py-2.5 rounded-lg text-sm font-semibold"
-                  style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
-            Cancel
-          </button>
-          <button type="submit" disabled={loading || !count || count === 'loading'}
-                  className="btn-primary px-8 py-2.5">
-            {loading ? 'Sending...' : `Send to ${count ?? '...'} →`}
-          </button>
         </div>
       </form>
     </div>
