@@ -9,6 +9,7 @@ use App\Models\AttendanceSession;
 use App\Models\Children;
 use App\Models\Member;
 use App\Models\ServiceType;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -209,12 +210,68 @@ class AttendanceController extends Controller
             ])
             ->values();
 
+        // Week-over-week: most recent adult session vs the one before it
+        $lastTwo = AttendanceSession::where('branch_id', $branchId)
+            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+            ->with('records')
+            ->latest('service_date')
+            ->take(2)
+            ->get();
+        $weekOverWeek = null;
+        if ($lastTwo->count() === 2) {
+            $current = $lastTwo[0]->adult_count;
+            $previous = $lastTwo[1]->adult_count;
+            if ($previous > 0) {
+                $weekOverWeek = round((($current - $previous) / $previous) * 100, 1);
+            }
+        }
+
+        // Monthly trend: total attendance grouped by month, last 6 months
+        $monthlyTrend = AttendanceSession::where('branch_id', $branchId)
+            ->where('service_date', '>=', now()->subMonths(6)->startOfMonth())
+            ->with('records')
+            ->get()
+            ->groupBy(fn ($s) => $s->service_date->format('Y-m'))
+            ->map(fn ($group, $key) => [
+                'month' => Carbon::createFromFormat('Y-m', $key)->format('M'),
+                'total' => $group->sum(fn ($s) => $s->total_count),
+            ])
+            ->values();
+
+        // Insights: real computed facts for leadership
+        $allAdult = AttendanceSession::where('branch_id', $branchId)
+            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+            ->with(['serviceType', 'records'])
+            ->get();
+        $topService = $allAdult
+            ->groupBy(fn ($s) => $s->serviceType?->name ?? 'Service')
+            ->map(fn ($group) => $group->avg(fn ($s) => $s->adult_count))
+            ->sortDesc()
+            ->keys()
+            ->first();
+        $avgAdults = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->adult_count)) : 0;
+        $avgChildren = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->children_count)) : 0;
+        $trendDirection = 'flat';
+        if ($monthlyTrend->count() >= 2) {
+            $last = $monthlyTrend->last()['total'];
+            $prev = $monthlyTrend[$monthlyTrend->count() - 2]['total'];
+            $trendDirection = $last > $prev ? 'up' : ($last < $prev ? 'down' : 'flat');
+        }
+
         return response()->json([
             'data' => [
                 'last_sunday' => $lastSunday,
                 'average' => $avgAttendance,
                 'total_sessions' => $totalSessions,
                 'chart' => $chartData,
+                'monthly_trend' => $monthlyTrend,
+                'week_over_week_pct' => $weekOverWeek,
+                'insights' => [
+                    'top_service' => $topService ?? 'N/A',
+                    'avg_adults' => $avgAdults,
+                    'avg_children' => $avgChildren,
+                    'trend_direction' => $trendDirection,
+                ],
             ],
         ]);
     }
