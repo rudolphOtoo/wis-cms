@@ -62,6 +62,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'is_active' => $request->boolean('is_active', true),
+            'must_change_password' => true,
         ]);
 
         $user->assignRole($request->role);

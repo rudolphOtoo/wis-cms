@@ -92,6 +92,7 @@ class AuthController extends Controller
 
         $request->user()->update([
             'password' => Hash::make($request->new_password),
+            'must_change_password' => false,
         ]);
 
         activity()->causedBy($request->user())->log('User changed their password');

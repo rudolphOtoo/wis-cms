@@ -12,13 +12,14 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
+use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(function () {
 
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);

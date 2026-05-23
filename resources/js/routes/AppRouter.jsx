@@ -8,6 +8,7 @@ import MembersPage       from '../pages/members/index'
 import MemberForm        from '../pages/members/MemberForm'
 import MemberDetail      from '../pages/members/MemberDetail'
 import Portal            from '../pages/portal/Portal'
+import ChangePassword    from '../pages/auth/ChangePassword'
 import VisitorsPage      from '../pages/visitors/index'
 import VisitorForm       from '../pages/visitors/VisitorForm'
 import DepartmentsPage   from '../pages/departments/index'
@@ -33,6 +34,7 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/portal" element={<Portal />} />
+          <Route path="/change-password" element={<ChangePassword />} />
           <Route element={<AppLayout />}>
             <Route path="/"                     element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"            element={<Dashboard />} />

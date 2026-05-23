@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Login() {
-  const { login, loading, error, isAuthenticated, hasRole } = useAuth()
+  const { login, loading, error, isAuthenticated, hasRole, user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm]     = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const panelRef = useRef(null)
 
   useEffect(() => {
-    if (isAuthenticated) navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
+    if (isAuthenticated) {
+      if (user?.must_change_password) navigate('/change-password', { replace: true })
+      else navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
+    }
   }, [isAuthenticated])
 
   useEffect(() => {
@@ -29,8 +32,12 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await login(form.email, form.password)
-      navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
+      const data = await login(form.email, form.password)
+      if (data?.user?.must_change_password) {
+        navigate('/change-password', { replace: true })
+      } else {
+        navigate(data?.user?.roles?.includes('member') ? '/portal' : '/dashboard', { replace: true })
+      }
     } catch (_) {}
   }
 

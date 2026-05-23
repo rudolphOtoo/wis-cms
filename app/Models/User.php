@@ -18,7 +18,7 @@ class User extends Authenticatable
     public $incrementing = false;
 
     protected $fillable = [
-        'name', 'email', 'password', 'branch_id', 'member_id', 'is_active',
+        'name', 'email', 'password', 'branch_id', 'member_id', 'is_active', 'must_change_password',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -29,6 +29,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
             'password' => 'hashed',
         ];
     }

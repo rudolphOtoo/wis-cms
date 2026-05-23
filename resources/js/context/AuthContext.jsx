@@ -37,13 +37,18 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const updateUser = (newUser) => {
+    localStorage.setItem('wis_user', JSON.stringify(newUser))
+    setUser(newUser)
+  }
+
   const hasRole       = (role)       => user?.roles?.includes(role)
   const hasPermission = (permission) => user?.permissions?.includes(permission)
 
   return (
     <AuthContext.Provider value={{
       user, token, loading, error,
-      login, logout, hasRole, hasPermission,
+      login, logout, updateUser, hasRole, hasPermission,
       isAuthenticated: !!token,
     }}>
       {children}
