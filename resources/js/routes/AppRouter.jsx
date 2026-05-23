@@ -9,6 +9,8 @@ import MemberForm        from '../pages/members/MemberForm'
 import MemberDetail      from '../pages/members/MemberDetail'
 import Portal            from '../pages/portal/Portal'
 import ChangePassword    from '../pages/auth/ChangePassword'
+import ForgotPassword    from '../pages/auth/ForgotPassword'
+import ResetPassword     from '../pages/auth/ResetPassword'
 import VisitorsPage      from '../pages/visitors/index'
 import VisitorForm       from '../pages/visitors/VisitorForm'
 import DepartmentsPage   from '../pages/departments/index'
@@ -32,6 +34,8 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/portal" element={<Portal />} />
           <Route path="/change-password" element={<ChangePassword />} />

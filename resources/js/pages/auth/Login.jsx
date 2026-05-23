@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Login() {
@@ -171,10 +171,10 @@ export default function Login() {
                        style={{accentColor:'var(--color-navy)'}} />
                 <span style={{fontSize:'14px',color:'#44474f'}}>Remember device</span>
               </label>
-              <span title="Password reset coming soon — contact your administrator"
-                    style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)',cursor:'not-allowed'}}>
+              <Link to="/forgot-password"
+                    style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
                 Forgot password?
-              </span>
+              </Link>
             </div>
 
             {/* Sign in */}
