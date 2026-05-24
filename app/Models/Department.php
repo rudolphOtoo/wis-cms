@@ -36,6 +36,7 @@ class Department extends Model
     public function members()
     {
         return $this->belongsToMany(Member::class, 'department_members')
+            ->using(DepartmentMember::class)
             ->withPivot('role', 'joined_at')
             ->withTimestamps();
     }

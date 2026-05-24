@@ -13,10 +13,29 @@ use Illuminate\Http\Request;
 
 class DepartmentController extends Controller
 {
+    /**
+     * A department query scoped to what the user may access.
+     * Admin-type roles see all branch departments; a department_leader
+     * sees only the department(s) they lead.
+     */
+    protected function scopedQuery(Request $request)
+    {
+        $user = $request->user();
+
+        $query = Department::query()->where('branch_id', $user->branch_id);
+
+        $seesAll = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+
+        if (! $seesAll && $user->hasRole('department_leader')) {
+            $query->where('leader_user_id', $user->id);
+        }
+
+        return $query;
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $departments = Department::query()
-            ->where('branch_id', $request->user()->branch_id)
+        $departments = $this->scopedQuery($request)
             ->with('leader')
             ->withCount('members')
             ->orderBy('name')
@@ -47,7 +66,7 @@ class DepartmentController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->with(['leader', 'members'])
             ->withCount('members')
             ->findOrFail($id);
@@ -57,7 +76,7 @@ class DepartmentController extends Controller
 
     public function update(UpdateDepartmentRequest $request, string $id): JsonResponse
     {
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
         $department->update($request->validated());
@@ -74,7 +93,7 @@ class DepartmentController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
         $name = $department->name;
@@ -89,7 +108,7 @@ class DepartmentController extends Controller
     // GET /api/departments/{id}/members
     public function departmentMembers(Request $request, string $id): JsonResponse
     {
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
         $members = $department->members()
@@ -115,7 +134,7 @@ class DepartmentController extends Controller
             'role' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
         // Prevent duplicate
@@ -139,7 +158,7 @@ class DepartmentController extends Controller
     // DELETE /api/departments/{id}/members/{memberId}
     public function removeMember(Request $request, string $id, string $memberId): JsonResponse
     {
-        $department = Department::where('branch_id', $request->user()->branch_id)
+        $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
         $department->members()->detach($memberId);
