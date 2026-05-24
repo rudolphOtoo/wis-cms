@@ -14,7 +14,7 @@ class AttendanceSession extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'service_type_id', 'service_date', 'notes', 'recorded_by',
+        'branch_id', 'service_type_id', 'department_id', 'service_date', 'notes', 'recorded_by',
     ];
 
     protected function casts(): array
@@ -30,6 +30,11 @@ class AttendanceSession extends Model
     public function serviceType()
     {
         return $this->belongsTo(ServiceType::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function recorder()

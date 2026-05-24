@@ -7,6 +7,7 @@ use App\Http\Resources\AttendanceSessionResource;
 use App\Models\AttendanceRecord;
 use App\Models\AttendanceSession;
 use App\Models\Children;
+use App\Models\Department;
 use App\Models\Member;
 use App\Models\ServiceType;
 use Carbon\Carbon;
@@ -50,11 +51,31 @@ class AttendanceController extends Controller
             'service_type_id' => ['required', 'uuid', 'exists:service_types,id'],
             'service_date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
+            'department_id' => ['nullable', 'uuid', 'exists:departments,id'],
         ]);
+
+        // If a department is given, the user must actually lead it
+        // (unless they're an admin-type role). Prevents recording meetings
+        // for departments you don't lead.
+        $departmentId = $request->department_id;
+        if ($departmentId) {
+            $user = $request->user();
+            $leadsIt = Department::where('id', $departmentId)
+                ->where('branch_id', $user->branch_id)
+                ->where('leader_user_id', $user->id)
+                ->exists();
+            $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+            if (! $leadsIt && ! $isAdmin) {
+                return response()->json([
+                    'message' => 'You can only record meetings for a department you lead.',
+                ], 403);
+            }
+        }
 
         // Prevent duplicate session
         $existing = AttendanceSession::where('branch_id', $request->user()->branch_id)
             ->where('service_type_id', $request->service_type_id)
+            ->where('department_id', $departmentId)
             ->whereDate('service_date', $request->service_date)
             ->first();
 
@@ -68,6 +89,7 @@ class AttendanceController extends Controller
         $session = AttendanceSession::create([
             'branch_id' => $request->user()->branch_id,
             'service_type_id' => $request->service_type_id,
+            'department_id' => $departmentId,
             'service_date' => $request->service_date,
             'notes' => $request->notes,
             'recorded_by' => $request->user()->id,
@@ -105,6 +127,18 @@ class AttendanceController extends Controller
                     'class' => $c->class_group,
                     'is_present' => $session->records->where('child_id', $c->id)->first()?->is_present ?? false,
                 ]);
+        } elseif ($session->department_id) {
+            // Department meeting: only this department's members
+            $dept = Department::with('members')->find($session->department_id);
+            $people = ($dept?->members ?? collect())
+                ->sortBy('first_name')
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->full_name,
+                    'type' => 'member',
+                    'member_number' => $m->member_number,
+                    'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
+                ])->values();
         } else {
             $people = Member::where('branch_id', $request->user()->branch_id)
                 ->where('status', 'active')

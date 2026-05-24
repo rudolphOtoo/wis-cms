@@ -359,30 +359,63 @@ function LeaderDashboard({ data, user, navigate }) {
         </div>
       ) : depts.map(dept => (
         <div key={dept.id} className="space-y-6">
-          {/* Stat + quick actions row */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="rounded-xl flex flex-col justify-between" style={{...cardStyle, minHeight:'140px'}}>
-              <div className="flex justify-between items-start">
-                <p style={{fontSize:'14px',fontWeight:600,color:'#44474f'}}>Active Members · {dept.name}</p>
-                <Icon path={ICONS.people} color="var(--color-navy)" />
+          {/* Stat cards row — real department-meeting data */}
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { label:'Active Members', value: dept.active_members, icon: ICONS.people },
+              { label:'Last Meeting', value: dept.attendance.last_present, icon: ICONS.event },
+              { label:'Attendance Rate', value: `${dept.attendance.attendance_rate}%`, icon: ICONS.people },
+              { label:'Meetings This Month', value: dept.attendance.meetings_this_month, icon: ICONS.event },
+            ].map(s => (
+              <div key={s.label} className="rounded-xl flex flex-col justify-between" style={{...cardStyle, minHeight:'130px'}}>
+                <div className="flex justify-between items-start">
+                  <p className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>{s.label}</p>
+                  <Icon path={s.icon} color="var(--color-navy)" size={20}/>
+                </div>
+                <span style={{fontFamily:'var(--font-display)',fontSize:'40px',fontWeight:700,lineHeight:1,color:'var(--color-navy)'}}>
+                  {s.value}
+                </span>
               </div>
-              <span style={{fontFamily:'var(--font-display)',fontSize:'48px',fontWeight:700,lineHeight:1,color:'var(--color-navy)'}}>
-                {dept.active_members}
-              </span>
-            </div>
+            ))}
+          </section>
 
+          {/* Attendance trend + quick actions */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="rounded-xl lg:col-span-2" style={cardStyle}>
+              <h3 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>
+                Attendance Trend
+              </h3>
+              {dept.attendance.trend.length === 0 ? (
+                <div className="text-center py-12" style={{color:'#9ca3af'}}>
+                  <div className="text-3xl mb-2">📋</div>
+                  <div className="text-sm font-semibold" style={{color:'var(--color-navy)'}}>No department meetings recorded yet</div>
+                  <div className="text-xs mt-1">Use "Take Attendance" to record your first meeting.</div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={dept.attendance.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E9F2"/>
+                    <XAxis dataKey="date" stroke="#9ca3af" style={{fontSize:'12px'}}/>
+                    <YAxis stroke="#9ca3af" style={{fontSize:'12px'}} allowDecimals={false}/>
+                    <Tooltip contentStyle={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',borderRadius:'8px',fontSize:'12px'}}/>
+                    <Line type="monotone" dataKey="count" stroke="var(--color-navy)" strokeWidth={2.5}
+                          dot={{ fill:'var(--color-navy)', r:4 }} activeDot={{ r:6 }} name="Present"/>
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="rounded-xl" style={cardStyle}>
               <h3 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <button onClick={() => navigate('/members/new')}
-                        className="flex items-center justify-center gap-2 rounded-xl transition-colors"
-                        style={{padding:'20px',backgroundColor:'var(--color-navy)',color:'white'}}>
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'var(--color-navy)',color:'white'}}>
                   <Icon path={ICONS.visitor} color="white" size={20}/>
                   <span style={{fontSize:'14px',fontWeight:600}}>Add Member</span>
                 </button>
                 <button onClick={() => navigate('/attendance/new')}
-                        className="flex items-center justify-center gap-2 rounded-xl transition-colors"
-                        style={{padding:'20px',backgroundColor:'white',border:'2px solid var(--color-gold)',color:'var(--color-navy)'}}>
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'white',border:'2px solid var(--color-gold)',color:'var(--color-navy)'}}>
                   <Icon path={ICONS.event} color="var(--color-navy)" size={20}/>
                   <span style={{fontSize:'14px',fontWeight:600}}>Take Attendance</span>
                 </button>

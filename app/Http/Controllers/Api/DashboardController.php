@@ -198,12 +198,40 @@ class DashboardController extends Controller
                     ])
                     ->values();
 
+                // Department-meeting attendance stats (real, from sessions
+                // scoped to this department).
+                $deptSessions = AttendanceSession::where('branch_id', $dept->branch_id)
+                    ->where('department_id', $dept->id)
+                    ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
+                    ->orderByDesc('service_date')
+                    ->get();
+
+                $memberCount = $dept->members->count();
+                $lastMeeting = $deptSessions->first();
+                $lastPresent = $lastMeeting?->present_count ?? 0;
+                $attendanceRate = ($memberCount > 0 && $lastMeeting)
+                    ? round(($lastPresent / $memberCount) * 100)
+                    : 0;
+                $meetingsThisMonth = $deptSessions
+                    ->filter(fn ($s) => $s->service_date->isSameMonth(now()))
+                    ->count();
+                $trend = $deptSessions->take(6)->reverse()->map(fn ($s) => [
+                    'date' => $s->service_date->format('d M'),
+                    'count' => $s->present_count,
+                ])->values();
+
                 return [
                     'id' => $dept->id,
                     'name' => $dept->name,
-                    'active_members' => $dept->members->count(),
+                    'active_members' => $memberCount,
                     'members' => $members->values(),
                     'recent_members' => $recent,
+                    'attendance' => [
+                        'last_present' => $lastPresent,
+                        'attendance_rate' => $attendanceRate,
+                        'meetings_this_month' => $meetingsThisMonth,
+                        'trend' => $trend,
+                    ],
                 ];
             });
 

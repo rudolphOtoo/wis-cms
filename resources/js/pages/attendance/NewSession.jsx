@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getServiceTypes, createSession } from '../../api/attendance'
+import { getDepartments } from '../../api/departments'
+import { useAuth } from '../../context/AuthContext'
 
 export default function NewSession() {
   const navigate = useNavigate()
+  const { hasRole } = useAuth()
+  const isLeader = hasRole('department_leader') && !hasRole('super_admin') && !hasRole('pastor') && !hasRole('secretary')
+
   const [serviceTypes, setServiceTypes] = useState([])
+  const [myDepartments, setMyDepartments] = useState([])
   const [form, setForm] = useState({
     service_type_id: '',
+    department_id: '',
     service_date: new Date().toISOString().split('T')[0],
     notes: '',
   })
@@ -15,10 +22,23 @@ export default function NewSession() {
   const [errors,   setErrors]   = useState({})
 
   useEffect(() => {
-    getServiceTypes()
-      .then(res => setServiceTypes(res.data.data))
-      .finally(() => setFetching(false))
-  }, [])
+    Promise.all([
+      getServiceTypes().then(res => res.data.data),
+      isLeader ? getDepartments().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
+    ]).then(([types, depts]) => {
+      setServiceTypes(types)
+      setMyDepartments(depts)
+      // For a leader, default the service type to "Department Meeting"
+      if (isLeader) {
+        const deptMeeting = types.find(t => t.name === 'Department Meeting')
+        setForm(f => ({
+          ...f,
+          service_type_id: deptMeeting?.id ?? '',
+          department_id: depts.length === 1 ? depts[0].id : '',
+        }))
+      }
+    }).finally(() => setFetching(false))
+  }, [isLeader])
 
   const set = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }))
@@ -30,16 +50,20 @@ export default function NewSession() {
     setLoading(true)
     setErrors({})
     try {
-      const res = await createSession(form)
+      // Only send department_id when it's set (leader meeting)
+      const payload = { ...form }
+      if (!payload.department_id) delete payload.department_id
+      const res = await createSession(payload)
       navigate(`/attendance/${res.data.data.id}`)
     } catch (err) {
       if (err.response?.status === 422) {
         if (err.response.data.session_id) {
-          // Session already exists — go to it
           navigate(`/attendance/${err.response.data.session_id}`)
         } else {
           setErrors(err.response.data.errors ?? {})
         }
+      } else if (err.response?.status === 403) {
+        alert(err.response.data.message ?? 'Not allowed.')
       } else {
         alert('Something went wrong.')
       }
@@ -59,40 +83,65 @@ export default function NewSession() {
           </svg>
         </button>
         <div>
-          <h2 className="text-xl font-bold"
-              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-            Take Attendance
+          <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
+            {isLeader ? 'Record Department Meeting' : 'Take Attendance'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
-            Select the service and date to begin
+            {isLeader ? 'Record attendance for your department meeting' : 'Select the service and date to begin'}
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-4">
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-            Service Type *
-          </label>
-          {fetching ? (
-            <div className="input-field" style={{color:'#9ca3af'}}>Loading services...</div>
-          ) : (
-            <select className="input-field" value={form.service_type_id}
-                    onChange={set('service_type_id')} required>
-              <option value="">Select service...</option>
-              {serviceTypes.map(st => (
-                <option key={st.id} value={st.id}>{st.name}</option>
-              ))}
-            </select>
-          )}
-          {errors.service_type_id && (
-            <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.service_type_id[0]}</p>
-          )}
-        </div>
+        {/* Department picker — leaders only */}
+        {isLeader && (
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
+              Department *
+            </label>
+            {myDepartments.length === 0 ? (
+              <div className="input-field" style={{color:'#9ca3af'}}>You don't lead a department yet.</div>
+            ) : (
+              <select className="input-field" value={form.department_id}
+                      onChange={set('department_id')} required>
+                <option value="">Select department...</option>
+                {myDepartments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            )}
+            {errors.department_id && (
+              <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.department_id[0]}</p>
+            )}
+          </div>
+        )}
+
+        {/* Service type — hidden for leaders (auto-set to Department Meeting) */}
+        {!isLeader && (
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
+              Service Type *
+            </label>
+            {fetching ? (
+              <div className="input-field" style={{color:'#9ca3af'}}>Loading services...</div>
+            ) : (
+              <select className="input-field" value={form.service_type_id}
+                      onChange={set('service_type_id')} required>
+                <option value="">Select service...</option>
+                {serviceTypes.filter(st => st.name !== 'Department Meeting').map(st => (
+                  <option key={st.id} value={st.id}>{st.name}</option>
+                ))}
+              </select>
+            )}
+            {errors.service_type_id && (
+              <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.service_type_id[0]}</p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-            Service Date *
+            {isLeader ? 'Meeting Date *' : 'Service Date *'}
           </label>
           <input type="date" className="input-field" value={form.service_date}
                  onChange={set('service_date')} required/>
@@ -107,17 +156,16 @@ export default function NewSession() {
           </label>
           <textarea className="input-field" value={form.notes}
                     onChange={set('notes')} rows={2}
-                    placeholder="e.g. Easter Sunday, Special service..."/>
+                    placeholder={isLeader ? 'e.g. Weekly rehearsal' : 'e.g. Easter Sunday, Special service...'}/>
         </div>
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={() => navigate('/attendance')}
                   className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
-                  style={{backgroundColor:'white',
-                          border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                  style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
             Cancel
           </button>
-          <button type="submit" disabled={loading} className="flex-1 btn-primary py-2.5">
+          <button type="submit" disabled={loading || (isLeader && myDepartments.length === 0)} className="flex-1 btn-primary py-2.5">
             {loading ? 'Starting...' : 'Start Taking Attendance →'}
           </button>
         </div>
