@@ -15,7 +15,16 @@ class DashboardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
+        $user = $request->user();
+
+        // Department leaders (not also admins) get a scoped dashboard:
+        // their own department(s) only, NO church finances or church-wide data.
+        if ($user->hasRole('department_leader')
+            && ! $user->hasAnyRole(['super_admin', 'pastor', 'secretary'])) {
+            return $this->leaderDashboard($user);
+        }
+
+        $branchId = $user->branch_id;
         $now = now();
 
         // === HERO STATS ===
@@ -155,6 +164,57 @@ class DashboardController extends Controller
                 'top_categories' => $topCategories,
                 'recent_members' => $recentMembers,
                 'recent_transactions' => $recentTransactions,
+            ],
+        ]);
+    }
+
+    /**
+     * Scoped dashboard for a department leader: only the department(s)
+     * they lead, their members and recent additions. Deliberately
+     * excludes all finance and church-wide data.
+     */
+    protected function leaderDashboard($user): JsonResponse
+    {
+        $departments = Department::where('branch_id', $user->branch_id)
+            ->where('leader_user_id', $user->id)
+            ->with(['members' => fn ($q) => $q->orderBy('first_name')])
+            ->get()
+            ->map(function ($dept) {
+                $members = $dept->members->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->full_name,
+                    'member_number' => $m->member_number,
+                    'phone' => $m->phone,
+                    'role' => $m->pivot->role ?? 'member',
+                ]);
+
+                $recent = $dept->members
+                    ->sortByDesc(fn ($m) => $m->pivot->joined_at)
+                    ->take(5)
+                    ->map(fn ($m) => [
+                        'name' => $m->full_name,
+                        'member_number' => $m->member_number,
+                        'joined_at' => $m->pivot->joined_at,
+                    ])
+                    ->values();
+
+                return [
+                    'id' => $dept->id,
+                    'name' => $dept->name,
+                    'active_members' => $dept->members->count(),
+                    'members' => $members->values(),
+                    'recent_members' => $recent,
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'mode' => 'department_leader',
+                'departments' => $departments->values(),
+                'totals' => [
+                    'departments_led' => $departments->count(),
+                    'total_active_members' => $departments->sum('active_members'),
+                ],
             ],
         ]);
     }

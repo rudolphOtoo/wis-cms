@@ -59,6 +59,10 @@ export default function Dashboard() {
     </div>
   )
 
+  if (data.mode === 'department_leader') {
+    return <LeaderDashboard data={data} user={user} navigate={navigate} />
+  }
+
   const { hero, gender_split, counts, attendance_chart, finance_chart,
           top_categories, recent_members, recent_transactions } = data
 
@@ -297,6 +301,164 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+
+function LeaderDashboard({ data, user, navigate }) {
+  const cardStyle = {
+    backgroundColor:'#fff', border:'1px solid var(--color-surface-border)',
+    boxShadow:'0 4px 12px rgba(13,31,60,0.05)', padding:'24px',
+  }
+  const ROLE_PILL = {
+    president: { bg:'#ffedd5', text:'#9a3412' },
+    secretary: { bg:'rgba(27,58,107,0.1)', text:'var(--color-navy)' },
+    leader:    { bg:'#ffedd5', text:'#9a3412' },
+    member:    { bg:'#e1e2e5', text:'#44474f' },
+  }
+  const pill = (role) => ROLE_PILL[(role || 'member').toLowerCase()] ?? ROLE_PILL.member
+  const initials = (name) => name.split(' ').map(w => w.charAt(0)).slice(0,2).join('')
+
+  const depts = data.departments ?? []
+
+  return (
+    <div className="space-y-6" style={{maxWidth:'1440px'}}>
+      {/* Welcome banner */}
+      <section className="rounded-xl relative overflow-hidden flex justify-between items-center"
+               style={{background:'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)',padding:'40px'}}>
+        <div className="relative z-10">
+          <h2 className="font-bold text-white" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px'}}>
+            {greeting()}, {user?.name?.split(' ')[0]}
+          </h2>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            {depts.length === 0 ? (
+              <span style={{color:'rgba(255,255,255,0.8)'}}>You are not assigned to lead a department yet.</span>
+            ) : (
+              <>
+                <span className="inline-flex items-center rounded-full font-bold"
+                      style={{padding:'6px 16px',backgroundColor:'var(--color-gold)',color:'var(--color-navy)',fontSize:'14px'}}>
+                  Leading: {depts.map(d => d.name).join(', ')}
+                </span>
+                <span style={{color:'rgba(255,255,255,0.8)',fontSize:'14px'}}>
+                  {data.totals.total_active_members} member{data.totals.total_active_members === 1 ? '' : 's'} in your care
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="absolute rounded-full"
+             style={{right:'-10%',top:'-50%',width:'384px',height:'384px',background:'rgba(255,255,255,0.05)',filter:'blur(60px)'}}/>
+      </section>
+
+      {depts.length === 0 ? (
+        <div className="rounded-xl text-center" style={{...cardStyle, padding:'48px'}}>
+          <div className="text-4xl mb-3">🏛️</div>
+          <div className="font-semibold" style={{color:'var(--color-navy)'}}>No department assigned</div>
+          <p className="text-sm mt-1" style={{color:'#6b7280'}}>An administrator will assign you to a department to lead.</p>
+        </div>
+      ) : depts.map(dept => (
+        <div key={dept.id} className="space-y-6">
+          {/* Stat + quick actions row */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="rounded-xl flex flex-col justify-between" style={{...cardStyle, minHeight:'140px'}}>
+              <div className="flex justify-between items-start">
+                <p style={{fontSize:'14px',fontWeight:600,color:'#44474f'}}>Active Members · {dept.name}</p>
+                <Icon path={ICONS.people} color="var(--color-navy)" />
+              </div>
+              <span style={{fontFamily:'var(--font-display)',fontSize:'48px',fontWeight:700,lineHeight:1,color:'var(--color-navy)'}}>
+                {dept.active_members}
+              </span>
+            </div>
+
+            <div className="rounded-xl lg:col-span-2" style={cardStyle}>
+              <h3 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>Quick Actions</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => navigate('/members/new')}
+                        className="flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'20px',backgroundColor:'var(--color-navy)',color:'white'}}>
+                  <Icon path={ICONS.visitor} color="white" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Add Member</span>
+                </button>
+                <button onClick={() => navigate('/attendance/new')}
+                        className="flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'20px',backgroundColor:'white',border:'2px solid var(--color-gold)',color:'var(--color-navy)'}}>
+                  <Icon path={ICONS.event} color="var(--color-navy)" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Take Attendance</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Members table + recently added */}
+          <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="rounded-xl xl:col-span-2" style={{...cardStyle, padding:0, overflow:'hidden'}}>
+              <div className="flex justify-between items-center" style={{padding:'24px',borderBottom:'1px solid var(--color-surface-border)'}}>
+                <h3 style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>
+                  {dept.name} Members
+                </h3>
+                <button onClick={() => navigate(`/departments/${dept.id}`)} className="text-xs font-semibold" style={{color:'var(--color-navy)'}}>View all →</button>
+              </div>
+              {dept.members.length === 0 ? (
+                <div className="text-center" style={{padding:'32px',fontSize:'14px',color:'#9ca3af'}}>No members in this department yet</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr style={{backgroundColor:'#f8f9fc'}}>
+                        {['Name','Member ID','Phone','Role'].map(h => (
+                          <th key={h} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dept.members.map(m => {
+                        const p = pill(m.role)
+                        return (
+                          <tr key={m.id} style={{borderTop:'1px solid var(--color-surface-border)'}}>
+                            <td style={{padding:'14px 24px'}}>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white" style={{backgroundColor:'var(--color-navy)'}}>{initials(m.name)}</div>
+                                <span style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>{m.name}</span>
+                              </div>
+                            </td>
+                            <td style={{padding:'14px 24px',fontSize:'14px',color:'#44474f'}}>{m.member_number}</td>
+                            <td style={{padding:'14px 24px',fontSize:'14px',color:'#44474f'}}>{m.phone || '—'}</td>
+                            <td style={{padding:'14px 24px'}}>
+                              <span className="rounded-full uppercase tracking-wide" style={{padding:'3px 12px',fontSize:'11px',fontWeight:700,backgroundColor:p.bg,color:p.text}}>{m.role || 'member'}</span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl" style={cardStyle}>
+              <h3 className="mb-6" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>Recently Added</h3>
+              {dept.recent_members.length === 0 ? (
+                <div className="text-sm" style={{color:'#9ca3af'}}>No recent additions</div>
+              ) : (
+                <div className="space-y-5">
+                  {dept.recent_members.map((m, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{initials(m.name)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate" style={{color:'var(--color-navy)'}}>{m.name}</div>
+                        <div className="uppercase tracking-widest" style={{fontSize:'10px',fontWeight:700,color:'#9ca3af'}}>
+                          {m.joined_at ? `Joined ${m.joined_at}` : m.member_number}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      ))}
     </div>
   )
 }
