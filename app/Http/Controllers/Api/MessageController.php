@@ -140,7 +140,10 @@ class MessageController extends Controller
                 ]);
 
                 // Dispatch via sync driver for now — wire queue in production
-                SendBroadcastMessageJob::dispatchSync($recipient->id);
+                // Honors QUEUE_CONNECTION: sync driver sends immediately (dev /
+                // small sends); database/redis queues it for a worker (production,
+                // avoids request timeouts on large broadcasts).
+                SendBroadcastMessageJob::dispatch($recipient->id);
             }
 
             $msg->update(['status' => 'sent']);

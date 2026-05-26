@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\BroadcastMessage;
 use App\Models\MessageRecipient;
+use App\Services\ArkeselSmsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -18,38 +19,66 @@ class SendBroadcastMessageJob implements ShouldQueue
 
     public function __construct(public string $recipientId) {}
 
-    public function handle(): void
+    public function handle(ArkeselSmsService $sms): void
     {
         $recipient = MessageRecipient::with(['message.sender', 'member'])->find($this->recipientId);
-
         if (! $recipient) {
             return;
         }
 
         $message = $recipient->message;
-        $branchName = $message->sender?->name ? 'Wesleyan International Society' : 'WIS-CMS';
+        $branchName = 'Wesleyan International Society';
+        $channel = $message->channel;
+
+        $attempted = false;   // did we try to send on any channel?
+        $failures = [];       // human-readable reasons
 
         try {
-            if (in_array($message->channel, ['email', 'both']) && $recipient->email) {
-                Mail::to($recipient->email)->send(new BroadcastMessage(
-                    subjectLine: $message->subject ?? 'Church Announcement',
-                    messageBody: $message->body,
-                    recipientName: $recipient->member?->full_name ?? 'Member',
-                    branchName: $branchName,
-                ));
+            // --- EMAIL ---
+            if (in_array($channel, ['email', 'both'])) {
+                if ($recipient->email) {
+                    $attempted = true;
+                    Mail::to($recipient->email)->send(new BroadcastMessage(
+                        subjectLine: $message->subject ?? 'Church Announcement',
+                        messageBody: $message->body,
+                        recipientName: $recipient->member?->full_name ?? 'Member',
+                        branchName: $branchName,
+                    ));
+                } elseif ($channel === 'email') {
+                    $failures[] = 'No email address on file';
+                }
             }
 
-            // SMS dispatch placeholder — wire Arkesel here later
-            if (in_array($message->channel, ['sms', 'both']) && $recipient->phone) {
-                Log::info("SMS would send to {$recipient->phone}: {$message->body}");
-                // TODO: Arkesel API call goes here
+            // --- SMS (Arkesel) ---
+            if (in_array($channel, ['sms', 'both'])) {
+                if ($recipient->phone) {
+                    $attempted = true;
+                    $sent = $sms->send($recipient->phone, $message->body);
+                    if (! $sent) {
+                        $failures[] = 'SMS provider did not accept the message';
+                    }
+                } elseif ($channel === 'sms') {
+                    $failures[] = 'No phone number on file';
+                }
             }
 
-            $recipient->update([
-                'delivery_status' => 'delivered',
-                'delivered_at' => now(),
-            ]);
-
+            // --- Honest delivery status ---
+            if (! $attempted) {
+                $recipient->update([
+                    'delivery_status' => 'failed',
+                    'failure_reason' => $failures ? implode('; ', $failures) : 'No deliverable channel for this recipient',
+                ]);
+            } elseif ($failures) {
+                $recipient->update([
+                    'delivery_status' => 'failed',
+                    'failure_reason' => implode('; ', $failures),
+                ]);
+            } else {
+                $recipient->update([
+                    'delivery_status' => 'delivered',
+                    'delivered_at' => now(),
+                ]);
+            }
         } catch (\Throwable $e) {
             $recipient->update([
                 'delivery_status' => 'failed',
