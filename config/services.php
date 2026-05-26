@@ -28,6 +28,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'arkesel' => [
+        'api_key' => env('ARKESEL_API_KEY'),
+        'sender_id' => env('ARKESEL_SENDER_ID', 'WIS-CMS'),
+        'base_url' => env('ARKESEL_BASE_URL', 'https://sms.arkesel.com/api/v2'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
