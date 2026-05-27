@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
-import { getTransactions, getFinanceStats, getFinanceCategories, deleteTransaction, exportTransactions } from '../../api/finance'
+import { getTransactions, getFinanceStats, getFinanceCategories, deleteTransaction, exportTransactions, downloadLedgerPdf } from '../../api/finance'
 import { usePermission } from '../../hooks/usePermission'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -42,6 +42,47 @@ export default function FinancePage() {
   const [meta,         setMeta]    = useState(null)
   const [deleting,     setDel]     = useState(null)
   const [exporting,    setExporting] = useState(false)
+  const [generating,   setGenerating] = useState(false)
+
+  const today = () => new Date().toISOString().split('T')[0]
+  const firstOfMonth = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]
+  const lastOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]
+
+  const [reportFrom, setReportFrom] = useState(firstOfMonth())
+  const [reportTo,   setReportTo]   = useState(today())
+
+  const applyPreset = (kind) => {
+    const now = new Date()
+    if (kind === 'this-month') {
+      setReportFrom(firstOfMonth()); setReportTo(today())
+    } else if (kind === 'last-month') {
+      const last = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      setReportFrom(firstOfMonth(last)); setReportTo(lastOfMonth(last))
+    } else if (kind === 'this-quarter') {
+      const q = Math.floor(now.getMonth() / 3)
+      setReportFrom(new Date(now.getFullYear(), q * 3, 1).toISOString().split('T')[0])
+      setReportTo(today())
+    }
+  }
+
+  const handleDownloadLedger = async () => {
+    if (!reportFrom || !reportTo) return
+    setGenerating(true)
+    try {
+      const res = await downloadLedgerPdf({ from: reportFrom, to: reportTo })
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `financial-ledger-${reportFrom}-to-${reportTo}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Could not generate the report. Please check the date range and try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const handleExport = async () => {
     setExporting(true)
@@ -146,6 +187,51 @@ export default function FinancePage() {
           </div>
         ))}
       </div>
+
+      {/* Financial Report card — generates a PDF income/expense ledger */}
+      {can('export finance') && (
+        <div style={{...cardBase, padding:'24px'}}>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h3 style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>Financial Report</h3>
+              <p style={{fontSize:'14px',color:'#747780',marginTop:'4px'}}>Generate a PDF income &amp; expense ledger for any date range.</p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label style={{display:'block',fontSize:'11px',fontWeight:700,color:'#747780',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>From</label>
+                <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)}
+                       style={{padding:'8px 12px',border:'1px solid var(--color-surface-border)',borderRadius:'8px',fontSize:'14px',color:'var(--color-navy)'}}/>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:'11px',fontWeight:700,color:'#747780',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>To</label>
+                <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)}
+                       style={{padding:'8px 12px',border:'1px solid var(--color-surface-border)',borderRadius:'8px',fontSize:'14px',color:'var(--color-navy)'}}/>
+              </div>
+              <button onClick={handleDownloadLedger} disabled={generating || !reportFrom || !reportTo}
+                      className="btn-primary gap-2 inline-flex items-center"
+                      style={{padding:'10px 20px',opacity: generating ? 0.6 : 1}}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V3m0 9l-4-4m4 4l4-4"/>
+                </svg>
+                {generating ? 'Generating...' : 'Download PDF'}
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+            <span style={{fontSize:'11px',fontWeight:600,color:'#747780',textTransform:'uppercase',letterSpacing:'0.04em',alignSelf:'center'}}>Quick:</span>
+            {[
+              { label:'This Month',  kind:'this-month' },
+              { label:'Last Month',  kind:'last-month' },
+              { label:'This Quarter',kind:'this-quarter' },
+            ].map(p => (
+              <button key={p.kind} type="button" onClick={() => applyPreset(p.kind)}
+                      style={{padding:'6px 14px',backgroundColor:'#f2f3f6',color:'var(--color-navy)',border:'1px solid var(--color-surface-border)',borderRadius:'999px',fontSize:'12px',fontWeight:600}}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Transactions card */}
       <div style={{...cardBase, overflow:'hidden'}}>

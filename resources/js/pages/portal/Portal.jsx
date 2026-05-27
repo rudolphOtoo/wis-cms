@@ -72,11 +72,7 @@ export default function Portal() {
       <header className="shadow-sm" style={{backgroundColor:'var(--color-navy)'}}>
         <div className="flex justify-between items-center max-w-5xl mx-auto px-6 h-16">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{backgroundColor:'var(--color-gold)'}}>
-              <svg className="w-5 h-5" style={{color:'var(--color-navy)'}} fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18L20 8.5v7L12 19.82 4 15.5v-7l8-4.32z"/>
-              </svg>
-            </div>
+            <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-8 h-8 object-contain" />
             <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-gold-light)'}}>WIS-CMS</h1>
           </div>
           <div className="flex items-center gap-4">

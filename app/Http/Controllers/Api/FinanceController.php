@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\CSV\Writer;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
@@ -198,6 +199,60 @@ class FinanceController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    // GET /api/finance/reports/ledger?from=YYYY-MM-DD&to=YYYY-MM-DD
+    public function ledger(Request $request)
+    {
+        $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+        ]);
+
+        $branchId = $request->user()->branch_id;
+        $from = $request->get('from');
+        $to = $request->get('to');
+
+        $transactions = \App\Models\Transaction::where('branch_id', $branchId)
+            ->whereBetween('transaction_date', [$from, $to])
+            ->with('category')
+            ->orderBy('transaction_date')
+            ->get();
+
+        $groupByCategory = fn ($items) => $items
+            ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
+            ->map(fn ($group) => [
+                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'count' => $group->count(),
+                'total' => round($group->sum('amount'), 2),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        $income = $transactions->where('type', 'income');
+        $expense = $transactions->where('type', 'expense');
+
+        $incomeByCategory = $groupByCategory($income);
+        $expenseByCategory = $groupByCategory($expense);
+
+        $totalIncome = round($income->sum('amount'), 2);
+        $totalExpense = round($expense->sum('amount'), 2);
+        $net = round($totalIncome - $totalExpense, 2);
+
+        $branch = \App\Models\Branch::find($branchId);
+
+        $pdf = Pdf::loadView('pdf.financial-ledger', [
+            'period' => ['from' => $from, 'to' => $to],
+            'incomeByCategory' => $incomeByCategory,
+            'expenseByCategory' => $expenseByCategory,
+            'totalIncome' => $totalIncome,
+            'totalExpense' => $totalExpense,
+            'net' => $net,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y'),
+        ]);
+
+        return $pdf->download("financial-ledger-{$from}-to-{$to}.pdf");
     }
 
     public function stats(Request $request): JsonResponse

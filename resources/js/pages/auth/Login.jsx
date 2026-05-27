@@ -70,16 +70,7 @@ export default function Login() {
         <div className="relative z-10 flex-grow flex flex-col items-center justify-center text-center login-fade">
           {/* Logo tile */}
           <div className="mb-2 flex items-center justify-center">
-            <div className="flex items-center justify-center rounded-xl"
-                 style={{
-                   width:'96px',height:'96px',
-                   backgroundColor:'rgba(226,192,106,0.20)',
-                   border:'1px solid rgba(201,168,76,0.30)',
-                 }}>
-              <svg className="w-14 h-14" style={{color:'var(--color-gold-light)'}} fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18L20 8.5v7L12 19.82 4 15.5v-7l8-4.32z"/>
-              </svg>
-            </div>
+            <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-24 h-24 object-contain" />
           </div>
 
           <h1 className="font-bold mb-1"

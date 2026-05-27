@@ -9,3 +9,6 @@ export const getFinanceStats     = ()       => api.get('/finance/stats')
 export const getFinanceCategories = (params) => api.get('/finance/categories', { params })
 export const exportTransactions = (params) =>
   api.get('/finance/transactions/export', { params, responseType: 'blob' })
+
+export const downloadLedgerPdf = (params) =>
+  api.get('/finance/reports/ledger', { params, responseType: 'blob' })

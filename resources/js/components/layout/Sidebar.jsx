@@ -30,11 +30,7 @@ export default function Sidebar() {
     <div className="w-64 flex flex-col h-full flex-shrink-0" style={{backgroundColor:'var(--color-navy-deeper)'}}>
       <div className="px-6 py-5" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor:'var(--color-gold)'}}>
-            <svg className="w-5 h-5" style={{color:'var(--color-navy-deeper)'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18L20 8.5v7L12 19.82 4 15.5v-7l8-4.32z"/>
-            </svg>
-          </div>
+          <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
             <div className="text-white text-sm font-bold" style={{fontFamily:'var(--font-display)'}}>WIS-CMS</div>
             <div className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Methodist Church Ghana</div>
