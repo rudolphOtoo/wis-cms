@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreTransactionRequest;
 use App\Http\Requests\Finance\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
+use App\Models\Branch;
 use App\Models\FinanceCategory;
 use App\Models\Transaction;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\CSV\Writer;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
@@ -213,7 +214,7 @@ class FinanceController extends Controller
         $from = $request->get('from');
         $to = $request->get('to');
 
-        $transactions = \App\Models\Transaction::where('branch_id', $branchId)
+        $transactions = Transaction::where('branch_id', $branchId)
             ->whereBetween('transaction_date', [$from, $to])
             ->with('category')
             ->orderBy('transaction_date')
@@ -239,7 +240,7 @@ class FinanceController extends Controller
         $totalExpense = round($expense->sum('amount'), 2);
         $net = round($totalIncome - $totalExpense, 2);
 
-        $branch = \App\Models\Branch::find($branchId);
+        $branch = Branch::find($branchId);
 
         $pdf = Pdf::loadView('pdf.financial-ledger', [
             'period' => ['from' => $from, 'to' => $to],
