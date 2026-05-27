@@ -220,6 +220,12 @@ export default function UsersPage() {
 
 function UserModal({ user, roles, onClose, onSuccess }) {
   const isEdit = Boolean(user)
+
+  const [mode,          setMode]          = useState('form')
+  const [tempPassword,  setTempPassword]  = useState(null)
+  const [copied,        setCopied]        = useState(false)
+  const [createdName,   setCreatedName]   = useState('')
+
   const [form, setForm] = useState({
     name:      user?.name      ?? '',
     email:     user?.email     ?? '',
@@ -242,10 +248,24 @@ function UserModal({ user, roles, onClose, onSuccess }) {
     setErrors({})
     try {
       const data = { ...form }
-      if (isEdit && !data.password) delete data.password
-      if (isEdit) { await updateUser(user.id, data) }
-      else        { await createUser(data) }
-      onSuccess()
+      if (isEdit) {
+        if (!data.password) delete data.password
+        await updateUser(user.id, data)
+        onSuccess()
+      } else {
+        // Create — server generates the temporary password.
+        delete data.password
+        const res = await createUser(data)
+        const temp = res?.data?.temp_password ?? null
+        if (temp) {
+          setTempPassword(temp)
+          setCreatedName(form.name)
+          setMode('temp-password')
+        } else {
+          // Defensive: if backend didn't return a temp password, just close.
+          onSuccess()
+        }
+      }
     } catch (err) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
@@ -258,19 +278,80 @@ function UserModal({ user, roles, onClose, onSuccess }) {
     }
   }
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(tempPassword)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // older browsers / non-https — fall back silently
+      alert('Could not copy automatically. Please copy the password manually.')
+    }
+  }
+
+  const finishAndClose = () => {
+    setTempPassword(null)  // discard from React state
+    onSuccess()
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{backgroundColor:'rgba(13,31,60,0.4)',backdropFilter:'blur(4px)'}}>
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 pt-6 pb-4 flex justify-between items-start" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
           <div>
-            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'24px',color:'var(--color-navy)'}}>{isEdit ? 'Edit User' : 'New User'}</h2>
-            <p style={{fontSize:'14px',color:'#747780',marginTop:'4px'}}>Update administrative profile and permissions.</p>
+            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'24px',color:'var(--color-navy)'}}>
+              {mode === 'temp-password' ? 'User Created' : (isEdit ? 'Edit User' : 'New User')}
+            </h2>
+            <p style={{fontSize:'14px',color:'#747780',marginTop:'4px'}}>
+              {mode === 'temp-password'
+                ? 'Share the temporary password with the new user.'
+                : 'Update administrative profile and permissions.'}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" style={{color:'#747780'}}>
+          <button onClick={mode === 'temp-password' ? finishAndClose : onClose}
+                  className="p-1 rounded hover:bg-gray-100" style={{color:'#747780'}}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
+        {mode === 'temp-password' ? (
+          <div className="p-6">
+            <div className="rounded-lg p-4 mb-4" style={{backgroundColor:'#dcfce7',border:'1px solid #86efac'}}>
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 mt-0.5" style={{color:'#15803d'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div>
+                  <div style={{fontSize:'14px',fontWeight:700,color:'#15803d'}}>Account created for {createdName}</div>
+                  <p style={{fontSize:'13px',color:'#166534',marginTop:'2px'}}>Share the temporary password below. They will be required to change it on first login.</p>
+                </div>
+              </div>
+            </div>
+
+            <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Temporary Password</label>
+            <div className="flex items-center gap-2 mb-2">
+              <input type="text" readOnly value={tempPassword ?? ''}
+                     className="input-field"
+                     style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:'16px',letterSpacing:'0.05em'}}
+                     onFocus={(e) => e.target.select()}/>
+              <button type="button" onClick={handleCopy}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap"
+                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)',color:'white'}}>
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
+            </div>
+            <p style={{fontSize:'12px',color:'#747780',fontStyle:'italic'}}>
+              This password is shown only once. It cannot be retrieved later — if lost, delete the user and recreate them.
+            </p>
+
+            <div className="flex justify-end mt-6 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+              <button type="button" onClick={finishAndClose} className="btn-primary px-8 py-2">
+                I've shared it — Done
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -283,15 +364,27 @@ function UserModal({ user, roles, onClose, onSuccess }) {
               <input type="email" className="input-field" value={form.email} onChange={set('email')} required/>
               {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
             </div>
-            <div className="md:col-span-2">
-              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
-                {isEdit ? 'Password' : 'Password *'}
-              </label>
-              <input type="password" className="input-field" value={form.password} onChange={set('password')}
-                     required={!isEdit} minLength={8} placeholder={isEdit ? '••••••••' : 'Minimum 8 characters'}/>
-              {isEdit && <p className="italic mt-1" style={{fontSize:'12px',color:'#747780'}}>Leave blank to keep current password</p>}
-              {errors.password && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.password[0]}</p>}
-            </div>
+
+            {isEdit ? (
+              <div className="md:col-span-2">
+                <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Password</label>
+                <input type="password" className="input-field" value={form.password} onChange={set('password')}
+                       minLength={8} placeholder="••••••••"/>
+                <p className="italic mt-1" style={{fontSize:'12px',color:'#747780'}}>Leave blank to keep current password. If you set one, the user will be required to change it on next login.</p>
+                {errors.password && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.password[0]}</p>}
+              </div>
+            ) : (
+              <div className="md:col-span-2 rounded-lg p-3 flex items-start gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" style={{color:'var(--color-navy)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                <div>
+                  <div style={{fontSize:'13px',fontWeight:700,color:'var(--color-navy)'}}>A temporary password will be generated</div>
+                  <p style={{fontSize:'12px',color:'#747780',marginTop:'2px'}}>You will see it once after creation. Share it with the user — they will be required to change it on first login.</p>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Role Selection *</label>
               <select className="input-field" value={form.role} onChange={set('role')} required>
@@ -315,7 +408,6 @@ function UserModal({ user, roles, onClose, onSuccess }) {
               </label>
             </div>
           </div>
-
           <div className="flex justify-end gap-3 mt-6 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
             <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
                     style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
@@ -324,6 +416,7 @@ function UserModal({ user, roles, onClose, onSuccess }) {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   )

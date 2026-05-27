@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -56,24 +57,32 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request): JsonResponse
     {
+        // Auto-generate a strong temporary password; the admin hands it
+        // to the user, who is forced to change it on first login
+        // (must_change_password = true + EnsurePasswordChanged middleware).
+        $tempPassword = Str::password(12);
+
         $user = User::create([
             'branch_id' => $request->user()->branch_id,
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => Hash::make($tempPassword),
             'is_active' => $request->boolean('is_active', true),
             'must_change_password' => true,
         ]);
-
         $user->assignRole($request->role);
 
+        // Audit trail: log the issuance, NOT the password itself.
         activity()->causedBy($request->user())
             ->performedOn($user)
-            ->log("Created user: {$user->name} with role {$request->role}");
+            ->log("Created user: {$user->name} with role {$request->role} (temporary password issued)");
 
+        // The plain password is returned in this one response only —
+        // never stored anywhere reversible, never logged.
         return response()->json([
             'message' => 'User created successfully.',
             'data' => $this->transform($user->load('roles')),
+            'temp_password' => $tempPassword,
         ], 201);
     }
 
