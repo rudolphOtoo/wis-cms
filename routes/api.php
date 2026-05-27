@@ -99,6 +99,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('finance/stats', [FinanceController::class, 'stats']);
         Route::get('finance/categories', [FinanceController::class, 'categories']);
         Route::get('finance/transactions', [FinanceController::class, 'index']);
+        Route::get('finance/transactions/export', [FinanceController::class, 'export'])->middleware('permission:export finance');
         Route::get('finance/transactions/{id}', [FinanceController::class, 'show']);
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);

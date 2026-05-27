@@ -10,6 +10,9 @@ use App\Models\FinanceCategory;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\CSV\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
 {
@@ -137,6 +140,66 @@ class FinanceController extends Controller
     }
 
     // GET /api/finance/stats
+    // GET /api/finance/transactions/export — streams a CSV of the (filtered) transactions
+    public function export(Request $request): StreamedResponse
+    {
+        $query = Transaction::query()
+            ->where('branch_id', $request->user()->branch_id)
+            ->with(['category', 'member']);
+
+        // Mirror index() filters so the export matches the on-screen list.
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference', 'ilike', "%{$search}%")
+                    ->orWhere('notes', 'ilike', "%{$search}%");
+            });
+        }
+        if ($type = $request->get('type')) {
+            $query->where('type', $type);
+        }
+        if ($categoryId = $request->get('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
+        if ($from = $request->get('from')) {
+            $query->whereDate('transaction_date', '>=', $from);
+        }
+        if ($to = $request->get('to')) {
+            $query->whereDate('transaction_date', '<=', $to);
+        }
+
+        $query->orderByDesc('transaction_date');
+
+        $filename = 'transactions-'.now()->format('Y-m-d').'.csv';
+
+        return new StreamedResponse(function () use ($query) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues([
+                'Date', 'Type', 'Category', 'Amount', 'Currency',
+                'Member', 'Reference', 'Notes',
+            ]));
+
+            $query->lazy()->each(function ($t) use ($writer) {
+                $writer->addRow(Row::fromValues([
+                    optional($t->transaction_date)->toDateString(),
+                    ucfirst($t->type),
+                    $t->category?->name ?? '',
+                    (string) $t->amount,
+                    $t->currency ?? 'GHS',
+                    $t->member?->full_name ?? '',
+                    $t->reference,
+                    $t->notes,
+                ]));
+            });
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     public function stats(Request $request): JsonResponse
     {
         $branchId = $request->user()->branch_id;
