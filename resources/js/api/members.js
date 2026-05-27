@@ -10,3 +10,6 @@ export const getMemberStats = ()       => api.get('/members/stats')
 export const getMemberGiving = (id, year) => api.get(`/members/${id}/giving`, { params: { year } })
 export const downloadGivingStatement = (id, year) =>
   api.get(`/members/${id}/giving-statement`, { params: { year }, responseType: 'blob' })
+
+export const exportMembers = (params) =>
+  api.get('/members/export', { params, responseType: 'blob' })

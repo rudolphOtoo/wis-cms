@@ -37,6 +37,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('members/{id}/giving', [MemberController::class, 'giving']);
         Route::get('members/{id}/giving-statement', [MemberController::class, 'givingStatement']);
         Route::get('members', [MemberController::class, 'index']);
+        Route::get('members/export', [MemberController::class, 'export'])->middleware('permission:export members');
         Route::get('members/{id}', [MemberController::class, 'show']);
     });
     Route::middleware('permission:create members')->post('members', [MemberController::class, 'store']);

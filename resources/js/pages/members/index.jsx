@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getMembers, deleteMember, getMemberStats } from '../../api/members'
+import { getMembers, deleteMember, getMemberStats, exportMembers } from '../../api/members'
 import { usePermission } from '../../hooks/usePermission'
 
 const STATUS_COLORS = {
@@ -40,6 +40,27 @@ export default function MembersPage() {
   const [page,       setPage]       = useState(1)
   const [meta,       setMeta]       = useState(null)
   const [deleting,   setDeleting]   = useState(null)
+  const [exporting,  setExporting]  = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await exportMembers({ search, status: statusFilter, gender: genderFilter })
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `members-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Export failed. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const fetchMembers = useCallback(async () => {
     setLoading(true)
@@ -103,14 +124,26 @@ export default function MembersPage() {
           </h2>
           <p style={{color:'#44474f'}}>{meta ? `${meta.total} Total Registered Members` : 'Loading...'}</p>
         </div>
-        {can('create members') && (
-          <button onClick={() => navigate('/members/new')} className="btn-primary gap-2" style={{padding:'10px 24px'}}>
-            Add Member
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-            </svg>
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {can('export members') && (
+            <button onClick={handleExport} disabled={exporting}
+                    className="gap-2 inline-flex items-center rounded-lg font-semibold"
+                    style={{padding:'10px 20px',backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)',fontSize:'14px',opacity: exporting ? 0.6 : 1}}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V3m0 9l-4-4m4 4l4-4"/>
+              </svg>
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          )}
+          {can('create members') && (
+            <button onClick={() => navigate('/members/new')} className="btn-primary gap-2" style={{padding:'10px 24px'}}>
+              Add Member
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stat cards */}

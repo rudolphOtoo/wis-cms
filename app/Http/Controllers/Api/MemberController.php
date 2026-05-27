@@ -10,6 +10,9 @@ use App\Models\Member;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\CSV\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberController extends Controller
 {
@@ -117,6 +120,66 @@ class MemberController extends Controller
     }
 
     // GET /api/members/stats
+    // GET /api/members/export  — streams a CSV of the (optionally filtered) member list
+    public function export(Request $request): StreamedResponse
+    {
+        $query = Member::query()
+            ->where('branch_id', $request->user()->branch_id);
+
+        // Mirror the same filters as index() so the export matches what
+        // the user is looking at.
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                    ->orWhere('other_names', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'ilike', "%{$search}%")
+                    ->orWhere('member_number', 'ilike', "%{$search}%");
+            });
+        }
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+        if ($gender = $request->get('gender')) {
+            $query->where('gender', $gender);
+        }
+
+        $query->orderBy('first_name')->orderBy('last_name');
+
+        $filename = 'members-'.now()->format('Y-m-d').'.csv';
+
+        return new StreamedResponse(function () use ($query) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues([
+                'Member Number', 'First Name', 'Last Name', 'Other Names',
+                'Phone', 'Email', 'Gender', 'Status', 'Join Date',
+            ]));
+
+            // lazy() streams rows in chunks so a large membership doesn't
+            // exhaust memory.
+            $query->lazy()->each(function ($m) use ($writer) {
+                $writer->addRow(Row::fromValues([
+                    $m->member_number,
+                    $m->first_name,
+                    $m->last_name,
+                    $m->other_names,
+                    $m->phone,
+                    $m->email,
+                    $m->gender,
+                    $m->status,
+                    optional($m->join_date)->toDateString(),
+                ]));
+            });
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     public function stats(Request $request): JsonResponse
     {
         $branchId = $request->user()->branch_id;
