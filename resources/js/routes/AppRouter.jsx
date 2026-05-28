@@ -16,6 +16,9 @@ import VisitorForm       from '../pages/visitors/VisitorForm'
 import DepartmentsPage   from '../pages/departments/index'
 import DepartmentForm    from '../pages/departments/DepartmentForm'
 import DepartmentDetail  from '../pages/departments/DepartmentDetail'
+import CellsPage         from '../pages/cells/index'
+import CellForm          from '../pages/cells/CellForm'
+import CellDetail        from '../pages/cells/CellDetail'
 import AttendancePage    from '../pages/attendance/index'
 import NewSession        from '../pages/attendance/NewSession'
 import TakeAttendance    from '../pages/attendance/TakeAttendance'
@@ -53,6 +56,10 @@ export default function AppRouter() {
             <Route path="/departments/new"      element={<DepartmentForm />} />
             <Route path="/departments/:id"      element={<DepartmentDetail />} />
             <Route path="/departments/:id/edit" element={<DepartmentForm />} />
+            <Route path="/cells"                element={<CellsPage />} />
+            <Route path="/cells/new"            element={<CellForm />} />
+            <Route path="/cells/:id"            element={<CellDetail />} />
+            <Route path="/cells/:id/edit"       element={<CellForm />} />
             <Route path="/attendance"           element={<AttendancePage />} />
             <Route path="/attendance/new"       element={<NewSession />} />
             <Route path="/attendance/:id"       element={<TakeAttendance />} />

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CellController;
 use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
@@ -77,6 +78,19 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::middleware('permission:create departments')->post('departments', [DepartmentController::class, 'store']);
     Route::middleware('permission:edit departments')->put('departments/{id}', [DepartmentController::class, 'update']);
     Route::middleware('permission:delete departments')->delete('departments/{id}', [DepartmentController::class, 'destroy']);
+
+    // Cells (classes) — a member belongs to exactly one cell.
+    Route::middleware('permission:view cells')->group(function () {
+        Route::get('cells', [CellController::class, 'index']);
+        Route::get('cells/{id}', [CellController::class, 'show']);
+    });
+    Route::middleware('permission:create cells')->post('cells', [CellController::class, 'store']);
+    Route::middleware('permission:edit cells')->put('cells/{id}', [CellController::class, 'update']);
+    Route::middleware('permission:delete cells')->delete('cells/{id}', [CellController::class, 'destroy']);
+    Route::middleware('permission:edit cells')->group(function () {
+        Route::post('cells/{id}/members/{memberId}', [CellController::class, 'assignMember']);
+        Route::delete('cells/{id}/members/{memberId}', [CellController::class, 'unassignMember']);
+    });
     Route::middleware('permission:message own department')->post('departments/{id}/message', [DepartmentController::class, 'message']);
     Route::middleware('permission:manage department members')->group(function () {
         Route::post('departments/{id}/members', [DepartmentController::class, 'addMember']);

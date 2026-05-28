@@ -17,7 +17,7 @@ class Member extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'member_number', 'first_name', 'last_name',
+        'branch_id', 'cell_id', 'member_number', 'first_name', 'last_name',
         'other_names', 'gender', 'date_of_birth', 'phone', 'email',
         'address', 'occupation', 'marital_status', 'join_date',
         'is_baptised', 'baptism_date', 'status', 'photo_path', 'notes',
@@ -69,6 +69,12 @@ class Member extends Model
     public function children()
     {
         return $this->hasMany(Children::class, 'guardian_member_id');
+    }
+
+    public function cell()
+    {
+        // A member belongs to exactly ONE cell (or none) via cell_id.
+        return $this->belongsTo(Cell::class);
     }
 
     public function departments()

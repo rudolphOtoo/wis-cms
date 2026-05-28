@@ -19,6 +19,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view visitors', 'create visitors', 'edit visitors', 'delete visitors',
             'view attendance', 'create attendance', 'edit attendance', 'delete attendance',
             'view departments', 'create departments', 'edit departments', 'delete departments',
+            'view cells', 'create cells', 'edit cells', 'delete cells',
             'manage department members',
             'view finance', 'create transactions', 'edit transactions', 'delete transactions', 'export finance',
             'view messages', 'send messages', 'message own department',
@@ -38,7 +39,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $pastor = Role::firstOrCreate(['name' => 'pastor']);
         $pastor->syncPermissions([
             'view members', 'view children', 'view visitors', 'view attendance',
-            'view departments', 'view finance', 'view messages', 'view reports',
+            'view departments', 'view cells', 'view finance', 'view messages', 'view reports',
             'export reports', 'export members', 'export finance',
         ]);
 
@@ -50,6 +51,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view attendance', 'create attendance', 'edit attendance',
             'view departments', 'create departments', 'edit departments',
             'manage department members',
+            'view cells', 'create cells', 'edit cells', 'delete cells',
             'view messages', 'send messages',
             'view reports', 'export reports',
         ]);
