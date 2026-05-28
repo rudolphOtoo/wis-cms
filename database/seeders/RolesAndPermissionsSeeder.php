@@ -21,7 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view departments', 'create departments', 'edit departments', 'delete departments',
             'manage department members',
             'view finance', 'create transactions', 'edit transactions', 'delete transactions', 'export finance',
-            'view messages', 'send messages',
+            'view messages', 'send messages', 'message own department',
             'view reports', 'export reports',
             'manage users', 'manage roles', 'manage branches', 'manage service types',
             'manage finance categories', 'view audit log',
@@ -65,6 +65,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $deptLeader->syncPermissions([
             'view members', 'view departments', 'manage department members',
             'view attendance', 'create attendance', 'view reports',
+            'message own department',
         ]);
 
         $usher = Role::firstOrCreate(['name' => 'usher']);

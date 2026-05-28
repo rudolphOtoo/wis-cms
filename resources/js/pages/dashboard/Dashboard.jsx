@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { useAuth } from '../../context/AuthContext'
 import { getDashboard } from '../../api/dashboard'
+import { messageDepartment } from '../../api/departments'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtShort = (n) => {
@@ -307,6 +308,7 @@ export default function Dashboard() {
 
 
 function LeaderDashboard({ data, user, navigate }) {
+  const [msgDept, setMsgDept] = useState(null)
   const cardStyle = {
     backgroundColor:'#fff', border:'1px solid var(--color-surface-border)',
     boxShadow:'0 4px 12px rgba(13,31,60,0.05)', padding:'24px',
@@ -419,6 +421,12 @@ function LeaderDashboard({ data, user, navigate }) {
                   <Icon path={ICONS.event} color="var(--color-navy)" size={20}/>
                   <span style={{fontSize:'14px',fontWeight:600}}>Take Attendance</span>
                 </button>
+                <button onClick={() => setMsgDept(dept)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'#f2f3f6',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
+                  <Icon path={ICONS.people} color="var(--color-navy)" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Message Members</span>
+                </button>
               </div>
             </div>
           </section>
@@ -492,6 +500,103 @@ function LeaderDashboard({ data, user, navigate }) {
           </section>
         </div>
       ))}
+
+      {msgDept && (
+        <MessageModal dept={msgDept} onClose={() => setMsgDept(null)} />
+      )}
+    </div>
+  )
+}
+
+function MessageModal({ dept, onClose }) {
+  const [channel, setChannel] = useState('sms')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null) // {ok, text}
+
+  const send = async () => {
+    if (!body.trim()) return
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await messageDepartment(dept.id, { subject: subject || null, body, channel })
+      setResult({ ok: true, text: res.data.message || 'Message sent.' })
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Could not send the message.'
+      setResult({ ok: false, text: msg })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const channels = [
+    { key: 'sms', label: 'SMS' },
+    { key: 'email', label: 'Email' },
+    { key: 'both', label: 'Both' },
+  ]
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{backgroundColor:'rgba(13,31,60,0.4)',backdropFilter:'blur(4px)'}}>
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl">
+        <div className="px-6 pt-6 pb-4 flex justify-between items-start" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
+          <div>
+            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>Message {dept.name}</h2>
+            <p style={{fontSize:'13px',color:'#747780',marginTop:'2px'}}>Sent to your department's members with contact details.</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" style={{color:'#747780'}}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        {result?.ok ? (
+          <div className="p-6">
+            <div className="rounded-lg p-4" style={{backgroundColor:'#dcfce7',border:'1px solid #86efac'}}>
+              <div style={{fontSize:'14px',fontWeight:700,color:'#15803d'}}>{result.text}</div>
+              <p style={{fontSize:'12px',color:'#166534',marginTop:'4px'}}>Messages are delivered once an SMS provider is connected.</p>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button onClick={onClose} className="btn-primary px-6 py-2">Done</button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Channel</label>
+              <div className="flex gap-2">
+                {channels.map(c => (
+                  <button key={c.key} type="button" onClick={() => setChannel(c.key)}
+                          style={{padding:'8px 18px',borderRadius:'999px',fontSize:'13px',fontWeight:600,
+                                  backgroundColor: channel===c.key ? 'var(--color-navy)' : '#f2f3f6',
+                                  color: channel===c.key ? 'white' : 'var(--color-navy)',
+                                  border:'1px solid var(--color-surface-border)'}}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Subject (optional)</label>
+              <input type="text" className="input-field" value={subject} onChange={e => setSubject(e.target.value)} maxLength={200}/>
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Message *</label>
+              <textarea className="input-field" rows={4} value={body} onChange={e => setBody(e.target.value)} placeholder="e.g. Choir rehearsal moved to 5pm on Saturday."/>
+            </div>
+            {result && !result.ok && (
+              <p style={{fontSize:'13px',color:'#ba1a1a'}}>{result.text}</p>
+            )}
+            <p style={{fontSize:'12px',color:'#9ca3af',fontStyle:'italic'}}>Note: messages send for real once an SMS provider is connected.</p>
+            <div className="flex justify-end gap-3 pt-2" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+              <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
+                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+              <button type="button" onClick={send} disabled={sending || !body.trim()} className="btn-primary px-6 py-2" style={{opacity: (sending || !body.trim()) ? 0.6 : 1}}>
+                {sending ? 'Sending...' : 'Send Message'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

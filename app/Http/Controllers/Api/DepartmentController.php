@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Department\StoreDepartmentRequest;
 use App\Http\Requests\Department\UpdateDepartmentRequest;
 use App\Http\Resources\DepartmentResource;
+use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Department;
 use App\Models\Member;
+use App\Models\Message;
+use App\Models\MessageRecipient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DepartmentController extends Controller
 {
@@ -184,5 +188,82 @@ class DepartmentController extends Controller
                 'total_members_assigned' => $departments->sum('members_count'),
             ],
         ]);
+    }
+
+    /**
+     * A department leader sends a message to their own department's members.
+     * Scoped: the user must lead the department (scopedQuery enforces this).
+     * Reuses the broadcast pipeline (SendBroadcastMessageJob).
+     */
+    public function message(Request $request, string $id): JsonResponse
+    {
+        $department = $this->scopedQuery($request)->findOrFail($id);
+
+        $request->validate([
+            'subject' => ['nullable', 'string', 'max:200'],
+            'body' => ['required', 'string'],
+            'channel' => ['required', 'in:sms,email,both'],
+        ]);
+
+        // Recipients = this department's members with valid contact info
+        // for the chosen channel.
+        $recipients = $department->members()
+            ->where(function ($q) use ($request) {
+                if ($request->channel === 'email') {
+                    $q->whereNotNull('email')->where('email', '!=', '');
+                } elseif ($request->channel === 'sms') {
+                    $q->whereNotNull('phone')->where('phone', '!=', '');
+                } else {
+                    $q->where(function ($inner) {
+                        $inner->whereNotNull('email')->where('email', '!=', '')
+                            ->orWhereNotNull('phone')->where('phone', '!=', '');
+                    });
+                }
+            })
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return response()->json([
+                'message' => 'No members in this department have contact details for the selected channel.',
+            ], 422);
+        }
+
+        $message = DB::transaction(function () use ($request, $department, $recipients) {
+            $msg = Message::create([
+                'branch_id' => $request->user()->branch_id,
+                'sender_id' => $request->user()->id,
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'channel' => $request->channel,
+                'status' => 'sending',
+                'recipient_group' => 'department',
+                'department_id' => $department->id,
+                'sent_at' => now(),
+            ]);
+
+            foreach ($recipients as $member) {
+                $r = MessageRecipient::create([
+                    'message_id' => $msg->id,
+                    'member_id' => $member->id,
+                    'phone' => $member->phone,
+                    'email' => $member->email,
+                    'delivery_status' => 'pending',
+                ]);
+                SendBroadcastMessageJob::dispatch($r->id);
+            }
+
+            $msg->update(['status' => 'sent']);
+
+            return $msg;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($message)
+            ->log("Department leader messaged {$recipients->count()} members of {$department->name}");
+
+        return response()->json([
+            'message' => "Message sent to {$recipients->count()} members of {$department->name}.",
+            'data' => ['id' => $message->id],
+        ], 201);
     }
 }

@@ -77,6 +77,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::middleware('permission:create departments')->post('departments', [DepartmentController::class, 'store']);
     Route::middleware('permission:edit departments')->put('departments/{id}', [DepartmentController::class, 'update']);
     Route::middleware('permission:delete departments')->delete('departments/{id}', [DepartmentController::class, 'destroy']);
+    Route::middleware('permission:message own department')->post('departments/{id}/message', [DepartmentController::class, 'message']);
     Route::middleware('permission:manage department members')->group(function () {
         Route::post('departments/{id}/members', [DepartmentController::class, 'addMember']);
         Route::delete('departments/{id}/members/{memberId}', [DepartmentController::class, 'removeMember']);
