@@ -6,7 +6,8 @@
         "build": "vite build",
         "dev": "vite",
         "lint": "eslint resources/js",
-        "lint:fix": "eslint resources/js --fix"
+        "lint:fix": "eslint resources/js --fix",
+        "prepare": "husky"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.4",
@@ -17,7 +18,9 @@
         "eslint-plugin-react-hooks": "^7.1.1",
         "eslint-plugin-react-refresh": "^0.5.2",
         "globals": "^17.6.0",
+        "husky": "^9.1.7",
         "laravel-vite-plugin": "^3.1.0",
+        "lint-staged": "^16.4.0",
         "tailwindcss": "^4.3.0",
         "vite": "^8.0.0"
     },
@@ -28,5 +31,13 @@
         "react-dom": "^19.2.6",
         "react-router-dom": "^7.15.1",
         "recharts": "^3.8.1"
+    },
+    "lint-staged": {
+        "resources/js/**/*.{js,jsx}": "eslint --fix",
+        "app/**/*.php": "./vendor/bin/pint",
+        "tests/**/*.php": "./vendor/bin/pint",
+        "database/**/*.php": "./vendor/bin/pint",
+        "routes/**/*.php": "./vendor/bin/pint",
+        "config/**/*.php": "./vendor/bin/pint"
     }
 }
