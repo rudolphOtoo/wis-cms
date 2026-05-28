@@ -20,6 +20,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view attendance', 'create attendance', 'edit attendance', 'delete attendance',
             'view departments', 'create departments', 'edit departments', 'delete departments',
             'view cells', 'create cells', 'edit cells', 'delete cells',
+            'manage cell members', 'message own cell',
             'manage department members',
             'view finance', 'create transactions', 'edit transactions', 'delete transactions', 'export finance',
             'view messages', 'send messages', 'message own department',
@@ -68,6 +69,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'view members', 'view departments', 'manage department members',
             'view attendance', 'create attendance', 'view reports',
             'message own department',
+        ]);
+
+        $cellLeader = Role::firstOrCreate(['name' => 'cell_leader']);
+        $cellLeader->syncPermissions([
+            'view members', 'view cells', 'manage cell members',
+            'view attendance', 'create attendance', 'view reports',
+            'message own cell',
         ]);
 
         $usher = Role::firstOrCreate(['name' => 'usher']);
