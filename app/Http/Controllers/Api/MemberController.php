@@ -6,10 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
+use App\Models\Cell;
+use App\Models\Department;
 use App\Models\Member;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\CSV\Writer;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -279,5 +285,81 @@ class MemberController extends Controller
         ]);
 
         return $pdf->download("giving-statement-{$member->member_number}-{$year}.pdf");
+    }
+
+    /**
+     * Promote a Member to leadership of a specific cell or department.
+     *
+     * This is the atomic, church-native promotion workflow: a Member
+     * (already in the congregation) is appointed to lead a specific
+     * unit, in one transaction creating their User account, assigning
+     * their role, linking the User<->Member relationship, and setting
+     * them as the unit's leader. Returns a temp password (shown once).
+     *
+     * Architecture: matches the "membership-first leadership" model
+     * from the design review. Cannot promote a Member who already has
+     * a User account, or appoint to a unit that already has a leader
+     * (must explicitly demote first).
+     */
+    public function promoteToLeader(Request $request, string $id): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+
+        $member = Member::where('branch_id', $branchId)->findOrFail($id);
+
+        $data = $request->validate([
+            'leadership_type' => ['required', 'in:cell,department'],
+            'target_id' => ['required', 'uuid'],
+            'email' => ['required', 'email', 'unique:users,email', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        if (User::where('member_id', $member->id)->exists()) {
+            return response()->json([
+                'message' => 'This member already has a user account. Edit their roles directly.',
+            ], 422);
+        }
+
+        $unitClass = $data['leadership_type'] === 'cell' ? Cell::class : Department::class;
+        $unit = $unitClass::where('branch_id', $branchId)->findOrFail($data['target_id']);
+
+        if ($unit->leader_user_id) {
+            return response()->json([
+                'message' => "This {$data['leadership_type']} already has a leader. Demote them first.",
+            ], 422);
+        }
+
+        $tempPassword = Str::password(12);
+        $roleName = $data['leadership_type'] === 'cell' ? 'cell_leader' : 'department_leader';
+
+        $user = DB::transaction(function () use ($member, $unit, $data, $tempPassword, $roleName, $branchId) {
+            $newUser = User::create([
+                'branch_id' => $branchId,
+                'name' => $data['name'] ?? trim("{$member->first_name} {$member->last_name}"),
+                'email' => $data['email'],
+                'password' => Hash::make($tempPassword),
+                'is_active' => true,
+                'must_change_password' => true,
+                'member_id' => $member->id,
+            ]);
+            $newUser->assignRole($roleName);
+            $unit->update(['leader_user_id' => $newUser->id]);
+
+            return $newUser;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Promoted member {$member->first_name} {$member->last_name} to {$roleName} of {$unit->name}");
+
+        return response()->json([
+            'message' => "{$member->first_name} promoted to {$roleName} of {$unit->name}.",
+            'data' => [
+                'user_id' => $user->id,
+                'role' => $roleName,
+                'unit' => ['id' => $unit->id, 'name' => $unit->name],
+            ],
+            'temp_password' => $tempPassword,
+        ], 201);
     }
 }

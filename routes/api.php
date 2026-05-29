@@ -146,6 +146,10 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::post('users/{id}/link-member', [UserController::class, 'linkMember']);
         Route::post('users/{id}/create-and-link', [UserController::class, 'createAndLinkMember']);
         Route::delete('users/{id}/link-member', [UserController::class, 'unlinkMember']);
+
+        // Promote a Member to leadership of a specific cell or department.
+        // Atomic: creates User + assigns role + links member + sets unit leader.
+        Route::post('members/{id}/promote-to-leader', [MemberController::class, 'promoteToLeader']);
     });
 
     // AUDIT
