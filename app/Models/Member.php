@@ -77,6 +77,16 @@ class Member extends Model
         return $this->belongsTo(Cell::class);
     }
 
+    /**
+     * The User account linked to this Member, if any.
+     * At most one User per Member (enforced by UNIQUE constraint on
+     * users.member_id). NULL for members who don't have a login.
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class);
+    }
+
     public function departments()
     {
         return $this->belongsToMany(Department::class, 'department_members')
