@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getMember, getMemberGiving, downloadGivingStatement } from '../../api/members'
+import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader } from '../../api/members'
+import { getCells } from '../../api/cells'
+import { getDepartments } from '../../api/departments'
 import { usePermission } from '../../hooks/usePermission'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -29,6 +31,7 @@ const cardBase = {
 export default function MemberDetail() {
   const { id }   = useParams()
   const navigate = useNavigate()
+  const [promoteOpen, setPromoteOpen] = useState(false)
   const { can }  = usePermission()
 
   const [member,  setMember]  = useState(null)
@@ -124,6 +127,17 @@ export default function MemberDetail() {
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             Edit Profile
+          </button>
+        )}
+        {can('manage users') && !member.has_user_account && (
+          <button onClick={() => setPromoteOpen(true)}
+                  className="gap-2 inline-flex items-center"
+                  style={{padding:'10px 24px', backgroundColor:'var(--color-gold)', color:'var(--color-navy)', borderRadius:'8px', fontWeight:600}}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Promote to Leader
           </button>
         )}
       </div>
@@ -295,6 +309,154 @@ export default function MemberDetail() {
             </div>
           )}
         </div>
+      </div>
+      {promoteOpen && (
+        <PromoteModal member={member} onClose={() => setPromoteOpen(false)}
+                      onSuccess={() => { setPromoteOpen(false); window.location.reload() }} />
+      )}
+    </div>
+  )
+}
+
+function PromoteModal({ member, onClose, onSuccess }) {
+  const [mode, setMode]       = useState('form') // form | submitting | temp-password
+  const [type, setType]       = useState('cell')
+  const [units, setUnits]     = useState([])
+  const [targetId, setTargetId] = useState('')
+  const [email, setEmail]     = useState(
+    `${(member.first_name ?? '').toLowerCase()}.${(member.last_name ?? '').toLowerCase()}@wis-cms.local`.replace(/\s+/g, '')
+  )
+  const [nameOverride, setNameOverride] = useState('')
+  const [errors, setErrors]   = useState({})
+  const [serverErr, setServerErr] = useState('')
+  const [tempPassword, setTempPassword] = useState('')
+  const [unitName, setUnitName] = useState('')
+  const [copied, setCopied]   = useState(false)
+
+  // Load leaderless units when type changes
+  useEffect(() => {
+    let cancelled = false
+    setUnits([]); setTargetId('')
+    const fetcher = type === 'cell' ? getCells : getDepartments
+    fetcher({ per_page: 100 }).then(res => {
+      if (cancelled) return
+      const all = res.data.data ?? []
+      // Only show units without a current leader (matches backend hard-reject rule)
+      setUnits(all.filter(u => !u.leader_user_id && !u.leader_name))
+    }).catch(() => !cancelled && setServerErr('Could not load units.'))
+    return () => { cancelled = true }
+  }, [type])
+
+  const submit = async () => {
+    setMode('submitting'); setErrors({}); setServerErr('')
+    try {
+      const res = await promoteMemberToLeader(member.id, {
+        leadership_type: type,
+        target_id: targetId,
+        email: email.trim(),
+        name: nameOverride.trim() || null,
+      })
+      setTempPassword(res.data.temp_password)
+      setUnitName(res.data.data.unit.name)
+      setMode('temp-password')
+    } catch (err) {
+      if (err.response?.status === 422) {
+        setErrors(err.response.data.errors ?? {})
+        if (err.response.data.message) setServerErr(err.response.data.message)
+      } else {
+        setServerErr(err.response?.data?.message ?? 'Promotion failed.')
+      }
+      setMode('form')
+    }
+  }
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(13,31,60,0.6)'}}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg" style={{boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>
+            {mode === 'temp-password' ? 'Leader Created' : `Promote ${member.full_name} to Leader`}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">×</button>
+        </div>
+
+        {mode === 'temp-password' ? (
+          <div className="space-y-4">
+            <div className="rounded-lg p-3" style={{backgroundColor:'#dcfce7',border:'1px solid #86efac'}}>
+              <div style={{fontSize:'13px',fontWeight:600,color:'#15803d'}}>
+                {member.full_name} now leads {unitName}.
+              </div>
+              <div style={{fontSize:'12px',color:'#15803d',marginTop:'2px'}}>
+                Share this password — it will not be shown again.
+              </div>
+            </div>
+            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
+              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'var(--color-navy)',wordBreak:'break-all'}}>{tempPassword}</code>
+              <button onClick={copy} className="px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap"
+                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)', color:'white'}}>
+                {copied ? 'Copied ✓' : 'Copy'}
+              </button>
+            </div>
+            <p style={{fontSize:'12px',color:'#747780'}}>
+              The new leader will be required to change this password on first login.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={onSuccess} className="btn-primary px-6 py-2">Done</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {serverErr && (
+              <div className="rounded p-2" style={{backgroundColor:'#fee2e2',border:'1px solid #fecaca',fontSize:'12px',color:'#b91c1c'}}>
+                {serverErr}
+              </div>
+            )}
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Leadership Type *</label>
+              <div className="flex gap-3">
+                {[{ v:'cell', label:'Cell Leader' }, { v:'department', label:'Department Leader' }].map(opt => (
+                  <label key={opt.v} className="flex-1 cursor-pointer">
+                    <input type="radio" name="ltype" value={opt.v} checked={type === opt.v} onChange={() => setType(opt.v)} className="sr-only peer"/>
+                    <div className="rounded-lg p-3 text-center text-sm font-semibold transition-all" style={{
+                      border: type === opt.v ? '2px solid var(--color-navy)' : '1px solid var(--color-surface-border)',
+                      backgroundColor: type === opt.v ? '#eef2ff' : 'white',
+                      color: 'var(--color-navy)',
+                    }}>{opt.label}</div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>{type === 'cell' ? 'Cell' : 'Department'} to Lead *</label>
+              <select className="input-field" value={targetId} onChange={e => setTargetId(e.target.value)}>
+                <option value="">{units.length === 0 ? 'No leaderless units available' : 'Choose…'}</option>
+                {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              {errors.target_id && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.target_id[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Email *</label>
+              <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)}/>
+              {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Name (optional override)</label>
+              <input type="text" className="input-field" placeholder={member.full_name} value={nameOverride} onChange={e => setNameOverride(e.target.value)}/>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
+                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+              <button onClick={submit} disabled={mode === 'submitting' || !targetId || !email}
+                      className="btn-primary px-6 py-2" style={{opacity: (!targetId || !email) ? 0.5 : 1}}>
+                {mode === 'submitting' ? 'Promoting…' : 'Promote & Generate Login'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
