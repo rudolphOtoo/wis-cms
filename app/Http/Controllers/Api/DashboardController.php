@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceSession;
+use App\Models\Cell;
 use App\Models\Department;
 use App\Models\Member;
 use App\Models\Transaction;
@@ -19,7 +20,7 @@ class DashboardController extends Controller
 
         // Department leaders (not also admins) get a scoped dashboard:
         // their own department(s) only, NO church finances or church-wide data.
-        if ($user->hasRole('department_leader')
+        if ($user->hasAnyRole(['department_leader', 'cell_leader'])
             && ! $user->hasAnyRole(['super_admin', 'pastor', 'secretary'])) {
             return $this->leaderDashboard($user);
         }
@@ -235,13 +236,64 @@ class DashboardController extends Controller
                 ];
             });
 
+        // Cells the user leads (one-to-many members via cell_id). Mirrors
+        // the department mapping; cell attendance is scoped by cell_id and
+        // is empty until cell meetings are recorded.
+        $cells = Cell::where('branch_id', $user->branch_id)
+            ->where('leader_user_id', $user->id)
+            ->with(['members' => fn ($q) => $q->orderBy('first_name')])
+            ->get()
+            ->map(function ($cell) {
+                $members = $cell->members->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->full_name,
+                    'member_number' => $m->member_number,
+                    'phone' => $m->phone,
+                ]);
+
+                $sessions = AttendanceSession::where('branch_id', $cell->branch_id)
+                    ->where('cell_id', $cell->id)
+                    ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
+                    ->orderByDesc('service_date')
+                    ->get();
+
+                $memberCount = $cell->members->count();
+                $lastMeeting = $sessions->first();
+                $lastPresent = $lastMeeting?->present_count ?? 0;
+                $attendanceRate = ($memberCount > 0 && $lastMeeting)
+                    ? round(($lastPresent / $memberCount) * 100)
+                    : 0;
+                $meetingsThisMonth = $sessions
+                    ->filter(fn ($s) => $s->service_date->isSameMonth(now()))
+                    ->count();
+                $trend = $sessions->take(6)->reverse()->map(fn ($s) => [
+                    'date' => $s->service_date->format('d M'),
+                    'count' => $s->present_count,
+                ])->values();
+
+                return [
+                    'id' => $cell->id,
+                    'name' => $cell->name,
+                    'active_members' => $memberCount,
+                    'members' => $members->values(),
+                    'attendance' => [
+                        'last_present' => $lastPresent,
+                        'attendance_rate' => $attendanceRate,
+                        'meetings_this_month' => $meetingsThisMonth,
+                        'trend' => $trend,
+                    ],
+                ];
+            });
+
         return response()->json([
             'data' => [
-                'mode' => 'department_leader',
+                'mode' => 'leader',
                 'departments' => $departments->values(),
+                'cells' => $cells->values(),
                 'totals' => [
                     'departments_led' => $departments->count(),
-                    'total_active_members' => $departments->sum('active_members'),
+                    'cells_led' => $cells->count(),
+                    'total_active_members' => $departments->sum('active_members') + $cells->sum('active_members'),
                 ],
             ],
         ]);
