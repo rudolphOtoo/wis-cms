@@ -46,7 +46,11 @@ class Member extends Model
 
                 DB::transaction(function () use ($member, $year) {
                     // Acquire row lock on the highest-numbered member this year
-                    $last = static::where('member_number', 'like', "WIS-{$year}-%")
+                    // withTrashed: soft-deleted members KEEP their member_number,
+                    // so we must consider them when generating the next number to
+                    // avoid collisions with the (still present, soft-deleted) row.
+                    $last = static::withTrashed()
+                        ->where('member_number', 'like', "WIS-{$year}-%")
                         ->orderByDesc('member_number')
                         ->lockForUpdate()
                         ->first();

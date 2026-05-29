@@ -141,6 +141,11 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('users/{id}', [UserController::class, 'show']);
         Route::put('users/{id}', [UserController::class, 'update']);
         Route::delete('users/{id}', [UserController::class, 'destroy']);
+
+        // Member linking — for the User <-> Member architecture.
+        Route::post('users/{id}/link-member', [UserController::class, 'linkMember']);
+        Route::post('users/{id}/create-and-link', [UserController::class, 'createAndLinkMember']);
+        Route::delete('users/{id}/link-member', [UserController::class, 'unlinkMember']);
     });
 
     // AUDIT

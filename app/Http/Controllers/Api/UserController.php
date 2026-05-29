@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
+use App\Models\Member;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -146,6 +148,119 @@ class UserController extends Controller
             ->log("Deleted user: {$name}");
 
         return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+    /**
+     * Link a User to an existing Member record.
+     * Enforces: same-branch + UNIQUE constraint (one Member = one User).
+     */
+    public function linkMember(Request $request, string $id): JsonResponse
+    {
+        $user = User::where('branch_id', $request->user()->branch_id)->findOrFail($id);
+
+        $data = $request->validate([
+            'member_id' => ['required', 'uuid', 'exists:members,id'],
+        ]);
+
+        $member = Member::where('branch_id', $user->branch_id)
+            ->findOrFail($data['member_id']);
+
+        if ($user->member_id) {
+            return response()->json([
+                'message' => 'This user is already linked to a member. Unlink first.',
+            ], 422);
+        }
+
+        if (User::where('member_id', $member->id)->exists()) {
+            return response()->json([
+                'message' => 'Another user is already linked to this member.',
+            ], 422);
+        }
+
+        $user->update(['member_id' => $member->id]);
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Linked user {$user->name} to member {$member->first_name} {$member->last_name}");
+
+        return response()->json([
+            'message' => 'Member linked successfully.',
+            'data' => $this->transform($user->fresh()->load('member')),
+        ]);
+    }
+
+    /**
+     * Create a new Member from form data AND link to this User in one
+     * transaction. Useful when a leader exists as a User but has no
+     * Member record yet.
+     */
+    public function createAndLinkMember(Request $request, string $id): JsonResponse
+    {
+        $user = User::where('branch_id', $request->user()->branch_id)->findOrFail($id);
+
+        if ($user->member_id) {
+            return response()->json([
+                'message' => 'This user is already linked to a member.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:80'],
+            'last_name' => ['required', 'string', 'max:80'],
+            'gender' => ['required', 'in:male,female'],
+            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:150'],
+        ]);
+
+        $member = DB::transaction(function () use ($user, $data) {
+            $m = Member::create([
+                ...$data,
+                'branch_id' => $user->branch_id,
+                'status' => 'active',
+                'join_date' => now()->toDateString(),
+            ]);
+
+            $user->update(['member_id' => $m->id]);
+
+            return $m;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Created member {$member->first_name} {$member->last_name} and linked to user {$user->name}");
+
+        return response()->json([
+            'message' => 'Member created and linked successfully.',
+            'data' => $this->transform($user->fresh()->load('member')),
+        ], 201);
+    }
+
+    /**
+     * Unlink a User from their Member (sets member_id = NULL).
+     * The Member record is preserved — only the link is severed.
+     */
+    public function unlinkMember(Request $request, string $id): JsonResponse
+    {
+        $user = User::where('branch_id', $request->user()->branch_id)->findOrFail($id);
+
+        if (! $user->member_id) {
+            return response()->json([
+                'message' => 'This user is not linked to a member.',
+            ], 422);
+        }
+
+        $memberName = $user->member?->first_name.' '.$user->member?->last_name;
+        $user->update(['member_id' => null]);
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Unlinked user {$user->name} from member {$memberName}");
+
+        return response()->json([
+            'message' => 'Member unlinked successfully.',
+            'data' => $this->transform($user->fresh()),
+        ]);
     }
 
     protected function transform(User $user): array
