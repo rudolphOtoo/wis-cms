@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { getUsers, getUserRoles, createUser, updateUser, deleteUser } from '../../api/users'
+import { getUsers, getUserRoles, createUser, updateUser, deleteUser, linkMember, createAndLinkMember, unlinkMember } from '../../api/users'
+import { getMembers } from '../../api/members'
 import { useAuth } from '../../context/AuthContext'
 
 const cardBase = {
@@ -407,6 +408,11 @@ function UserModal({ user, roles, onClose, onSuccess }) {
                 </div>
               </label>
             </div>
+            {isEdit && (
+              <div className="md:col-span-2">
+                <MemberLinkPanel user={user} onChanged={onSuccess} />
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 mt-6 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
             <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
@@ -418,6 +424,181 @@ function UserModal({ user, roles, onClose, onSuccess }) {
         </form>
         )}
       </div>
+    </div>
+  )
+}
+
+function MemberLinkPanel({ user, onChanged }) {
+  const linked = user.member  // populated when backend includes member
+  const [mode, setMode]       = useState('view') // 'view' | 'pick' | 'create' | 'busy'
+  const [members, setMembers] = useState([])
+  const [selectedId, setSelectedId] = useState('')
+  const [search, setSearch]   = useState('')
+  const [createForm, setCreateForm] = useState({
+    first_name: '', last_name: '', gender: '', date_of_birth: '', phone: '', email: '',
+  })
+  const [errors, setErrors] = useState({})
+  const [notice, setNotice] = useState(null)
+
+  const openPicker = async () => {
+    setMode('pick'); setNotice(null); setSelectedId('')
+    try {
+      const res = await getMembers({ per_page: 200 })
+      setMembers(res.data.data ?? [])
+    } catch { setNotice({ ok: false, text: 'Could not load members.' }) }
+  }
+
+  const doLink = async () => {
+    if (!selectedId) return
+    setMode('busy'); setNotice(null)
+    try {
+      await linkMember(user.id, selectedId)
+      setNotice({ ok: true, text: 'Member linked.' })
+      onChanged?.()
+    } catch (err) {
+      setNotice({ ok: false, text: err.response?.data?.message ?? 'Could not link.' })
+      setMode('pick')
+    }
+  }
+
+  const doUnlink = async () => {
+    if (!confirm(`Unlink ${linked?.first_name ?? 'this member'} from this user? The user keeps their login.`)) return
+    setMode('busy')
+    try {
+      await unlinkMember(user.id)
+      setNotice({ ok: true, text: 'Member unlinked.' })
+      onChanged?.()
+    } catch (err) {
+      setNotice({ ok: false, text: err.response?.data?.message ?? 'Could not unlink.' })
+      setMode('view')
+    }
+  }
+
+  const doCreate = async () => {
+    setMode('busy'); setErrors({}); setNotice(null)
+    try {
+      await createAndLinkMember(user.id, {
+        ...createForm,
+        date_of_birth: createForm.date_of_birth || null,
+        phone: createForm.phone || null,
+        email: createForm.email || null,
+      })
+      setNotice({ ok: true, text: 'Member created and linked.' })
+      onChanged?.()
+    } catch (err) {
+      if (err.response?.status === 422) setErrors(err.response.data.errors ?? {})
+      else setNotice({ ok: false, text: err.response?.data?.message ?? 'Could not create member.' })
+      setMode('create')
+    }
+  }
+
+  const filteredMembers = members.filter(m =>
+    !search ||
+    `${m.first_name} ${m.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+    (m.member_number ?? '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="rounded-lg p-4" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <div style={{fontSize:'13px',fontWeight:700,color:'var(--color-navy)'}}>Member Link</div>
+          <p style={{fontSize:'12px',color:'#747780',marginTop:'2px'}}>Connect this login to a church member record.</p>
+        </div>
+      </div>
+
+      {notice && (
+        <div className="rounded p-2 mb-3" style={{backgroundColor: notice.ok ? '#dcfce7' : '#fee2e2', border: `1px solid ${notice.ok ? '#86efac' : '#fecaca'}`, fontSize:'12px', color: notice.ok ? '#15803d' : '#b91c1c'}}>
+          {notice.text}
+        </div>
+      )}
+
+      {/* LINKED state */}
+      {linked && mode === 'view' && (
+        <div className="bg-white rounded-lg p-3 flex items-start justify-between gap-3" style={{border:'1px solid var(--color-surface-border)'}}>
+          <div>
+            <div style={{fontWeight:600,color:'var(--color-navy)'}}>{linked.first_name} {linked.last_name}</div>
+            <div className="font-mono" style={{fontSize:'12px',color:'#747780'}}>{linked.member_number}</div>
+            {linked.phone && <div style={{fontSize:'12px',color:'#747780'}}>{linked.phone}</div>}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={openPicker} className="px-3 py-1.5 rounded text-xs font-semibold" style={{backgroundColor:'#edeef1',color:'var(--color-navy)'}}>Change</button>
+            <button type="button" onClick={doUnlink} className="px-3 py-1.5 rounded text-xs font-semibold" style={{backgroundColor:'#fef2f2',color:'#b91c1c'}}>Unlink</button>
+          </div>
+        </div>
+      )}
+
+      {/* NOT LINKED state */}
+      {!linked && mode === 'view' && (
+        <div className="flex gap-2">
+          <button type="button" onClick={openPicker} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:'var(--color-navy)',color:'white'}}>Link to existing member</button>
+          <button type="button" onClick={() => { setMode('create'); setNotice(null) }} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Create new member</button>
+        </div>
+      )}
+
+      {/* PICK existing */}
+      {mode === 'pick' && (
+        <div className="space-y-2">
+          <input type="text" className="input-field" placeholder="Search by name or member number..." value={search} onChange={e => setSearch(e.target.value)}/>
+          <select className="input-field" value={selectedId} onChange={e => setSelectedId(e.target.value)} size={Math.min(8, Math.max(3, filteredMembers.length))}>
+            {filteredMembers.length === 0 && <option value="">No members match.</option>}
+            {filteredMembers.map(m => (
+              <option key={m.id} value={m.id}>{m.first_name} {m.last_name} — {m.member_number} {m.phone ? `(${m.phone})` : ''}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={doLink} disabled={!selectedId} className="btn-primary text-sm px-4 py-2" style={{opacity: selectedId ? 1 : 0.5}}>Link</button>
+            <button type="button" onClick={() => setMode('view')} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE new */}
+      {mode === 'create' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>First Name *</label>
+              <input type="text" className="input-field" value={createForm.first_name} onChange={e => setCreateForm(f => ({...f, first_name: e.target.value}))}/>
+              {errors.first_name && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.first_name[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Last Name *</label>
+              <input type="text" className="input-field" value={createForm.last_name} onChange={e => setCreateForm(f => ({...f, last_name: e.target.value}))}/>
+              {errors.last_name && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.last_name[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Gender *</label>
+              <select className="input-field" value={createForm.gender} onChange={e => setCreateForm(f => ({...f, gender: e.target.value}))}>
+                <option value="">—</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+              {errors.gender && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.gender[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Date of Birth</label>
+              <input type="date" className="input-field" value={createForm.date_of_birth} onChange={e => setCreateForm(f => ({...f, date_of_birth: e.target.value}))}/>
+            </div>
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Phone</label>
+              <input type="text" className="input-field" value={createForm.phone} onChange={e => setCreateForm(f => ({...f, phone: e.target.value}))}/>
+            </div>
+            <div>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Email</label>
+              <input type="email" className="input-field" value={createForm.email} onChange={e => setCreateForm(f => ({...f, email: e.target.value}))}/>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={doCreate} className="btn-primary text-sm px-4 py-2">Create &amp; Link</button>
+            <button type="button" onClick={() => { setMode('view'); setErrors({}) }} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'busy' && (
+        <div className="text-sm" style={{color:'#747780'}}>Working…</div>
+      )}
     </div>
   )
 }

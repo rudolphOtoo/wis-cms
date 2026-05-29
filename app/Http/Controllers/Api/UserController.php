@@ -20,7 +20,7 @@ class UserController extends Controller
     {
         $query = User::query()
             ->where('branch_id', $request->user()->branch_id)
-            ->with('roles');
+            ->with(['roles', 'member']);
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -91,7 +91,7 @@ class UserController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $user = User::where('branch_id', $request->user()->branch_id)
-            ->with('roles')
+            ->with(['roles', 'member'])
             ->findOrFail($id);
 
         return response()->json(['data' => $this->transform($user)]);
@@ -274,6 +274,14 @@ class UserController extends Controller
             'role' => $user->roles->first()?->name,
             'role_label' => $user->roles->first() ? ucwords(str_replace('_', ' ', $user->roles->first()->name)) : null,
             'created_at' => $user->created_at->format('Y-m-d'),
+            'member_id' => $user->member_id,
+            'member' => $user->relationLoaded('member') && $user->member ? [
+                'id' => $user->member->id,
+                'first_name' => $user->member->first_name,
+                'last_name' => $user->member->last_name,
+                'member_number' => $user->member->member_number,
+                'phone' => $user->member->phone,
+            ] : null,
         ];
     }
 }
