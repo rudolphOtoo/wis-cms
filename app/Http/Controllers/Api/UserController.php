@@ -71,6 +71,7 @@ class UserController extends Controller
             'password' => Hash::make($tempPassword),
             'is_active' => $request->boolean('is_active', true),
             'must_change_password' => true,
+            'member_id' => $request->input('member_id'),
         ]);
         $user->assignRole($request->role);
 
