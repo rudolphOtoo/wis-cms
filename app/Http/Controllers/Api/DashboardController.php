@@ -287,7 +287,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'data' => [
-                'mode' => 'leader',
+                'mode' => 'department_leader',
                 'departments' => $departments->values(),
                 'cells' => $cells->values(),
                 'totals' => [

@@ -323,6 +323,7 @@ function LeaderDashboard({ data, user, navigate }) {
   const initials = (name) => name.split(' ').map(w => w.charAt(0)).slice(0,2).join('')
 
   const depts = data.departments ?? []
+  const cells = data.cells ?? []
 
   return (
     <div className="space-y-6" style={{maxWidth:'1440px'}}>
@@ -353,10 +354,10 @@ function LeaderDashboard({ data, user, navigate }) {
              style={{right:'-10%',top:'-50%',width:'384px',height:'384px',background:'rgba(255,255,255,0.05)',filter:'blur(60px)'}}/>
       </section>
 
-      {depts.length === 0 ? (
+      {depts.length === 0 && cells.length === 0 ? (
         <div className="rounded-xl text-center" style={{...cardStyle, padding:'48px'}}>
           <div className="text-4xl mb-3">🏛️</div>
-          <div className="font-semibold" style={{color:'var(--color-navy)'}}>No department assigned</div>
+          <div className="font-semibold" style={{color:'var(--color-navy)'}}>No department or cell assigned</div>
           <p className="text-sm mt-1" style={{color:'#6b7280'}}>An administrator will assign you to a department to lead.</p>
         </div>
       ) : depts.map(dept => (
@@ -496,6 +497,87 @@ function LeaderDashboard({ data, user, navigate }) {
                   ))}
                 </div>
               )}
+            </div>
+          </section>
+        </div>
+      ))}
+
+      {cells.map(cell => (
+        <div key={cell.id} className="space-y-6">
+          <section>
+            <h2 className="font-bold mb-1" style={{fontFamily:'var(--font-display)',fontSize:'24px',color:'var(--color-navy)'}}>
+              Cell — {cell.name}
+            </h2>
+            <p className="text-sm" style={{color:'#6b7280'}}>
+              {cell.active_members} member{cell.active_members === 1 ? '' : 's'} · Each member belongs to one cell.
+            </p>
+          </section>
+
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { label:'Active Members',      value: cell.active_members,                 icon: ICONS.people },
+              { label:'Last Meeting',        value: cell.attendance.last_present,        icon: ICONS.event  },
+              { label:'Attendance Rate',     value: `${cell.attendance.attendance_rate}%`, icon: ICONS.people },
+              { label:'Meetings This Month', value: cell.attendance.meetings_this_month, icon: ICONS.event  },
+            ].map(s => (
+              <div key={s.label} className="rounded-xl flex flex-col justify-between" style={{...cardStyle, minHeight:'130px'}}>
+                <div className="flex justify-between items-start">
+                  <p className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>{s.label}</p>
+                  <Icon path={s.icon} color="var(--color-navy)" size={20}/>
+                </div>
+                <span style={{fontFamily:'var(--font-display)',fontSize:'40px',fontWeight:700,lineHeight:1,color:'var(--color-navy)'}}>
+                  {s.value}
+                </span>
+              </div>
+            ))}
+          </section>
+
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="rounded-xl lg:col-span-2" style={cardStyle}>
+              <h3 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>
+                Attendance Trend
+              </h3>
+              {cell.attendance.trend.length === 0 ? (
+                <div className="text-center py-12" style={{color:'#9ca3af'}}>
+                  <div className="text-3xl mb-2">📋</div>
+                  <div className="text-sm font-semibold" style={{color:'var(--color-navy)'}}>No cell meetings recorded yet</div>
+                  <div className="text-xs mt-1">Use "Take Attendance" to record your first meeting.</div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={cell.attendance.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E9F2"/>
+                    <XAxis dataKey="date" stroke="#9ca3af" style={{fontSize:'12px'}}/>
+                    <YAxis stroke="#9ca3af" style={{fontSize:'12px'}} allowDecimals={false}/>
+                    <Tooltip contentStyle={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',borderRadius:'8px',fontSize:'12px'}}/>
+                    <Line type="monotone" dataKey="count" stroke="var(--color-navy)" strokeWidth={2.5}
+                          dot={{ fill:'var(--color-navy)', r:4 }} activeDot={{ r:6 }} name="Present"/>
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="rounded-xl" style={cardStyle}>
+              <h3 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>Quick Actions</h3>
+              <div className="space-y-3">
+                <button onClick={() => navigate(`/cells/${cell.id}`)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'var(--color-navy)',color:'white'}}>
+                  <Icon path={ICONS.people} color="white" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Manage Members</span>
+                </button>
+                <button onClick={() => navigate('/attendance/new')}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'white',border:'2px solid var(--color-gold)',color:'var(--color-navy)'}}>
+                  <Icon path={ICONS.event} color="var(--color-navy)" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Take Attendance</span>
+                </button>
+                <button onClick={() => alert('Cell messaging arrives in the next update.')}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
+                        style={{padding:'16px',backgroundColor:'#f2f3f6',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)',opacity:0.85}}>
+                  <Icon path={ICONS.people} color="var(--color-navy)" size={20}/>
+                  <span style={{fontSize:'14px',fontWeight:600}}>Message Members</span>
+                </button>
+              </div>
             </div>
           </section>
         </div>
