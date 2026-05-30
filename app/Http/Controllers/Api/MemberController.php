@@ -362,4 +362,60 @@ class MemberController extends Controller
             'temp_password' => $tempPassword,
         ], 201);
     }
+
+    /**
+     * Create a User account for a Member (member-portal login).
+     *
+     * Parallel to promoteToLeader but for the simpler case: a Member
+     * gets a login WITHOUT being appointed to lead anything. They
+     * get the 'member' role and can sign in to /portal to view their
+     * giving, attendance, and profile.
+     *
+     * Architecture: same atomic-transaction shape as promoteToLeader.
+     * The User is linked to the Member via member_id from the start;
+     * the UNIQUE constraint ensures one-User-per-Member at the DB level.
+     */
+    public function createLogin(Request $request, string $id): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+        $member = Member::where('branch_id', $branchId)->findOrFail($id);
+
+        $data = $request->validate([
+            'email' => ['required', 'email', 'unique:users,email', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        if (User::where('member_id', $member->id)->exists()) {
+            return response()->json([
+                'message' => 'This member already has a user account.',
+            ], 422);
+        }
+
+        $tempPassword = Str::password(12);
+
+        $user = DB::transaction(function () use ($member, $data, $tempPassword, $branchId) {
+            $newUser = User::create([
+                'branch_id' => $branchId,
+                'name' => $data['name'] ?? trim("{$member->first_name} {$member->last_name}"),
+                'email' => $data['email'],
+                'password' => Hash::make($tempPassword),
+                'is_active' => true,
+                'must_change_password' => true,
+                'member_id' => $member->id,
+            ]);
+            $newUser->assignRole('member');
+
+            return $newUser;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Created member-portal login for {$member->first_name} {$member->last_name}");
+
+        return response()->json([
+            'message' => "Login created for {$member->first_name}.",
+            'data' => ['user_id' => $user->id, 'role' => 'member'],
+            'temp_password' => $tempPassword,
+        ], 201);
+    }
 }

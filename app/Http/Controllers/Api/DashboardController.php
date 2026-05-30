@@ -25,6 +25,18 @@ class DashboardController extends Controller
             return $this->leaderDashboard($user);
         }
 
+        // PRIVACY GUARDRAIL: the admin payload includes church-wide
+        // finances, membership composition, attendance trends, and
+        // recent transactions. Only roles entrusted with church-wide
+        // visibility may see it. Pure members and other non-admin
+        // roles receive 403 here; the frontend redirects them to
+        // /portal (their personal view).
+        if (! $user->hasAnyRole(['super_admin', 'pastor', 'secretary', 'finance_officer'])) {
+            return response()->json([
+                'message' => 'You do not have permission to view the admin dashboard.',
+            ], 403);
+        }
+
         $branchId = $user->branch_id;
         $now = now();
 

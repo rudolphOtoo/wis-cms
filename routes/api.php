@@ -150,6 +150,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         // Promote a Member to leadership of a specific cell or department.
         // Atomic: creates User + assigns role + links member + sets unit leader.
         Route::post('members/{id}/promote-to-leader', [MemberController::class, 'promoteToLeader']);
+        Route::post('members/{id}/create-login', [MemberController::class, 'createLogin']);
     });
 
     // AUDIT

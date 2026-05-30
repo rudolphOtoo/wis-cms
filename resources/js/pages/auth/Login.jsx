@@ -12,7 +12,19 @@ export default function Login() {
   useEffect(() => {
     if (isAuthenticated) {
       if (user?.must_change_password) navigate('/change-password', { replace: true })
-      else navigate(hasRole('member') ? '/portal' : '/dashboard', { replace: true })
+      else {
+        // Architecture: pure members (only the 'member' role) land on the
+        // member portal; anyone with leadership goes to the unified dashboard.
+        // A user with BOTH 'member' and 'cell_leader' is a leader, not pure.
+        const isPureMember = hasRole('member')
+          && !hasRole('cell_leader')
+          && !hasRole('department_leader')
+          && !hasRole('pastor')
+          && !hasRole('secretary')
+          && !hasRole('finance_officer')
+          && !hasRole('super_admin')
+        navigate(isPureMember ? '/portal' : '/dashboard', { replace: true })
+      }
     }
   }, [isAuthenticated])
 
@@ -36,7 +48,15 @@ export default function Login() {
       if (data?.user?.must_change_password) {
         navigate('/change-password', { replace: true })
       } else {
-        navigate(data?.user?.roles?.includes('member') ? '/portal' : '/dashboard', { replace: true })
+        const roles = data?.user?.roles ?? []
+        const isPureMember = roles.includes('member')
+          && !roles.includes('cell_leader')
+          && !roles.includes('department_leader')
+          && !roles.includes('pastor')
+          && !roles.includes('secretary')
+          && !roles.includes('finance_officer')
+          && !roles.includes('super_admin')
+        navigate(isPureMember ? '/portal' : '/dashboard', { replace: true })
       }
     } catch (_) {}
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader } from '../../api/members'
+import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader, createMemberLogin } from '../../api/members'
 import { getCells } from '../../api/cells'
 import { getDepartments } from '../../api/departments'
 import { usePermission } from '../../hooks/usePermission'
@@ -32,6 +32,7 @@ export default function MemberDetail() {
   const { id }   = useParams()
   const navigate = useNavigate()
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [loginOpen, setLoginOpen] = useState(false)
   const { can }  = usePermission()
 
   const [member,  setMember]  = useState(null)
@@ -138,6 +139,17 @@ export default function MemberDetail() {
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             Promote to Leader
+          </button>
+        )}
+        {can('manage users') && !member.has_user_account && (
+          <button onClick={() => setLoginOpen(true)}
+                  className="gap-2 inline-flex items-center"
+                  style={{padding:'10px 24px', backgroundColor:'white', color:'var(--color-navy)', border:'1px solid var(--color-navy)', borderRadius:'8px', fontWeight:600}}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            Add Login
           </button>
         )}
       </div>
@@ -314,6 +326,10 @@ export default function MemberDetail() {
         <PromoteModal member={member} onClose={() => setPromoteOpen(false)}
                       onSuccess={() => { setPromoteOpen(false); window.location.reload() }} />
       )}
+      {loginOpen && (
+        <LoginAccountModal member={member} onClose={() => setLoginOpen(false)}
+                           onSuccess={() => { setLoginOpen(false); window.location.reload() }} />
+      )}
     </div>
   )
 }
@@ -453,6 +469,110 @@ function PromoteModal({ member, onClose, onSuccess }) {
               <button onClick={submit} disabled={mode === 'submitting' || !targetId || !email}
                       className="btn-primary px-6 py-2" style={{opacity: (!targetId || !email) ? 0.5 : 1}}>
                 {mode === 'submitting' ? 'Promoting…' : 'Promote & Generate Login'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LoginAccountModal({ member, onClose, onSuccess }) {
+  const [mode, setMode]       = useState('form')
+  const [email, setEmail]     = useState(
+    `${(member.first_name ?? '').toLowerCase()}.${(member.last_name ?? '').toLowerCase()}@wis-cms.local`.replace(/\s+/g, '')
+  )
+  const [nameOverride, setNameOverride] = useState('')
+  const [errors, setErrors]   = useState({})
+  const [serverErr, setServerErr] = useState('')
+  const [tempPassword, setTempPassword] = useState('')
+  const [copied, setCopied]   = useState(false)
+
+  const submit = async () => {
+    setMode('submitting'); setErrors({}); setServerErr('')
+    try {
+      const res = await createMemberLogin(member.id, {
+        email: email.trim(),
+        name: nameOverride.trim() || null,
+      })
+      setTempPassword(res.data.temp_password)
+      setMode('temp-password')
+    } catch (err) {
+      if (err.response?.status === 422) {
+        setErrors(err.response.data.errors ?? {})
+        if (err.response.data.message) setServerErr(err.response.data.message)
+      } else {
+        setServerErr(err.response?.data?.message ?? 'Could not create login.')
+      }
+      setMode('form')
+    }
+  }
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(13,31,60,0.6)'}}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md" style={{boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>
+            {mode === 'temp-password' ? 'Login Created' : `Add Login for ${member.full_name}`}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">×</button>
+        </div>
+
+        {mode === 'temp-password' ? (
+          <div className="space-y-4">
+            <div className="rounded-lg p-3" style={{backgroundColor:'#dcfce7',border:'1px solid #86efac'}}>
+              <div style={{fontSize:'13px',fontWeight:600,color:'#15803d'}}>
+                {member.full_name} can now sign in to the member portal.
+              </div>
+              <div style={{fontSize:'12px',color:'#15803d',marginTop:'2px'}}>
+                Share this password — it will not be shown again.
+              </div>
+            </div>
+            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
+              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'var(--color-navy)',wordBreak:'break-all'}}>{tempPassword}</code>
+              <button onClick={copy} className="px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap"
+                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)', color:'white'}}>
+                {copied ? 'Copied ✓' : 'Copy'}
+              </button>
+            </div>
+            <p style={{fontSize:'12px',color:'#747780'}}>
+              They will be required to change this password on first login.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={onSuccess} className="btn-primary px-6 py-2">Done</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {serverErr && (
+              <div className="rounded p-2" style={{backgroundColor:'#fee2e2',border:'1px solid #fecaca',fontSize:'12px',color:'#b91c1c'}}>
+                {serverErr}
+              </div>
+            )}
+            <p style={{fontSize:'13px',color:'#44474f'}}>
+              Create a member-portal login for {member.full_name}. They will be assigned the 'member' role
+              and can view their giving, attendance, and profile.
+            </p>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Email *</label>
+              <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)}/>
+              {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Name (optional)</label>
+              <input type="text" className="input-field" placeholder={member.full_name} value={nameOverride} onChange={e => setNameOverride(e.target.value)}/>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
+                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+              <button onClick={submit} disabled={mode === 'submitting' || !email}
+                      className="btn-primary px-6 py-2" style={{opacity: !email ? 0.5 : 1}}>
+                {mode === 'submitting' ? 'Creating…' : 'Create Login'}
               </button>
             </div>
           </div>

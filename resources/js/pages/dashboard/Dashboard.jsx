@@ -48,7 +48,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getDashboard().then(res => setData(res.data.data)).catch(console.error).finally(() => setLoading(false))
+    getDashboard()
+      .then(res => setData(res.data.data))
+      .catch(err => {
+        // Backend privacy guardrail: a non-admin user (e.g. a pure
+        // 'member') reaching /dashboard gets 403. Redirect them to
+        // their proper home rather than showing a broken page.
+        if (err.response?.status === 403) {
+          navigate('/portal', { replace: true })
+        } else {
+          console.error(err)
+        }
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) return (
