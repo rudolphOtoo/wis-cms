@@ -17,7 +17,14 @@ class CellController extends Controller
      */
     protected function scopedQuery(Request $request)
     {
-        return Cell::query()->where('branch_id', $request->user()->branch_id);
+        $user = $request->user();
+        $query = Cell::query()->where('branch_id', $user->branch_id);
+        $seesAll = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+        if (! $seesAll && $user->hasRole('cell_leader')) {
+            $query->where('leader_user_id', $user->id);
+        }
+
+        return $query;
     }
 
     public function index(Request $request): JsonResponse

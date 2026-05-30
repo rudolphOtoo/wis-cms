@@ -2,18 +2,24 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getServiceTypes, createSession } from '../../api/attendance'
 import { getDepartments } from '../../api/departments'
+import { getCells } from '../../api/cells'
 import { useAuth } from '../../context/AuthContext'
 
 export default function NewSession() {
   const navigate = useNavigate()
   const { hasRole } = useAuth()
-  const isLeader = hasRole('department_leader') && !hasRole('super_admin') && !hasRole('pastor') && !hasRole('secretary')
+  const notAdmin = !hasRole('super_admin') && !hasRole('pastor') && !hasRole('secretary')
+  const isDeptLeader = hasRole('department_leader') && notAdmin
+  const isCellLeader = hasRole('cell_leader') && notAdmin
+  const isLeader = isDeptLeader || isCellLeader
 
   const [serviceTypes, setServiceTypes] = useState([])
   const [myDepartments, setMyDepartments] = useState([])
+  const [myCells, setMyCells] = useState([])
   const [form, setForm] = useState({
     service_type_id: '',
     department_id: '',
+    cell_id: '',
     service_date: new Date().toISOString().split('T')[0],
     notes: '',
   })
@@ -24,12 +30,13 @@ export default function NewSession() {
   useEffect(() => {
     Promise.all([
       getServiceTypes().then(res => res.data.data),
-      isLeader ? getDepartments().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
-    ]).then(([types, depts]) => {
+      isDeptLeader ? getDepartments().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
+      isCellLeader ? getCells().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
+    ]).then(([types, depts, cells]) => {
       setServiceTypes(types)
       setMyDepartments(depts)
-      // For a leader, default the service type to "Department Meeting"
-      if (isLeader) {
+      setMyCells(cells)
+      if (isDeptLeader) {
         const deptMeeting = types.find(t => t.name === 'Department Meeting')
         setForm(f => ({
           ...f,
@@ -37,8 +44,16 @@ export default function NewSession() {
           department_id: depts.length === 1 ? depts[0].id : '',
         }))
       }
+      if (isCellLeader) {
+        const cellMeeting = types.find(t => t.name === 'Cell Meeting')
+        setForm(f => ({
+          ...f,
+          service_type_id: cellMeeting?.id ?? '',
+          cell_id: cells.length === 1 ? cells[0].id : '',
+        }))
+      }
     }).finally(() => setFetching(false))
-  }, [isLeader])
+  }, [isDeptLeader, isCellLeader])
 
   const set = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }))
@@ -50,9 +65,10 @@ export default function NewSession() {
     setLoading(true)
     setErrors({})
     try {
-      // Only send department_id when it's set (leader meeting)
+      // Only send the scope field that's relevant
       const payload = { ...form }
       if (!payload.department_id) delete payload.department_id
+      if (!payload.cell_id) delete payload.cell_id
       const res = await createSession(payload)
       navigate(`/attendance/${res.data.data.id}`)
     } catch (err) {
@@ -84,17 +100,19 @@ export default function NewSession() {
         </button>
         <div>
           <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-            {isLeader ? 'Record Department Meeting' : 'Take Attendance'}
+            {isCellLeader ? 'Record Cell Meeting' : isDeptLeader ? 'Record Department Meeting' : 'Take Attendance'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
-            {isLeader ? 'Record attendance for your department meeting' : 'Select the service and date to begin'}
+            {isCellLeader ? 'Record attendance for your cell meeting'
+              : isDeptLeader ? 'Record attendance for your department meeting'
+              : 'Select the service and date to begin'}
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-4">
-        {/* Department picker — leaders only */}
-        {isLeader && (
+        {/* Department picker — dept leaders only */}
+        {isDeptLeader && (
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
               Department *
@@ -112,6 +130,29 @@ export default function NewSession() {
             )}
             {errors.department_id && (
               <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.department_id[0]}</p>
+            )}
+          </div>
+        )}
+
+        {/* Cell picker — cell leaders only */}
+        {isCellLeader && (
+          <div>
+            <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
+              Cell *
+            </label>
+            {myCells.length === 0 ? (
+              <div className="input-field" style={{color:'#9ca3af'}}>You don't lead a cell yet.</div>
+            ) : (
+              <select className="input-field" value={form.cell_id}
+                      onChange={set('cell_id')} required>
+                <option value="">Select cell...</option>
+                {myCells.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+            {errors.cell_id && (
+              <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.cell_id[0]}</p>
             )}
           </div>
         )}
@@ -141,7 +182,7 @@ export default function NewSession() {
 
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
-            {isLeader ? 'Meeting Date *' : 'Service Date *'}
+            {(isDeptLeader || isCellLeader) ? 'Meeting Date *' : 'Service Date *'}
           </label>
           <input type="date" className="input-field" value={form.service_date}
                  onChange={set('service_date')} required/>
@@ -156,7 +197,7 @@ export default function NewSession() {
           </label>
           <textarea className="input-field" value={form.notes}
                     onChange={set('notes')} rows={2}
-                    placeholder={isLeader ? 'e.g. Weekly rehearsal' : 'e.g. Easter Sunday, Special service...'}/>
+                    placeholder={isCellLeader ? 'e.g. Bible study, Prayer meeting' : isDeptLeader ? 'e.g. Weekly rehearsal' : 'e.g. Easter Sunday, Special service...'}/>
         </div>
 
         <div className="flex gap-3 pt-2">
@@ -165,7 +206,7 @@ export default function NewSession() {
                   style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
             Cancel
           </button>
-          <button type="submit" disabled={loading || (isLeader && myDepartments.length === 0)} className="flex-1 btn-primary py-2.5">
+          <button type="submit" disabled={loading || (isDeptLeader && myDepartments.length === 0) || (isCellLeader && myCells.length === 0)} className="flex-1 btn-primary py-2.5">
             {loading ? 'Starting...' : 'Start Taking Attendance →'}
           </button>
         </div>
