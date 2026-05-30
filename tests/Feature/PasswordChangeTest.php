@@ -79,7 +79,7 @@ class PasswordChangeTest extends TestCase
 
         // Same token can now reach a normal route
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/dashboard')
+            ->getJson('/api/auth/me')
             ->assertOk();
     }
 
@@ -89,7 +89,7 @@ class PasswordChangeTest extends TestCase
         $token = $this->tokenFor($user);
 
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/dashboard')
+            ->getJson('/api/auth/me')
             ->assertOk();
     }
 }
