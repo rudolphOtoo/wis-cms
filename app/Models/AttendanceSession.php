@@ -14,7 +14,7 @@ class AttendanceSession extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'service_type_id', 'department_id', 'service_date', 'notes', 'recorded_by',
+        'branch_id', 'service_type_id', 'department_id', 'cell_id', 'service_date', 'notes', 'recorded_by',
     ];
 
     protected function casts(): array

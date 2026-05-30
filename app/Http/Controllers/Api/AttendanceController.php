@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AttendanceSessionResource;
 use App\Models\AttendanceRecord;
 use App\Models\AttendanceSession;
+use App\Models\Cell;
 use App\Models\Children;
 use App\Models\Department;
 use App\Models\Member;
@@ -52,7 +53,16 @@ class AttendanceController extends Controller
             'service_date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
             'department_id' => ['nullable', 'uuid', 'exists:departments,id'],
+            'cell_id' => ['nullable', 'uuid', 'exists:cells,id'],
         ]);
+
+        // A session is one of: church service, department meeting, OR cell meeting.
+        // Cannot be both a dept and a cell meeting.
+        if ($request->department_id && $request->cell_id) {
+            return response()->json([
+                'message' => 'A session cannot be both a department and a cell meeting.',
+            ], 422);
+        }
 
         // If a department is given, the user must actually lead it
         // (unless they're an admin-type role). Prevents recording meetings
@@ -72,10 +82,28 @@ class AttendanceController extends Controller
             }
         }
 
-        // Prevent duplicate session
+        // Same scoping for cells: a cell_leader can only record meetings
+        // for cells they actually lead.
+        $cellId = $request->cell_id;
+        if ($cellId) {
+            $user = $request->user();
+            $leadsCell = Cell::where('id', $cellId)
+                ->where('branch_id', $user->branch_id)
+                ->where('leader_user_id', $user->id)
+                ->exists();
+            $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+            if (! $leadsCell && ! $isAdmin) {
+                return response()->json([
+                    'message' => 'You can only record meetings for a cell you lead.',
+                ], 403);
+            }
+        }
+
+        // Prevent duplicate session (scoped by the right axis: service / dept / cell)
         $existing = AttendanceSession::where('branch_id', $request->user()->branch_id)
             ->where('service_type_id', $request->service_type_id)
             ->where('department_id', $departmentId)
+            ->where('cell_id', $cellId)
             ->whereDate('service_date', $request->service_date)
             ->first();
 
@@ -90,6 +118,7 @@ class AttendanceController extends Controller
             'branch_id' => $request->user()->branch_id,
             'service_type_id' => $request->service_type_id,
             'department_id' => $departmentId,
+            'cell_id' => $cellId,
             'service_date' => $request->service_date,
             'notes' => $request->notes,
             'recorded_by' => $request->user()->id,
@@ -131,6 +160,18 @@ class AttendanceController extends Controller
             // Department meeting: only this department's members
             $dept = Department::with('members')->find($session->department_id);
             $people = ($dept?->members ?? collect())
+                ->sortBy('first_name')
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->full_name,
+                    'type' => 'member',
+                    'member_number' => $m->member_number,
+                    'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
+                ])->values();
+        } elseif ($session->cell_id) {
+            // Cell meeting: only this cell's members (one-to-many via cell_id)
+            $cell = Cell::with('members')->find($session->cell_id);
+            $people = ($cell?->members ?? collect())
                 ->sortBy('first_name')
                 ->map(fn ($m) => [
                     'id' => $m->id,
