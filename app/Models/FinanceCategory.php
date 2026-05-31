@@ -15,7 +15,7 @@ class FinanceCategory extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'name', 'type', 'description', 'is_active',
+        'name', 'type', 'description', 'is_active', 'display_order',
     ];
 
     protected function casts(): array

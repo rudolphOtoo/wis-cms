@@ -71,7 +71,7 @@ class FinanceController extends Controller
     public function categories(Request $request): JsonResponse
     {
         $type = $request->get('type'); // income | expense | null
-        $query = FinanceCategory::where('is_active', true)->orderBy('name');
+        $query = FinanceCategory::where('is_active', true)->orderBy('display_order')->orderBy('name');
         if ($type) {
             $query->where('type', $type);
         }
