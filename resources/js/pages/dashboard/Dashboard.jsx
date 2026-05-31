@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { getDashboard } from '../../api/dashboard'
 import { messageDepartment } from '../../api/departments'
+import { messageCell } from '../../api/cells'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtShort = (n) => {
@@ -321,6 +322,7 @@ export default function Dashboard() {
 
 function LeaderDashboard({ data, user, navigate }) {
   const [msgDept, setMsgDept] = useState(null)
+  const [msgCell, setMsgCell] = useState(null)
   const cardStyle = {
     backgroundColor:'#fff', border:'1px solid var(--color-surface-border)',
     boxShadow:'0 4px 12px rgba(13,31,60,0.05)', padding:'24px',
@@ -583,7 +585,7 @@ function LeaderDashboard({ data, user, navigate }) {
                   <Icon path={ICONS.event} color="var(--color-navy)" size={20}/>
                   <span style={{fontSize:'14px',fontWeight:600}}>Take Attendance</span>
                 </button>
-                <button onClick={() => alert('Cell messaging arrives in the next update.')}
+                <button onClick={() => setMsgCell(cell)}
                         className="w-full flex items-center justify-center gap-2 rounded-xl transition-colors"
                         style={{padding:'16px',backgroundColor:'#f2f3f6',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)',opacity:0.85}}>
                   <Icon path={ICONS.people} color="var(--color-navy)" size={20}/>
@@ -598,11 +600,16 @@ function LeaderDashboard({ data, user, navigate }) {
       {msgDept && (
         <MessageModal dept={msgDept} onClose={() => setMsgDept(null)} />
       )}
+      {msgCell && (
+        <MessageModal cell={msgCell} onClose={() => setMsgCell(null)} />
+      )}
     </div>
   )
 }
 
-function MessageModal({ dept, onClose }) {
+function MessageModal({ dept, cell, onClose }) {
+  const target = dept || cell
+  const isCell = !!cell
   const [channel, setChannel] = useState('sms')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
@@ -614,7 +621,9 @@ function MessageModal({ dept, onClose }) {
     setSending(true)
     setResult(null)
     try {
-      const res = await messageDepartment(dept.id, { subject: subject || null, body, channel })
+      const res = isCell
+        ? await messageCell(cell.id, { subject: subject || null, body, channel })
+        : await messageDepartment(dept.id, { subject: subject || null, body, channel })
       setResult({ ok: true, text: res.data.message || 'Message sent.' })
     } catch (err) {
       const msg = err.response?.data?.message || 'Could not send the message.'
@@ -635,8 +644,8 @@ function MessageModal({ dept, onClose }) {
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl">
         <div className="px-6 pt-6 pb-4 flex justify-between items-start" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
           <div>
-            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>Message {dept.name}</h2>
-            <p style={{fontSize:'13px',color:'#747780',marginTop:'2px'}}>Sent to your department's members with contact details.</p>
+            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>Message {target.name}</h2>
+            <p style={{fontSize:'13px',color:'#747780',marginTop:'2px'}}>{isCell ? "Sent to your cell members with contact details." : "Sent to your department members with contact details."}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" style={{color:'#747780'}}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>

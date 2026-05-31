@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Cell;
 use App\Models\Member;
+use App\Models\Message;
+use App\Models\MessageRecipient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CellController extends Controller
 {
@@ -178,5 +182,88 @@ class CellController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * Send a broadcast message to all members of this cell.
+     *
+     * Permission: cell_leader gets 'message own cell'; admins
+     * bypass via the route middleware. scopedQuery (which is
+     * ownership-aware after the Phase 2 fix) ensures a cell_leader
+     * can only target cells they actually lead - findOrFail returns
+     * 404 if they pass someone else's id.
+     *
+     * Mirrors DepartmentController::message; the only differences
+     * are 'cell_id' instead of 'department_id' on the message row
+     * and 'recipient_group' = 'cell'.
+     */
+    public function message(Request $request, string $id): JsonResponse
+    {
+        $cell = $this->scopedQuery($request)->findOrFail($id);
+
+        $request->validate([
+            'subject' => ['nullable', 'string', 'max:200'],
+            'body' => ['required', 'string'],
+            'channel' => ['required', 'in:sms,email,both'],
+        ]);
+
+        $recipients = $cell->members()
+            ->where(function ($q) use ($request) {
+                if ($request->channel === 'email') {
+                    $q->whereNotNull('email')->where('email', '!=', '');
+                } elseif ($request->channel === 'sms') {
+                    $q->whereNotNull('phone')->where('phone', '!=', '');
+                } else {
+                    $q->where(function ($inner) {
+                        $inner->whereNotNull('email')->where('email', '!=', '')
+                            ->orWhereNotNull('phone')->where('phone', '!=', '');
+                    });
+                }
+            })
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return response()->json([
+                'message' => 'No members in this cell have contact details for the selected channel.',
+            ], 422);
+        }
+
+        $msg = DB::transaction(function () use ($request, $cell, $recipients) {
+            $message = Message::create([
+                'branch_id' => $request->user()->branch_id,
+                'sender_id' => $request->user()->id,
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'channel' => $request->channel,
+                'status' => 'sending',
+                'recipient_group' => 'cell',
+                'cell_id' => $cell->id,
+                'sent_at' => now(),
+            ]);
+
+            foreach ($recipients as $member) {
+                $r = MessageRecipient::create([
+                    'message_id' => $message->id,
+                    'member_id' => $member->id,
+                    'phone' => $member->phone,
+                    'email' => $member->email,
+                    'delivery_status' => 'pending',
+                ]);
+                SendBroadcastMessageJob::dispatch($r->id);
+            }
+
+            $message->update(['status' => 'sent']);
+
+            return $message;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($msg)
+            ->log("Sent message to {$cell->name} cell ({$recipients->count()} recipients)");
+
+        return response()->json([
+            'message' => "Message queued for {$recipients->count()} member(s) of {$cell->name}.",
+            'data' => ['message_id' => $msg->id, 'recipient_count' => $recipients->count()],
+        ], 201);
     }
 }

@@ -15,7 +15,7 @@ class Message extends Model
 
     protected $fillable = [
         'branch_id', 'sender_id', 'subject', 'body', 'channel',
-        'status', 'recipient_group', 'department_id', 'sent_at',
+        'status', 'recipient_group', 'department_id', 'cell_id', 'sent_at',
     ];
 
     protected function casts(): array

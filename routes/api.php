@@ -92,6 +92,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::delete('cells/{id}/members/{memberId}', [CellController::class, 'unassignMember']);
     });
     Route::middleware('permission:message own department')->post('departments/{id}/message', [DepartmentController::class, 'message']);
+    Route::middleware('permission:message own cell')->post('cells/{id}/message', [CellController::class, 'message']);
     Route::middleware('permission:manage department members')->group(function () {
         Route::post('departments/{id}/members', [DepartmentController::class, 'addMember']);
         Route::delete('departments/{id}/members/{memberId}', [DepartmentController::class, 'removeMember']);
