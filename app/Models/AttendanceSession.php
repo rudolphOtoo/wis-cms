@@ -14,12 +14,15 @@ class AttendanceSession extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'service_type_id', 'department_id', 'cell_id', 'service_date', 'notes', 'recorded_by',
+        'branch_id', 'service_type_id', 'department_id', 'cell_id', 'service_date', 'notes', 'recorded_by', 'follow_up_status', 'follow_up_sent_at',
     ];
 
     protected function casts(): array
     {
-        return ['service_date' => 'date'];
+        return [
+            'service_date' => 'date',
+            'follow_up_sent_at' => 'datetime',
+        ];
     }
 
     public function branch()
