@@ -22,7 +22,7 @@ class AttendanceController extends Controller
     {
         $sessions = AttendanceSession::query()
             ->where('branch_id', $request->user()->branch_id)
-            ->with(['serviceType', 'recorder'])
+            ->with(['serviceType', 'recorder', 'branch'])
             ->orderByDesc('service_date')
             ->paginate($request->get('per_page', 20));
 
@@ -130,7 +130,7 @@ class AttendanceController extends Controller
 
         return response()->json([
             'message' => 'Attendance session created.',
-            'data' => new AttendanceSessionResource($session->load('serviceType', 'recorder')),
+            'data' => new AttendanceSessionResource($session->load('serviceType', 'recorder', 'branch')),
         ], 201);
     }
 
@@ -138,7 +138,7 @@ class AttendanceController extends Controller
     public function showSession(Request $request, string $id): JsonResponse
     {
         $session = AttendanceSession::where('branch_id', $request->user()->branch_id)
-            ->with(['serviceType', 'recorder', 'records'])
+            ->with(['serviceType', 'recorder', 'records', 'branch'])
             ->findOrFail($id);
 
         // Get all members/children with their attendance status

@@ -100,6 +100,38 @@ export default function TakeAttendance() {
               Take Attendance: {session?.service_type?.name}
             </h2>
             <p style={{color:'#44474f'}}>{session?.service_date} · {total} people</p>
+
+            {/* Follow-up SMS status — automated post-meeting message lifecycle.
+                Only certain states surface a visible badge to the leader. */}
+            {session?.follow_up_status === 'not_sent' && session?.follow_up_scheduled_for && (
+              <div className="mt-2 inline-flex items-center gap-2"
+                   style={{backgroundColor:'#dbeafe',border:'1px solid #93c5fd',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',color:'#1e40af'}}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Follow-up SMS will be sent {new Date(session.follow_up_scheduled_for).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}
+              </div>
+            )}
+
+            {session?.follow_up_status === 'sent' && session?.follow_up_sent_at && (
+              <div className="mt-2 inline-flex items-center gap-2"
+                   style={{backgroundColor:'#dcfce7',border:'1px solid #86efac',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',color:'#15803d'}}>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                Follow-up sent {new Date(session.follow_up_sent_at).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}
+              </div>
+            )}
+
+            {session?.follow_up_status === 'failed' && (
+              <div className="mt-2 inline-flex items-center gap-2"
+                   style={{backgroundColor:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',color:'#991b1b'}}>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                Follow-up could not be sent. Contact admin.
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-full shadow-md"
