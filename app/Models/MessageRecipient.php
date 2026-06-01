@@ -15,7 +15,7 @@ class MessageRecipient extends Model
 
     protected $fillable = [
         'message_id', 'member_id', 'phone', 'email',
-        'delivery_status', 'delivered_at', 'failure_reason',
+        'delivery_status', 'delivered_at', 'failure_reason', 'rendered_body',
     ];
 
     protected function casts(): array

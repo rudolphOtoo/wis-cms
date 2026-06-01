@@ -18,3 +18,9 @@ Schedule::command('birthdays:send')->dailyAt('07:00');
 // (users with member-tied roles but no linked Member). In a healthy
 // system this always reports zero; alerts catch silent data drift.
 Schedule::command('app:audit-unlinked-leaders')->weeklyOn(1, '08:00');
+
+// Council-requested feature: automated post-meeting SMS follow-up.
+// Runs every 15 minutes, dispatches sessions ripe for sending
+// (branch.follow_up_enabled = true AND now >= created_at + delay_hours).
+// Idempotent; safe to re-run.
+Schedule::command('attendance:process-follow-ups')->everyFifteenMinutes();

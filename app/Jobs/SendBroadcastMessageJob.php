@@ -27,6 +27,10 @@ class SendBroadcastMessageJob implements ShouldQueue
         }
 
         $message = $recipient->message;
+        // Personalized per-recipient body wins; falls back to the shared
+        // message body for legacy broadcasts. Lets follow-up SMS render
+        // {name}/{date} per recipient while broadcast messaging works as before.
+        $body = $recipient->rendered_body ?: $message->body;
         $branchName = 'Wesleyan International Society';
         $channel = $message->channel;
 
@@ -40,7 +44,7 @@ class SendBroadcastMessageJob implements ShouldQueue
                     $attempted = true;
                     Mail::to($recipient->email)->send(new BroadcastMessage(
                         subjectLine: $message->subject ?? 'Church Announcement',
-                        messageBody: $message->body,
+                        messageBody: $body,
                         recipientName: $recipient->member?->full_name ?? 'Member',
                         branchName: $branchName,
                     ));
@@ -53,7 +57,7 @@ class SendBroadcastMessageJob implements ShouldQueue
             if (in_array($channel, ['sms', 'both'])) {
                 if ($recipient->phone) {
                     $attempted = true;
-                    $sent = $sms->send($recipient->phone, $message->body);
+                    $sent = $sms->send($recipient->phone, $body);
                     if (! $sent) {
                         $failures[] = 'SMS provider did not accept the message';
                     }

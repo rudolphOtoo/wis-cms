@@ -40,6 +40,11 @@ class AttendanceSession extends Model
         return $this->belongsTo(Department::class);
     }
 
+    public function cell()
+    {
+        return $this->belongsTo(Cell::class);
+    }
+
     public function recorder()
     {
         return $this->belongsTo(User::class, 'recorded_by');
