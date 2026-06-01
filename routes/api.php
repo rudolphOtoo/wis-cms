@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
 use App\Http\Middleware\EnsurePasswordChanged;
@@ -147,6 +148,11 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::post('users/{id}/link-member', [UserController::class, 'linkMember']);
         Route::post('users/{id}/create-and-link', [UserController::class, 'createAndLinkMember']);
         Route::delete('users/{id}/link-member', [UserController::class, 'unlinkMember']);
+
+        // Branch-level system settings: follow-up SMS templates, delay, toggle.
+        // Same admin gate as user management ('manage users').
+        Route::get('settings/follow-up', [SettingsController::class, 'show']);
+        Route::put('settings/follow-up', [SettingsController::class, 'updateFollowUp']);
 
         // Promote a Member to leadership of a specific cell or department.
         // Atomic: creates User + assigns role + links member + sets unit leader.

@@ -39,6 +39,11 @@ class User extends Authenticatable
         return $this->belongsTo(Member::class);
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function isMember(): bool
     {
         return $this->member_id !== null;
