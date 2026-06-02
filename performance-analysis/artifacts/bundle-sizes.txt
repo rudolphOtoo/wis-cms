@@ -1,0 +1,28 @@
+WIS-CMS Vite Production Build
+==============================
+Command: npm run build (repository root)
+Date: 2026-06-02
+Vite: v8.0.13
+Modules transformed: 684
+
+Output files (from build log):
+------------------------------
+public/build/manifest.json              0.38 kB │ gzip:   0.18 kB
+public/build/assets/app-BojPmarz.css   27.00 kB │ gzip:   5.85 kB
+public/build/assets/main-CA8Z6Aw2.js  956.28 kB │ gzip: 252.14 kB
+
+Build time: 2.41s
+
+Vite warning:
+---------------
+(!) Some chunks are larger than 500 kB after minification.
+Suggested: dynamic import(), code splitting, or adjust chunkSizeWarningLimit.
+
+Analysis notes:
+---------------
+- Single JS chunk (main-*.js) ~956 KB minified, ~252 KB gzip.
+- No route-based code splitting; all 30+ pages in one bundle.
+- Recharts (~3.8) is a major contributor inside the monolithic chunk.
+- CSS is modest (~27 KB); fonts loaded separately via Google Fonts @import in resources/css/app.css.
+
+Recommendations: see 04-frontend.md and 06-prioritized-roadmap.md Phase 2.
