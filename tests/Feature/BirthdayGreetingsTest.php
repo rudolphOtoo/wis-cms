@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Member;
 use App\Models\Message;
-use App\Services\ArkeselSmsService;
+use App\Services\MnotifySmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
@@ -36,7 +36,7 @@ class BirthdayGreetingsTest extends TestCase
     public function test_member_with_birthday_today_gets_a_greeting(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
 
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
@@ -54,7 +54,7 @@ class BirthdayGreetingsTest extends TestCase
     public function test_member_without_birthday_today_gets_nothing(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
 
         $this->makeMember(['date_of_birth' => '1990-01-15']); // not today
 
@@ -68,7 +68,7 @@ class BirthdayGreetingsTest extends TestCase
     public function test_year_is_ignored_only_month_and_day_matter(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
 
         // Born May 28 in different years — all should match a May 28 run
         $this->makeMember(['date_of_birth' => '1975-05-28', 'phone' => '0240000001']);
@@ -83,7 +83,7 @@ class BirthdayGreetingsTest extends TestCase
     {
         config(['church.birthday.enabled' => false]);
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
 
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
@@ -97,7 +97,7 @@ class BirthdayGreetingsTest extends TestCase
     public function test_inactive_member_gets_no_greeting(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
 
         $this->makeMember(['date_of_birth' => '1990-05-28', 'status' => 'inactive']);
 

@@ -7,7 +7,7 @@ use App\Models\Department;
 use App\Models\Member;
 use App\Models\MessageRecipient;
 use App\Models\User;
-use App\Services\ArkeselSmsService;
+use App\Services\MnotifySmsService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -66,7 +66,7 @@ class DepartmentMessagingTest extends TestCase
 
     public function test_leader_can_message_their_own_department(): void
     {
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
 
         $leader = $this->userWithRole('department_leader');
         $choir = $this->dept('Choir', $leader);
@@ -84,7 +84,7 @@ class DepartmentMessagingTest extends TestCase
 
     public function test_leader_cannot_message_a_department_they_dont_lead(): void
     {
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
 
         $leader = $this->userWithRole('department_leader');
         $this->dept('Choir', $leader);            // leads this

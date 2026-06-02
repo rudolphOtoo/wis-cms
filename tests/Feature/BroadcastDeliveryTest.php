@@ -8,7 +8,7 @@ use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Models\User;
-use App\Services\ArkeselSmsService;
+use App\Services\MnotifySmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -46,10 +46,10 @@ class BroadcastDeliveryTest extends TestCase
     public function test_sms_success_marks_delivered(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->once()->andReturn(true));
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->once()->andReturn(true));
 
         $r = $this->makeRecipient('sms');
-        (new SendBroadcastMessageJob($r->id))->handle(app(ArkeselSmsService::class));
+        (new SendBroadcastMessageJob($r->id))->handle(app(MnotifySmsService::class));
 
         $this->assertSame('delivered', $r->fresh()->delivery_status);
     }
@@ -57,10 +57,10 @@ class BroadcastDeliveryTest extends TestCase
     public function test_sms_failure_marks_failed_with_reason(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->once()->andReturn(false));
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->once()->andReturn(false));
 
         $r = $this->makeRecipient('sms');
-        (new SendBroadcastMessageJob($r->id))->handle(app(ArkeselSmsService::class));
+        (new SendBroadcastMessageJob($r->id))->handle(app(MnotifySmsService::class));
 
         $fresh = $r->fresh();
         $this->assertSame('failed', $fresh->delivery_status);
@@ -70,11 +70,11 @@ class BroadcastDeliveryTest extends TestCase
     public function test_sms_channel_with_no_phone_is_failed_not_delivered(): void
     {
         Mail::fake();
-        $this->mock(ArkeselSmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
 
         $r = $this->makeRecipient('sms', ['phone' => null]);
         $r->update(['phone' => null]);
-        (new SendBroadcastMessageJob($r->id))->handle(app(ArkeselSmsService::class));
+        (new SendBroadcastMessageJob($r->id))->handle(app(MnotifySmsService::class));
 
         // The honesty fix: no phone on an sms-only message = failed, NOT delivered
         $this->assertSame('failed', $r->fresh()->delivery_status);
