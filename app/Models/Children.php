@@ -35,6 +35,11 @@ class Children extends Model
         return $this->belongsTo(Member::class, 'guardian_member_id');
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
