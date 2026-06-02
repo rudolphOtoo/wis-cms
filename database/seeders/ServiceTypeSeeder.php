@@ -14,13 +14,10 @@ class ServiceTypeSeeder extends Seeder
      * leaves existing rows untouched so production-edited descriptions
      * are preserved.
      *
-     * STYLE NOTE: slugs are inconsistent — most use underscores
-     * (sunday_adult), but cell-meeting and department-meeting use
-     * hyphens. The hyphenated pair was added later and didn't follow
-     * the existing convention. They're in active use (8 dept sessions,
-     * 4 cell sessions in dev). A future cleanup task should rename
-     * them to underscores via a migration; not done here to keep
-     * production-readiness scope contained.
+     * STYLE: all slugs use underscores consistently. The two
+     * meeting types (cell_meeting, department_meeting) were
+     * originally hyphenated but were renamed to match the
+     * convention via the 2026_06_02 rename migration.
      */
     public function run(): void
     {
@@ -30,8 +27,8 @@ class ServiceTypeSeeder extends Seeder
             ['name' => 'Bible Study',             'slug' => 'bible_study',        'type' => 'combined', 'description' => 'Midweek Bible study session'],
             ['name' => 'Prayer Meeting',          'slug' => 'prayer_meeting',     'type' => 'combined', 'description' => 'Weekly prayer and intercession meeting'],
             ['name' => 'Special Service',         'slug' => 'special_service',    'type' => 'combined', 'description' => 'Special events and services'],
-            ['name' => 'Cell Meeting',            'slug' => 'cell-meeting',       'type' => 'combined', 'description' => 'Weekly cell group fellowship meeting'],
-            ['name' => 'Department Meeting',      'slug' => 'department-meeting', 'type' => 'combined', 'description' => 'Department-level meeting (Choir, Ushers, etc.)'],
+            ['name' => 'Cell Meeting',            'slug' => 'cell_meeting',       'type' => 'combined', 'description' => 'Weekly cell group fellowship meeting'],
+            ['name' => 'Department Meeting',      'slug' => 'department_meeting', 'type' => 'combined', 'description' => 'Department-level meeting (Choir, Ushers, etc.)'],
         ];
 
         foreach ($services as $service) {
