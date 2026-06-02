@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\BroadcastMessage;
 use App\Models\MessageRecipient;
-use App\Services\ArkeselSmsService;
+use App\Services\MnotifySmsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -19,7 +19,7 @@ class SendBroadcastMessageJob implements ShouldQueue
 
     public function __construct(public string $recipientId) {}
 
-    public function handle(ArkeselSmsService $sms): void
+    public function handle(MnotifySmsService $sms): void
     {
         $recipient = MessageRecipient::with(['message.sender', 'member'])->find($this->recipientId);
         if (! $recipient) {
@@ -53,7 +53,7 @@ class SendBroadcastMessageJob implements ShouldQueue
                 }
             }
 
-            // --- SMS (Arkesel) ---
+            // --- SMS (mNotify) ---
             if (in_array($channel, ['sms', 'both'])) {
                 if ($recipient->phone) {
                     $attempted = true;

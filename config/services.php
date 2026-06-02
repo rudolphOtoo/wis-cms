@@ -28,10 +28,10 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'arkesel' => [
-        'api_key' => env('ARKESEL_API_KEY'),
-        'sender_id' => env('ARKESEL_SENDER_ID', 'WIS-CMS'),
-        'base_url' => env('ARKESEL_BASE_URL', 'https://sms.arkesel.com/api/v2'),
+    'mnotify' => [
+        'api_key' => env('MNOTIFY_API_KEY'),
+        'sender_id' => env('MNOTIFY_SENDER_ID', 'WIS'),
+        'base_url' => env('MNOTIFY_BASE_URL', 'https://api.mnotify.com/api'),
     ],
 
     'slack' => [

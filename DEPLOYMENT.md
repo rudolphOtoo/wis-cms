@@ -53,9 +53,11 @@ Then edit `.env` and set **at minimum**:
     ADMIN_EMAIL=admin@your-church.example
     ADMIN_PASSWORD=use-a-strong-password-here
 
-    # Arkesel SMS provider - required for production SMS delivery
-    ARKESEL_API_KEY=your-arkesel-api-key
-    ARKESEL_SENDER_ID=your-sender-id
+    # mNotify SMS provider - required for production SMS delivery
+    # Sender ID must be REGISTERED AND APPROVED by mNotify before
+    # it will deliver. Max 11 alphanumeric characters.
+    MNOTIFY_API_KEY=your-mnotify-api-key
+    MNOTIFY_SENDER_ID=your-approved-sender-id
 
     # Mail - for non-SMS notifications (e.g. delivery failure alerts)
     MAIL_MAILER=smtp
