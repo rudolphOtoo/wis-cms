@@ -21,7 +21,7 @@ const adminNav = [
   { to: '/admin/settings/follow-up', label: 'Follow-up SMS', permission: 'manage users', d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const { user, logout } = useAuth()
   const { can }          = usePermission()
 
@@ -29,8 +29,8 @@ export default function Sidebar() {
   const visibleAdminNav = adminNav.filter(item => can(item.permission))
 
   return (
-    <div className="w-64 flex flex-col h-full flex-shrink-0" style={{backgroundColor:'var(--color-navy-deeper)'}}>
-      <div className="px-6 py-5" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+    <div className={`w-64 flex flex-col flex-shrink-0 z-40 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{backgroundColor:'var(--color-navy-deeper)', height:'100dvh'}}>
+      <div className="px-6 py-5 flex items-center justify-between" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
         <div className="flex items-center gap-3">
           <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
@@ -38,6 +38,13 @@ export default function Sidebar() {
             <div className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Methodist Church Ghana</div>
           </div>
         </div>
+        <button onClick={onMobileClose}
+                className="mobile-close-btn md:hidden text-white p-1"
+                aria-label="Close menu">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
