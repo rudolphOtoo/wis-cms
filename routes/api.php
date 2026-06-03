@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
+use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
@@ -119,6 +120,12 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('finance/transactions/export', [FinanceController::class, 'export'])->middleware('permission:export finance');
         Route::get('finance/reports/ledger', [FinanceController::class, 'ledger'])->middleware('permission:export finance');
         Route::get('finance/transactions/{id}', [FinanceController::class, 'show']);
+
+        // REPORTS — read-only aggregations for council monthly review.
+        // Each report is a discrete endpoint; aggregation logic lives
+        // in ReportsController. Same 'view finance' permission as other
+        // finance read endpoints. New reports get added to this group.
+        Route::get('reports/finance/income-by-category', [ReportsController::class, 'incomeByCategory']);
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
