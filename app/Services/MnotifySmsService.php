@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\TransientSmsException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -17,21 +19,27 @@ use Illuminate\Support\Facades\Log;
  * Endpoint: POST https://api.mnotify.com/api/sms/quick
  *
  * Reference: https://readthedocs.mnotify.com
+ *
+ * RETRY SEMANTICS
+ *   - Throws TransientSmsException on HTTP 5xx, connection timeout,
+ *     or network error. Caller (queue worker) retries with backoff.
+ *   - Returns false on HTTP 4xx, body status:'failed', or missing
+ *     credentials. These are permanent failures; no retry helps.
+ *   - Returns true on HTTP 200 with body status:'success'.
  */
 class MnotifySmsService
 {
     /**
      * Send a single SMS via mNotify.
      *
-     * Returns true on success, false on failure (logged). Never throws —
-     * callers treat a false return as a delivery failure for that recipient.
+     * @throws TransientSmsException when the failure is retry-worthy
      */
     public function send(string $phone, string $message): bool
     {
         $apiKey = config('services.mnotify.api_key');
 
-        // No key configured (dev / pre-launch): log and report failure
-        // honestly rather than pretending the SMS went out.
+        // No key configured (dev / pre-launch): permanent failure.
+        // Retrying won't help - the key will still be missing.
         if (! $apiKey) {
             Log::warning("mNotify API key not configured — SMS to {$phone} not sent.");
 
@@ -42,6 +50,7 @@ class MnotifySmsService
 
         try {
             $response = Http::asJson()
+                ->timeout(15)
                 ->post($endpoint, [
                     'recipient' => [$this->normalise($phone)],
                     'sender' => config('services.mnotify.sender_id'),
@@ -49,27 +58,41 @@ class MnotifySmsService
                     'is_schedule' => false,
                     'schedule_date' => '',
                 ]);
+        } catch (ConnectionException $e) {
+            // Network failure / timeout / DNS error - retry-worthy.
+            Log::warning("mNotify transient network failure for {$phone}: ".$e->getMessage());
+            throw new TransientSmsException(
+                'mNotify network failure: '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
 
-            if ($response->successful()) {
-                $body = $response->json();
-                // mNotify returns status in the body even on HTTP 200.
-                // status:'success' means accepted; other values are failures.
-                if (($body['status'] ?? null) === 'success') {
-                    return true;
-                }
-                Log::error("mNotify SMS rejected for {$phone}: ".json_encode($body));
+        // HTTP-level error: 5xx is transient (mNotify backend issue),
+        // 4xx is permanent (our request was rejected).
+        if ($response->serverError()) {
+            Log::warning("mNotify HTTP {$response->status()} for {$phone}: ".$response->body());
+            throw new TransientSmsException(
+                'mNotify server error: HTTP '.$response->status()
+            );
+        }
 
-                return false;
-            }
-
-            Log::error("mNotify SMS HTTP error for {$phone}: ".$response->status().' '.$response->body());
-
-            return false;
-        } catch (\Throwable $e) {
-            Log::error("mNotify SMS exception for {$phone}: ".$e->getMessage());
+        if (! $response->successful()) {
+            // 4xx range - permanent (auth, invalid number, etc.)
+            Log::error("mNotify SMS rejected (HTTP {$response->status()}) for {$phone}: ".$response->body());
 
             return false;
         }
+
+        // 2xx response. mNotify still reports status in body.
+        $body = $response->json();
+        if (($body['status'] ?? null) === 'success') {
+            return true;
+        }
+
+        Log::error("mNotify SMS rejected by provider for {$phone}: ".json_encode($body));
+
+        return false;
     }
 
     /**

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\TransientSmsException;
 use App\Services\MnotifySmsService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -85,5 +87,38 @@ class MnotifySmsServiceTest extends TestCase
         (new MnotifySmsService)->send('0241234567', 'Hi');
 
         Http::assertSent(fn ($request) => $request['recipient'] === ['0241234567']);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // TRANSIENT FAILURES — must throw so the queue can retry
+    // ──────────────────────────────────────────────────────────
+
+    public function test_throws_transient_exception_on_http_502(): void
+    {
+        config(['services.mnotify.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['error' => 'Bad Gateway'], 502)]);
+
+        $this->expectException(TransientSmsException::class);
+        (new MnotifySmsService)->send('0241234567', 'Hello');
+    }
+
+    public function test_throws_transient_exception_on_http_500(): void
+    {
+        config(['services.mnotify.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['error' => 'Internal Server Error'], 500)]);
+
+        $this->expectException(TransientSmsException::class);
+        (new MnotifySmsService)->send('0241234567', 'Hello');
+    }
+
+    public function test_throws_transient_exception_on_connection_failure(): void
+    {
+        config(['services.mnotify.api_key' => 'test-key']);
+        Http::fake(function () {
+            throw new ConnectionException('Connection timed out');
+        });
+
+        $this->expectException(TransientSmsException::class);
+        (new MnotifySmsService)->send('0241234567', 'Hello');
     }
 }
