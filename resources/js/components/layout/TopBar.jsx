@@ -15,6 +15,7 @@ const titles = {
   '/admin/users':   'User Management',
   '/admin/audit':   'Audit Log',
   '/admin/settings/follow-up': 'Follow-up SMS',
+  '/reports/finance/income-by-category': 'Income by Category',
 }
 
 export default function TopBar({ onMenuClick }) {

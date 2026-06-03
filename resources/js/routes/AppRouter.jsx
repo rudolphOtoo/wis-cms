@@ -29,6 +29,7 @@ import ChildForm         from '../pages/children/ChildForm'
 import UsersPage         from '../pages/admin/Users'
 import AuditLog          from '../pages/admin/AuditLog'
 import FollowUpSettings from '../pages/settings/FollowUpSettings'
+import IncomeByCategory from '../pages/reports/IncomeByCategory'
 import CommunicationPage from '../pages/communication/index'
 import Compose           from '../pages/communication/Compose'
 import MessageDetail     from '../pages/communication/MessageDetail'
@@ -76,6 +77,7 @@ export default function AppRouter() {
             <Route path="/admin/users"          element={<UsersPage />} />
             <Route path="/admin/audit"          element={<AuditLog />} />
             <Route path="/admin/settings/follow-up" element={<FollowUpSettings />} />
+            <Route path="/reports/finance/income-by-category" element={<IncomeByCategory />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

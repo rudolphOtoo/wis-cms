@@ -19,6 +19,7 @@ const adminNav = [
   { to: '/admin/users', label: 'Users',     permission: 'manage users',   d: 'M9 7a3 3 0 11-6 0 3 3 0 016 0zM6 21v-1a4 4 0 014-4h2m6-5v6m-3-3h6' },
   { to: '/admin/audit', label: 'Audit Log', permission: 'view audit log', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   { to: '/admin/settings/follow-up', label: 'Follow-up SMS', permission: 'manage users', d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { to: '/reports/finance/income-by-category', label: 'Income Report', permission: 'view finance', d: 'M9 17v-2a4 4 0 00-4-4H3m18 6v-2a4 4 0 00-4-4h-2m-4-6a4 4 0 11-8 0 4 4 0 018 0zM12 21v-4m0 0a4 4 0 014-4h2a4 4 0 014 4v4M5 17h.01M5 11h.01' },
 ]
 
 export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
