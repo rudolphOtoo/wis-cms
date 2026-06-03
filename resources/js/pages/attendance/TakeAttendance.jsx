@@ -193,29 +193,29 @@ export default function TakeAttendance() {
           <div>
             {filtered.map(person => (
               <div key={person.id}
-                   className="flex items-center justify-between transition-colors"
-                   style={{padding:'12px 24px',borderTop:'1px solid var(--color-surface-border)'}}>
-                <div className="flex items-center gap-4">
+                   className="flex items-center justify-between gap-3 transition-colors"
+                   style={{padding:'12px 16px',borderTop:'1px solid var(--color-surface-border)'}}>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
                        style={{backgroundColor: person.is_present ? '#dcfce7' : '#e1e2e5',
                                color: person.is_present ? '#15803d' : '#44474f',
                                border:'1px solid var(--color-surface-border)'}}>
                     {person.name.charAt(0)}
                   </div>
-                  <div>
-                    <h3 className="font-bold" style={{fontSize:'18px',color:'var(--color-navy)'}}>{person.name}</h3>
-                    <p style={{fontSize:'12px',color:'#747780'}}>{person.member_number ?? person.class ?? ''}</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold truncate" style={{fontSize:'17px',color:'var(--color-navy)'}}>{person.name}</h3>
+                    <p className="truncate" style={{fontSize:'12px',color:'#747780'}}>{person.member_number ?? person.class ?? ''}</p>
                   </div>
                 </div>
                 <button onClick={() => togglePerson(person.id)}
-                        className="flex items-center justify-center gap-2 rounded-xl shadow-sm transition-all active:scale-95"
-                        style={{width:'160px',padding:'12px',fontWeight:600,fontSize:'14px',
+                        className="flex items-center justify-center gap-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex-shrink-0 w-[100px] md:w-[160px]"
+                        style={{padding:'12px',fontWeight:600,fontSize:'13px',
                                 backgroundColor: person.is_present ? '#2e7d32' : '#e1e2e5',
                                 color: person.is_present ? 'white' : '#44474f'}}>
                   {person.is_present ? (
-                    <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>PRESENT</>
+                    <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>PRESENT</>
                   ) : (
-                    <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>ABSENT</>
+                    <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>ABSENT</>
                   )}
                 </button>
               </div>
@@ -230,7 +230,7 @@ export default function TakeAttendance() {
             Showing {filtered.length} of {total} {search ? '(filtered)' : 'members'}
           </p>
           <button onClick={handleSave} disabled={saving}
-                  className="btn-primary gap-2" style={{padding:'10px 32px'}}>
+                  className="btn-primary gap-2 hidden md:inline-flex" style={{padding:'10px 32px'}}>
             {saving ? (
               <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -243,11 +243,17 @@ export default function TakeAttendance() {
         </div>
       </div>
 
-      {/* Floating save */}
+      {/* Mobile bottom spacer — gives the fixed save bar clearance
+          so the last member rows aren't covered when scrolled to bottom.
+          Desktop ignores; the save bar floats over empty area on the right. */}
+      <div className="md:hidden" style={{height:'90px'}}></div>
+
+      {/* Floating save — full-width pinned on mobile (easy thumb-tap),
+          floating bottom-right card on desktop. */}
       {!saved && total > 0 && (
-        <div className="fixed bottom-6 right-6">
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:bottom-6 md:right-6 z-20">
           <button onClick={handleSave} disabled={saving}
-                  className="btn-primary px-6 py-3 shadow-lg gap-2 text-base">
+                  className="btn-primary w-full md:w-auto px-6 py-3 shadow-lg gap-2 text-base">
             {saving ? 'Saving...' : `Save — ${presentCount} Present`}
           </button>
         </div>
