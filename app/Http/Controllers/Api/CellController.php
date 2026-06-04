@@ -168,7 +168,8 @@ class CellController extends Controller
                 'id' => $cell->leader->id,
                 'name' => $cell->leader->name,
             ] : null,
-            'members_count' => $cell->members_count ?? $cell->members()->count(),
+            'members_count' => $cell->members_count
+                ?? ($cell->relationLoaded('members') ? $cell->members->count() : 0),
         ];
 
         if ($withMembers) {
