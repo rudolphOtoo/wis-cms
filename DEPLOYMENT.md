@@ -215,3 +215,85 @@ ProductionSeeder ran. Set them in .env and re-run:
 Use the UI (Profile - Change Password). Don't change ADMIN_PASSWORD
 in .env and re-seed - the SuperAdminSeeder is idempotent and will
 NOT update an existing user's password.
+
+## Architecture: Multi-Tenant Branch Scoping
+
+WIS-CMS is multi-tenant: every member, cell, transaction, message,
+attendance session, and child belongs to a branch. The system uses
+**defence-in-depth** to keep branch data separated: every read goes
+through both an automatic global scope AND explicit controller
+filters.
+
+### The `BelongsToBranch` trait
+
+Eight models use the trait (in `app/Models/Concerns/BelongsToBranch.php`):
+Member, Visitor, Cell, Department, Transaction, Message,
+AttendanceSession, Children.
+
+The trait does two things:
+
+1. **Global query scope** (`App\Models\Scopes\BranchScope`).
+   When an authenticated user is present, every query against these
+   models is automatically filtered to `branch_id = user->branch_id`.
+
+2. **Auto-set `branch_id` on create**. New records get their
+   `branch_id` filled from the authenticated user automatically.
+   Controllers can still set it explicitly; the trait won't overwrite.
+
+### When the trait does NOT apply
+
+- **CLI / system jobs**: when no auth user is present
+  (`Auth::user()` is null), the scope is skipped entirely. This is
+  why scheduled commands like `birthdays:send`,
+  `attendance:process-follow-ups`, and the FK audit can operate
+  across all branches as intended.
+
+- **The `User` model itself**: User provides the `branch_id` that
+  the trait depends on. Applying the trait to User would create a
+  chicken-and-egg loop on auth queries.
+
+- **Bypass for admin tooling or tests**:
+
+      Member::withoutGlobalScope(\App\Models\Scopes\BranchScope::class)
+          ->where(...)
+          ->get();
+
+### Why controllers still filter manually
+
+The 12 multi-tenant API controllers retain their explicit
+`->where('branch_id', $user->branch_id)` filters even though the
+trait makes them redundant. This is intentional:
+
+- **Defence in depth**: a bug in the trait or scope won't leak data
+  because the controller is also filtering.
+- **Cost is essentially zero**: `branch_id` is indexed (added in
+  17573c4); double-filtering on an indexed column is a no-op for
+  the query planner.
+- **Future cleanup is optional**: the manual filters can be removed
+  in a follow-up commit once there are months of production
+  confidence in the trait. No rush.
+
+### Role-based visibility is separate
+
+The trait handles the **branch** dimension only. Role-based "sees
+all" logic (where `super_admin`, `pastor`, `secretary` see all
+cells in their branch while `cell_leader` sees only their cell)
+stays in controllers - it's orthogonal: it widens visibility
+WITHIN a branch, not ACROSS branches.
+
+If cross-branch admin ever becomes a feature, that's a separate
+design (likely a nullable `users.branch_id` meaning "see all").
+
+### Verifying integrity
+
+After any model refactor, run:
+
+    php artisan app:audit-fk-relationships
+
+This audits that every FK column has a matching belongsTo
+relationship method on its owning model. It detects both
+class-defined methods and trait-provided ones (via
+`method_exists()`). Exit code 1 if anything is missing; suitable
+for CI failure gates.
+
+It also runs weekly on the scheduler (Mondays 08:30 UTC).
