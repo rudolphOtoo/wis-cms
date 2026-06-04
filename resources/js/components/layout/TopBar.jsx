@@ -16,6 +16,7 @@ const titles = {
   '/admin/audit':   'Audit Log',
   '/admin/settings/follow-up': 'Follow-up SMS',
   '/reports/finance/income-by-category': 'Income by Category',
+  '/reports/attendance/trends': 'Attendance Trends',
 }
 
 export default function TopBar({ onMenuClick }) {
