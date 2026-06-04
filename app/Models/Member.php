@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class Member extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use BelongsToBranch, HasFactory, HasUuids, SoftDeletes;
 
     protected $keyType = 'string';
 
@@ -63,11 +64,6 @@ class Member extends Model
                 });
             }
         });
-    }
-
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
     }
 
     public function children()
