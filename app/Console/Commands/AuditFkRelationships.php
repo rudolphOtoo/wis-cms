@@ -108,8 +108,13 @@ class AuditFkRelationships extends Command
                 continue;
             }
 
-            $contents = file_get_contents($modelPath);
-            $exists = preg_match('/public function '.preg_quote($method, '/').'\s*\(/', $contents);
+            // Use method_exists() against the fully-qualified class so
+            // we correctly detect methods provided by traits (e.g. the
+            // branch() method now lives in App\Models\Concerns\BelongsToBranch
+            // rather than directly on the model). file_get_contents + regex
+            // on the model file would miss these.
+            $fqcn = 'App\\Models\\'.$modelClass;
+            $exists = class_exists($fqcn) && method_exists($fqcn, $method);
 
             if ($exists) {
                 $results[] = [$modelClass, $row->column_name, $method.'()', '✓ OK'];
