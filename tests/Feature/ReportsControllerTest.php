@@ -442,4 +442,140 @@ class ReportsControllerTest extends TestCase
             ->getJson('/api/reports/attendance/trends?from_date=2026-06-30&to_date=2026-06-01');
         $response->assertStatus(422);
     }
+
+    // ──────────────────────────────────────────────────────────
+    // EXPENSE BY CATEGORY REPORT
+    // ──────────────────────────────────────────────────────────
+
+    protected function createExpense(FinanceCategory $cat, float $amount, string $date): Transaction
+    {
+        return Transaction::factory()->create([
+            'branch_id' => $this->branch->id,
+            'category_id' => $cat->id,
+            'type' => 'expense',
+            'amount' => $amount,
+            'transaction_date' => $date,
+            'recorded_by' => $this->recorder->id,
+        ]);
+    }
+
+    public function test_expense_returns_correct_grand_total(): void
+    {
+        $salaries = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Salaries '.uniqid(),
+            'slug' => 'salaries_'.uniqid(),
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $this->createExpense($salaries, 1000.00, '2026-03-15');
+        $this->createExpense($salaries, 1500.00, '2026-04-15');
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category?from_date=2026-03-01&to_date=2026-04-30');
+
+        $response->assertStatus(200);
+        $this->assertSame(2500.0, (float) $response->json('summary.grand_total'));
+    }
+
+    public function test_expense_groups_by_month_and_category(): void
+    {
+        $cat1 = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Utilities '.uniqid(),
+            'slug' => 'utilities_'.uniqid(),
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $this->createExpense($cat1, 200.00, '2026-03-10');
+        $this->createExpense($cat1, 300.00, '2026-04-10');
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category?from_date=2026-03-01&to_date=2026-04-30');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $this->assertCount(2, $rows, 'Two months should produce 2 rows');
+        $this->assertSame('2026-03', $rows[0]['month']);
+        $this->assertSame('2026-04', $rows[1]['month']);
+    }
+
+    public function test_expense_only_includes_expense_not_income(): void
+    {
+        $expenseCat = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Transport '.uniqid(),
+            'slug' => 'transport_'.uniqid(),
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $incomeCat = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Tithe '.uniqid(),
+            'slug' => 'tithe_'.uniqid(),
+            'type' => 'income',
+            'is_active' => true,
+        ]);
+
+        $this->createExpense($expenseCat, 500.00, '2026-03-15');
+        $this->createIncome($incomeCat, 5000.00, '2026-03-15');  // should NOT appear
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category?from_date=2026-03-01&to_date=2026-03-31');
+
+        $response->assertStatus(200);
+        $this->assertSame(500.0, (float) $response->json('summary.grand_total'));
+    }
+
+    public function test_expense_respects_from_date_filter(): void
+    {
+        $cat = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Events '.uniqid(),
+            'slug' => 'events_'.uniqid(),
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $this->createExpense($cat, 100.00, '2026-01-15');  // outside range
+        $this->createExpense($cat, 200.00, '2026-03-15');  // inside range
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category?from_date=2026-03-01&to_date=2026-03-31');
+
+        $response->assertStatus(200);
+        $this->assertSame(200.0, (float) $response->json('summary.grand_total'));
+    }
+
+    public function test_expense_excludes_soft_deleted(): void
+    {
+        $cat = FinanceCategory::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Maintenance '.uniqid(),
+            'slug' => 'maintenance_'.uniqid(),
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $kept = $this->createExpense($cat, 100.00, '2026-03-15');
+        $deleted = $this->createExpense($cat, 999.00, '2026-03-15');
+        $deleted->delete();
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category?from_date=2026-03-01&to_date=2026-03-31');
+
+        $response->assertStatus(200);
+        $this->assertSame(100.0, (float) $response->json('summary.grand_total'));
+    }
+
+    public function test_member_without_view_finance_blocked_from_expense(): void
+    {
+        $token = $this->memberToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/finance/expense-by-category');
+        $response->assertStatus(403);
+    }
 }

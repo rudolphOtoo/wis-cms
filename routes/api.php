@@ -126,6 +126,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         // in ReportsController. Same 'view finance' permission as other
         // finance read endpoints. New reports get added to this group.
         Route::get('reports/finance/income-by-category', [ReportsController::class, 'incomeByCategory']);
+        Route::get('reports/finance/expense-by-category', [ReportsController::class, 'expenseByCategory']);
         Route::get('reports/attendance/trends', [ReportsController::class, 'attendanceTrends']);
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
