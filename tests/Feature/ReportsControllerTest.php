@@ -2,13 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Models\AttendanceSession;
 use App\Models\Branch;
 use App\Models\FinanceCategory;
+use App\Models\Member;
+use App\Models\ServiceType;
 use App\Models\Transaction;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ReportsControllerTest extends TestCase
@@ -251,6 +256,190 @@ class ReportsControllerTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/reports/finance/income-by-category?from_date=2026-06-30&to_date=2026-06-01');
 
+        $response->assertStatus(422);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // ATTENDANCE TRENDS REPORT
+    // ──────────────────────────────────────────────────────────
+
+    protected function makeServiceType(string $name): ServiceType
+    {
+        // Suffix slug with uniqid() to avoid collisions with the 7
+        // service types pre-seeded by migrations (cell_meeting,
+        // sunday_adult, etc.). Tests should not depend on seed data.
+        $baseSlug = str_replace(' ', '_', strtolower($name));
+
+        return ServiceType::create([
+            'branch_id' => $this->branch->id,
+            'name' => $name.' '.uniqid(),
+            'slug' => $baseSlug.'_'.uniqid(),
+            'type' => 'adult',
+            'is_active' => true,
+        ]);
+    }
+
+    protected function makeSession(ServiceType $serviceType, string $date, array $attrs = []): AttendanceSession
+    {
+        return AttendanceSession::create(array_merge([
+            'branch_id' => $this->branch->id,
+            'service_type_id' => $serviceType->id,
+            'service_date' => $date,
+            'recorded_by' => $this->recorder->id,
+            'follow_up_status' => 'not_sent',
+        ], $attrs));
+    }
+
+    protected function makeMemberAndRecord(AttendanceSession $session, bool $isPresent = true): void
+    {
+        $member = Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'Test',
+            'last_name' => 'M'.uniqid(),
+            'gender' => 'male',
+            'status' => 'active',
+        ]);
+        DB::table('attendance_records')->insert([
+            'id' => (string) Str::uuid(),
+            'session_id' => $session->id,
+            'member_id' => $member->id,
+            'is_present' => $isPresent,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function test_attendance_report_returns_period_and_summary_shape(): void
+    {
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'period' => ['from', 'to', 'group_by'],
+                'rows',
+                'summary' => [
+                    'total_sessions', 'total_present', 'total_absent',
+                    'overall_attendance_rate', 'avg_per_session',
+                    'trend' => ['direction', 'recent_rate', 'prior_rate', 'delta'],
+                ],
+            ]);
+    }
+
+    public function test_attendance_groups_by_week_correctly(): void
+    {
+        $sunday = $this->makeServiceType('Sunday');
+        // Three sessions in the same ISO week (Mar 9-15, 2026)
+        $s1 = $this->makeSession($sunday, '2026-03-10');
+        $s2 = $this->makeSession($sunday, '2026-03-12');
+        $s3 = $this->makeSession($sunday, '2026-03-15');
+        $this->makeMemberAndRecord($s1, true);
+        $this->makeMemberAndRecord($s2, true);
+        $this->makeMemberAndRecord($s3, true);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-09&to_date=2026-03-15&group_by=week');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $this->assertCount(1, $rows, 'Three sessions in same week should produce 1 row');
+        $this->assertSame(3, $rows[0]['sessions_count']);
+    }
+
+    public function test_attendance_groups_by_month_when_requested(): void
+    {
+        $sunday = $this->makeServiceType('Sunday');
+        // 4 sessions spread across March 2026
+        foreach (['2026-03-01', '2026-03-08', '2026-03-15', '2026-03-22'] as $d) {
+            $s = $this->makeSession($sunday, $d);
+            $this->makeMemberAndRecord($s, true);
+        }
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-01&to_date=2026-03-31&group_by=month');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $this->assertCount(1, $rows, 'Four sessions in same month should produce 1 row');
+        $this->assertSame(4, $rows[0]['sessions_count']);
+        $this->assertSame('March 2026', $rows[0]['period_label']);
+    }
+
+    public function test_attendance_rate_calculated_from_present_total(): void
+    {
+        $sunday = $this->makeServiceType('Sunday');
+        $session = $this->makeSession($sunday, '2026-03-10');
+        // 5 records: 4 present, 1 absent → 80%
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, false);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-09&to_date=2026-03-15');
+
+        $response->assertStatus(200);
+        $summary = $response->json('summary');
+        $this->assertSame(5, $summary['total_present'] + $summary['total_absent']);
+        $this->assertSame(4, $summary['total_present']);
+        $this->assertSame(1, $summary['total_absent']);
+        // JSON encoding loses float type on whole numbers (80.0 to 80),
+        // so cast back before strict comparison.
+        $this->assertSame(80.0, (float) $summary['overall_attendance_rate']);
+    }
+
+    public function test_attendance_excludes_sessions_with_zero_records(): void
+    {
+        $sunday = $this->makeServiceType('Sunday');
+        $withRecords = $this->makeSession($sunday, '2026-03-10');
+        $orphan = $this->makeSession($sunday, '2026-03-11');  // no records
+        $this->makeMemberAndRecord($withRecords, true);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-09&to_date=2026-03-15');
+
+        $response->assertStatus(200);
+        $summary = $response->json('summary');
+        $this->assertSame(1, $summary['total_sessions'], 'Orphan session should be excluded');
+    }
+
+    public function test_attendance_service_type_filter_narrows_results(): void
+    {
+        $sunday = $this->makeServiceType('Sunday');
+        $cell = $this->makeServiceType('Cell Meeting');
+        $sundaySession = $this->makeSession($sunday, '2026-03-10');
+        $cellSession = $this->makeSession($cell, '2026-03-11');
+        $this->makeMemberAndRecord($sundaySession, true);
+        $this->makeMemberAndRecord($cellSession, true);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-09&to_date=2026-03-15&service_type_id='.$sunday->id);
+
+        $response->assertStatus(200);
+        $summary = $response->json('summary');
+        $this->assertSame(1, $summary['total_sessions'], 'Only Sunday session should be counted');
+    }
+
+    public function test_member_without_view_finance_is_blocked_from_attendance(): void
+    {
+        $token = $this->memberToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends');
+        $response->assertStatus(403);
+    }
+
+    public function test_attendance_validates_from_after_to(): void
+    {
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-06-30&to_date=2026-06-01');
         $response->assertStatus(422);
     }
 }
