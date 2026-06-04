@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class AttendanceSession extends Model
 {
-    use HasUuids;
+    use BelongsToBranch, HasUuids;
 
     protected $keyType = 'string';
 
@@ -23,11 +24,6 @@ class AttendanceSession extends Model
             'service_date' => 'date',
             'follow_up_sent_at' => 'datetime',
         ];
-    }
-
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
     }
 
     public function serviceType()
