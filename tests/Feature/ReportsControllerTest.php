@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AttendanceSession;
 use App\Models\Branch;
+use App\Models\Cell;
 use App\Models\FinanceCategory;
 use App\Models\Member;
 use App\Models\ServiceType;
@@ -576,6 +577,163 @@ class ReportsControllerTest extends TestCase
         $token = $this->memberToken();
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/reports/finance/expense-by-category');
+        $response->assertStatus(403);
+    }
+
+    // CELL COMPARISON REPORT
+
+    protected function makeCell(string $name, array $attrs = []): Cell
+    {
+        return Cell::create(array_merge([
+            'branch_id' => $this->branch->id,
+            'name' => $name,
+            'is_active' => true,
+        ], $attrs));
+    }
+
+    protected function makeMemberInCell(Cell $cell, array $attrs = []): Member
+    {
+        return Member::create(array_merge([
+            'branch_id' => $this->branch->id,
+            'cell_id' => $cell->id,
+            'first_name' => 'Test',
+            'last_name' => 'M'.uniqid(),
+            'gender' => 'male',
+            'status' => 'active',
+        ], $attrs));
+    }
+
+    public function test_cell_comparison_returns_all_cells_in_branch(): void
+    {
+        $this->makeCell('Alpha Cell');
+        $this->makeCell('Beta Cell');
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $names = array_column($response->json('cells'), 'name');
+        $this->assertContains('Alpha Cell', $names);
+        $this->assertContains('Beta Cell', $names);
+    }
+
+    public function test_cell_comparison_includes_leader_when_assigned(): void
+    {
+        $leader = User::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Cell Leader',
+            'email' => 'leader_'.uniqid().'@test.local',
+            'password' => Hash::make('Password@123'),
+            'is_active' => true,
+        ]);
+        $this->makeCell('Led Cell', ['leader_user_id' => $leader->id]);
+        $this->makeCell('Orphan Cell');
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $cells = collect($response->json('cells'));
+        $led = $cells->firstWhere('name', 'Led Cell');
+        $orphan = $cells->firstWhere('name', 'Orphan Cell');
+
+        $this->assertNotNull($led['leader']);
+        $this->assertSame('Cell Leader', $led['leader']['name']);
+        $this->assertNull($orphan['leader']);
+        $this->assertContains('no_leader', $orphan['health_flags']);
+    }
+
+    public function test_cell_comparison_counts_active_members_only(): void
+    {
+        $cell = $this->makeCell('Test Cell');
+        $this->makeMemberInCell($cell);
+        $this->makeMemberInCell($cell);
+        $this->makeMemberInCell($cell);
+        $this->makeMemberInCell($cell, ['status' => 'inactive']);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $found = collect($response->json('cells'))->firstWhere('name', 'Test Cell');
+        $this->assertSame(3, $found['member_count']);
+    }
+
+    public function test_cell_comparison_flags_low_membership(): void
+    {
+        $cell = $this->makeCell('Tiny Cell');
+        $this->makeMemberInCell($cell);
+        $this->makeMemberInCell($cell);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $found = collect($response->json('cells'))->firstWhere('name', 'Tiny Cell');
+        $this->assertContains('low_membership', $found['health_flags']);
+    }
+
+    public function test_cell_comparison_flags_no_recent_attendance(): void
+    {
+        $cell = $this->makeCell('Silent Cell');
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $found = collect($response->json('cells'))->firstWhere('name', 'Silent Cell');
+        $this->assertContains('no_recent_attendance', $found['health_flags']);
+        $this->assertSame(0, $found['recent_sessions']);
+        $this->assertNull($found['recent_attendance_rate']);
+    }
+
+    public function test_cell_comparison_calculates_attendance_rate_when_data_exists(): void
+    {
+        $cell = $this->makeCell('Active Cell');
+        $serviceType = $this->makeServiceType('Cell Meeting');
+
+        $session = AttendanceSession::create([
+            'branch_id' => $this->branch->id,
+            'service_type_id' => $serviceType->id,
+            'cell_id' => $cell->id,
+            'service_date' => now()->subDays(7)->toDateString(),
+            'recorded_by' => $this->recorder->id,
+            'follow_up_status' => 'not_sent',
+        ]);
+
+        foreach ([true, true, true, false] as $present) {
+            $member = $this->makeMemberInCell($cell);
+            DB::table('attendance_records')->insert([
+                'id' => (string) Str::uuid(),
+                'session_id' => $session->id,
+                'member_id' => $member->id,
+                'is_present' => $present,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
+
+        $response->assertStatus(200);
+        $found = collect($response->json('cells'))->firstWhere('name', 'Active Cell');
+        $this->assertSame(1, $found['recent_sessions']);
+        $this->assertSame(75.0, (float) $found['recent_attendance_rate']);
+        $this->assertNotContains('no_recent_attendance', $found['health_flags']);
+    }
+
+    public function test_member_without_view_finance_blocked_from_cell_comparison(): void
+    {
+        $token = $this->memberToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/cells/comparison');
         $response->assertStatus(403);
     }
 }

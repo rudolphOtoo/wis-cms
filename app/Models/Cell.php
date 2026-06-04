@@ -38,6 +38,18 @@ class Cell extends Model
 
     public function getMembersCountAttribute(): int
     {
+        // If withCount() or loadCount() has been used by the caller,
+        // Eloquent stores the value in $this->attributes['members_count'].
+        // Respect that — it lets callers filter the count (e.g. only
+        // active members) without this accessor overriding it.
+        //
+        // Without this check, $cell->withCount(['members' => fn ($q) =>
+        // $q->where('status', 'active')])->first()->members_count returns
+        // the UNFILTERED count, because the accessor re-queries every time.
+        if (array_key_exists('members_count', $this->attributes)) {
+            return (int) $this->attributes['members_count'];
+        }
+
         return $this->members()->count();
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceSession;
+use App\Models\Cell;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -416,6 +417,137 @@ class ReportsController extends Controller
                 'month_count' => $monthCount,
                 'top_category' => $topCategory,
                 'category_totals' => $categoryBreakdown,
+            ],
+        ]);
+    }
+
+    // GET /api/reports/cells/comparison
+    //
+    // Cell health snapshot for the authenticated user's branch.
+    // Returns every cell with its leader, member count, and
+    // recent-window attendance signals. Designed for council
+    // to see at a glance which cells have leaders, which are
+    // recording attendance, and where intervention is needed.
+    //
+    // Framed as 'comparison' but emphasises STRUCTURAL HEALTH
+    // (do cells have leaders? are they recording attendance?)
+    // rather than performance, because current data doesn't
+    // support fair performance comparison (only one cell has
+    // recent attendance records).
+    //
+    // Query params:
+    //   weeks (optional, default 4) - window for 'recent' signals
+    public function cellComparison(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'weeks' => 'nullable|integer|min:1|max:52',
+        ]);
+
+        $weeks = $validated['weeks'] ?? 4;
+        $cutoff = Carbon::today()->subWeeks($weeks);
+        $branchId = $request->user()->branch_id;
+
+        // Pass A: cells + leader + active member count
+        // Use a subquery for member_count rather than a join with
+        // GROUP BY (cleaner with the leader join already in place).
+        $cells = Cell::query()
+            ->where('branch_id', $branchId)
+            ->with(['leader:id,name'])
+            ->withCount(['members' => function ($q) {
+                $q->whereNull('deleted_at')->where('status', 'active');
+            }])
+            ->orderBy('name')
+            ->get();
+
+        // Pass B: attendance signals within the recency window,
+        // keyed by cell_id for cheap lookup.
+        $attendanceByCell = DB::table('attendance_sessions as s')
+            ->leftJoin('attendance_records as r', 'r.session_id', '=', 's.id')
+            ->where('s.branch_id', $branchId)
+            ->whereNotNull('s.cell_id')
+            ->where('s.service_date', '>=', $cutoff)
+            ->select(
+                's.cell_id',
+                DB::raw('COUNT(DISTINCT s.id) as sessions'),
+                DB::raw('COUNT(r.id) as records_total'),
+                DB::raw('SUM(CASE WHEN r.is_present THEN 1 ELSE 0 END) as records_present'),
+                DB::raw('MAX(s.service_date) as last_session_date')
+            )
+            ->groupBy('s.cell_id')
+            ->get()
+            ->keyBy('cell_id');
+
+        // Shape per-cell rows with health flags
+        $cellRows = $cells->map(function ($cell) use ($attendanceByCell) {
+            $att = $attendanceByCell->get($cell->id);
+            $sessions = (int) ($att->sessions ?? 0);
+            $recordsTotal = (int) ($att->records_total ?? 0);
+            $recordsPresent = (int) ($att->records_present ?? 0);
+            $rate = $recordsTotal > 0
+                ? round(($recordsPresent / $recordsTotal) * 100, 1)
+                : null;
+
+            $flags = [];
+            if (! $cell->leader_user_id) {
+                $flags[] = 'no_leader';
+            }
+            if ($sessions === 0) {
+                $flags[] = 'no_recent_attendance';
+            }
+            if ($cell->members_count < 5) {
+                $flags[] = 'low_membership';
+            }
+
+            return [
+                'id' => $cell->id,
+                'name' => $cell->name,
+                'description' => $cell->description,
+                'is_active' => (bool) $cell->is_active,
+                'leader' => $cell->leader ? [
+                    'id' => $cell->leader->id,
+                    'name' => $cell->leader->name,
+                ] : null,
+                'member_count' => (int) $cell->members_count,
+                'recent_sessions' => $sessions,
+                'recent_records_total' => $recordsTotal,
+                'recent_records_present' => $recordsPresent,
+                'recent_attendance_rate' => $rate,
+                'last_session_date' => $att->last_session_date ?? null,
+                'health_flags' => $flags,
+            ];
+        })->all();
+
+        // Summary stats
+        $totalMembers = array_sum(array_column($cellRows, 'member_count'));
+        $cellsWithLeader = count(array_filter($cellRows, fn ($c) => $c['leader'] !== null));
+        $cellsWithRecentAttendance = count(array_filter($cellRows, fn ($c) => $c['recent_sessions'] > 0));
+
+        // Average attendance rate across cells THAT HAVE data
+        // (avoid skewing 0% for cells with no recorded sessions)
+        $ratesAvailable = array_filter(
+            array_column($cellRows, 'recent_attendance_rate'),
+            fn ($r) => $r !== null
+        );
+        $avgRate = count($ratesAvailable) > 0
+            ? round(array_sum($ratesAvailable) / count($ratesAvailable), 1)
+            : null;
+
+        return response()->json([
+            'period' => [
+                'from' => $cutoff->toDateString(),
+                'to' => Carbon::today()->toDateString(),
+                'weeks' => $weeks,
+            ],
+            'cells' => $cellRows,
+            'summary' => [
+                'total_cells' => count($cellRows),
+                'cells_with_leader' => $cellsWithLeader,
+                'cells_with_recent_attendance' => $cellsWithRecentAttendance,
+                'total_members' => $totalMembers,
+                'avg_members_per_cell' => count($cellRows) > 0
+                    ? round($totalMembers / count($cellRows), 1)
+                    : 0,
+                'avg_attendance_rate' => $avgRate,
             ],
         ]);
     }

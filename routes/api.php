@@ -128,6 +128,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/finance/income-by-category', [ReportsController::class, 'incomeByCategory']);
         Route::get('reports/finance/expense-by-category', [ReportsController::class, 'expenseByCategory']);
         Route::get('reports/attendance/trends', [ReportsController::class, 'attendanceTrends']);
+        Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
