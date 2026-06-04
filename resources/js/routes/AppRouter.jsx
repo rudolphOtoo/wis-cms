@@ -30,6 +30,7 @@ import UsersPage         from '../pages/admin/Users'
 import AuditLog          from '../pages/admin/AuditLog'
 import FollowUpSettings from '../pages/settings/FollowUpSettings'
 import AttendanceTrends from '../pages/reports/AttendanceTrends'
+import CellComparison from '../pages/reports/CellComparison'
 import ExpenseByCategory from '../pages/reports/ExpenseByCategory'
 import IncomeByCategory from '../pages/reports/IncomeByCategory'
 import CommunicationPage from '../pages/communication/index'
@@ -81,6 +82,7 @@ export default function AppRouter() {
             <Route path="/admin/settings/follow-up" element={<FollowUpSettings />} />
             <Route path="/reports/finance/income-by-category" element={<IncomeByCategory />} />
             <Route path="/reports/finance/expense-by-category" element={<ExpenseByCategory />} />
+            <Route path="/reports/cells/comparison" element={<CellComparison />} />
             <Route path="/reports/attendance/trends" element={<AttendanceTrends />} />
           </Route>
         </Route>

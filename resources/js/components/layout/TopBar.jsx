@@ -17,6 +17,7 @@ const titles = {
   '/admin/settings/follow-up': 'Follow-up SMS',
   '/reports/finance/income-by-category': 'Income by Category',
   '/reports/finance/expense-by-category': 'Expense by Category',
+  '/reports/cells/comparison': 'Cell Comparison',
   '/reports/attendance/trends': 'Attendance Trends',
 }
 
