@@ -15,8 +15,8 @@ class MessageController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $messages = Message::where('branch_id', $request->user()->branch_id)
-            ->with('sender')
+        // Branch scoping handled by BelongsToBranch trait on Message.
+        $messages = Message::with('sender')
             ->withCount(['recipients',
                 'recipients as delivered_count' => fn ($q) => $q->where('delivery_status', 'delivered'),
                 'recipients as failed_count' => fn ($q) => $q->where('delivery_status', 'failed')])
@@ -49,8 +49,8 @@ class MessageController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $message = Message::where('branch_id', $request->user()->branch_id)
-            ->with(['sender', 'recipients.member'])
+        // Branch scoping handled by BelongsToBranch trait on Message.
+        $message = Message::with(['sender', 'recipients.member'])
             ->findOrFail($id);
 
         return response()->json([
@@ -163,18 +163,17 @@ class MessageController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
         $now = now();
 
         return response()->json([
             'data' => [
-                'total_sent' => Message::where('branch_id', $branchId)->where('status', 'sent')->count(),
-                'this_month' => Message::where('branch_id', $branchId)
+                'total_sent' => Message::where('status', 'sent')->count(),
+                'this_month' => Message::query()
                     ->whereMonth('created_at', $now->month)
                     ->whereYear('created_at', $now->year)
                     ->count(),
-                'total_recipients' => MessageRecipient::whereHas('message',
-                    fn ($q) => $q->where('branch_id', $branchId))->count(),
+                // MessageRecipient has no trait; rely on Message's trait via whereHas.
+                'total_recipients' => MessageRecipient::whereHas('message')->count(),
             ],
         ]);
     }
@@ -184,8 +183,8 @@ class MessageController extends Controller
      */
     protected function resolveRecipients(Request $request)
     {
-        $branchId = $request->user()->branch_id;
-        $query = Member::where('branch_id', $branchId);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        $query = Member::query();
 
         // Filter to recipients with valid contact info
         if ($request->channel === 'email') {
