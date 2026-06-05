@@ -50,8 +50,8 @@ class ReportsController extends Controller
 
         // Pass A: month + category breakdown (drives chart and table)
         // Postgres TO_CHAR(date, 'YYYY-MM') groups by month cleanly.
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
         $rows = Transaction::query()
-            ->where('branch_id', $branchId)
             ->where('type', 'income')
             ->whereBetween('transaction_date', [$from, $to])
             ->select([
@@ -73,7 +73,6 @@ class ReportsController extends Controller
 
         // Pass B: category totals (for summary percentages + top)
         $categoryTotals = Transaction::query()
-            ->where('branch_id', $branchId)
             ->where('type', 'income')
             ->whereBetween('transaction_date', [$from, $to])
             ->select(['category_id', DB::raw('SUM(amount) AS total')])
@@ -170,8 +169,8 @@ class ReportsController extends Controller
         $bucket = "DATE_TRUNC('{$groupBy}', service_date)::date";
 
         // Pass A: per-bucket aggregates (drives the chart)
+        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $base = AttendanceSession::query()
-            ->where('attendance_sessions.branch_id', $branchId)
             ->whereBetween('service_date', [$from, $to]);
 
         if ($serviceTypeFilter) {
@@ -357,8 +356,8 @@ class ReportsController extends Controller
 
         $branchId = $request->user()->branch_id;
 
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
         $rows = Transaction::query()
-            ->where('branch_id', $branchId)
             ->where('type', 'expense')
             ->whereBetween('transaction_date', [$from, $to])
             ->select([
@@ -379,7 +378,6 @@ class ReportsController extends Controller
             ]);
 
         $categoryTotals = Transaction::query()
-            ->where('branch_id', $branchId)
             ->where('type', 'expense')
             ->whereBetween('transaction_date', [$from, $to])
             ->select(['category_id', DB::raw('SUM(amount) AS total')])
@@ -450,8 +448,8 @@ class ReportsController extends Controller
         // Pass A: cells + leader + active member count
         // Use a subquery for member_count rather than a join with
         // GROUP BY (cleaner with the leader join already in place).
+        // Branch scoping handled by BelongsToBranch trait on Cell.
         $cells = Cell::query()
-            ->where('branch_id', $branchId)
             ->with(['leader:id,name'])
             ->withCount(['members' => function ($q) {
                 $q->whereNull('deleted_at')->where('status', 'active');
@@ -461,6 +459,10 @@ class ReportsController extends Controller
 
         // Pass B: attendance signals within the recency window,
         // keyed by cell_id for cheap lookup.
+        // NOTE: This uses DB::table() (raw query builder), so the
+        // BelongsToBranch global scope on AttendanceSession does NOT
+        // apply. The explicit branch_id filter MUST stay - removing it
+        // would leak attendance data across branches.
         $attendanceByCell = DB::table('attendance_sessions as s')
             ->leftJoin('attendance_records as r', 'r.session_id', '=', 's.id')
             ->where('s.branch_id', $branchId)
