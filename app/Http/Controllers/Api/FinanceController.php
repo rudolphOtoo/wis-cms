@@ -21,8 +21,8 @@ class FinanceController extends Controller
     // GET /api/finance/transactions
     public function index(Request $request): JsonResponse
     {
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
         $query = Transaction::query()
-            ->where('branch_id', $request->user()->branch_id)
             ->with(['category', 'member', 'recorder']);
 
         if ($search = $request->get('search')) {
@@ -102,9 +102,8 @@ class FinanceController extends Controller
     // GET /api/finance/transactions/{id}
     public function show(Request $request, string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->with(['category', 'member', 'recorder'])
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
+        $transaction = Transaction::with(['category', 'member', 'recorder'])->findOrFail($id);
 
         return response()->json(['data' => new TransactionResource($transaction)]);
     }
@@ -112,8 +111,8 @@ class FinanceController extends Controller
     // PUT /api/finance/transactions/{id}
     public function update(UpdateTransactionRequest $request, string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
+        $transaction = Transaction::findOrFail($id);
 
         $transaction->update($request->validated());
 
@@ -130,8 +129,8 @@ class FinanceController extends Controller
     // DELETE /api/finance/transactions/{id}
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
+        $transaction = Transaction::findOrFail($id);
 
         $transaction->delete();
 
@@ -145,8 +144,8 @@ class FinanceController extends Controller
     // GET /api/finance/transactions/export — streams a CSV of the (filtered) transactions
     public function export(Request $request): StreamedResponse
     {
+        // Branch scoping handled by BelongsToBranch trait on Transaction.
         $query = Transaction::query()
-            ->where('branch_id', $request->user()->branch_id)
             ->with(['category', 'member']);
 
         // Mirror index() filters so the export matches the on-screen list.
@@ -210,11 +209,10 @@ class FinanceController extends Controller
             'to' => ['required', 'date', 'after_or_equal:from'],
         ]);
 
-        $branchId = $request->user()->branch_id;
         $from = $request->get('from');
         $to = $request->get('to');
 
-        $transactions = Transaction::where('branch_id', $branchId)
+        $transactions = Transaction::query()
             ->whereBetween('transaction_date', [$from, $to])
             ->with('category')
             ->orderBy('transaction_date')
@@ -240,7 +238,7 @@ class FinanceController extends Controller
         $totalExpense = round($expense->sum('amount'), 2);
         $net = round($totalIncome - $totalExpense, 2);
 
-        $branch = Branch::find($branchId);
+        $branch = Branch::find($request->user()->branch_id);
 
         $pdf = Pdf::loadView('pdf.financial-ledger', [
             'period' => ['from' => $from, 'to' => $to],
@@ -258,10 +256,9 @@ class FinanceController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
         $now = now();
 
-        $thisMonth = Transaction::where('branch_id', $branchId)
+        $thisMonth = Transaction::query()
             ->whereMonth('transaction_date', $now->month)
             ->whereYear('transaction_date', $now->year);
 
@@ -271,19 +268,19 @@ class FinanceController extends Controller
         $totalCount = (clone $thisMonth)->count();
 
         // Total income/expenses all time
-        $totalIncome = Transaction::where('branch_id', $branchId)->where('type', 'income')->sum('amount');
-        $totalExpenses = Transaction::where('branch_id', $branchId)->where('type', 'expense')->sum('amount');
+        $totalIncome = Transaction::query()->where('type', 'income')->sum('amount');
+        $totalExpenses = Transaction::query()->where('type', 'expense')->sum('amount');
 
         // Last 6 months chart
         $chart = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = $now->copy()->subMonths($i);
-            $monthIncome = Transaction::where('branch_id', $branchId)
+            $monthIncome = Transaction::query()
                 ->where('type', 'income')
                 ->whereMonth('transaction_date', $month->month)
                 ->whereYear('transaction_date', $month->year)
                 ->sum('amount');
-            $monthExpenses = Transaction::where('branch_id', $branchId)
+            $monthExpenses = Transaction::query()
                 ->where('type', 'expense')
                 ->whereMonth('transaction_date', $month->month)
                 ->whereYear('transaction_date', $month->year)
@@ -297,7 +294,7 @@ class FinanceController extends Controller
         }
 
         // Top categories this month
-        $topCategories = Transaction::where('branch_id', $branchId)
+        $topCategories = Transaction::query()
             ->whereMonth('transaction_date', $now->month)
             ->whereYear('transaction_date', $now->year)
             ->where('type', 'income')
