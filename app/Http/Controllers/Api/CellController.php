@@ -22,7 +22,8 @@ class CellController extends Controller
     protected function scopedQuery(Request $request)
     {
         $user = $request->user();
-        $query = Cell::query()->where('branch_id', $user->branch_id);
+        // Branch scoping handled by BelongsToBranch trait on Cell.
+        $query = Cell::query();
         $seesAll = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
         if (! $seesAll && $user->hasRole('cell_leader')) {
             $query->where('leader_user_id', $user->id);
@@ -122,8 +123,8 @@ class CellController extends Controller
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
 
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($memberId);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        $member = Member::findOrFail($memberId);
 
         $member->update(['cell_id' => $cell->id]);
 
@@ -141,9 +142,8 @@ class CellController extends Controller
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
 
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->where('cell_id', $cell->id)
-            ->findOrFail($memberId);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        $member = Member::where('cell_id', $cell->id)->findOrFail($memberId);
 
         $member->update(['cell_id' => null]);
 
