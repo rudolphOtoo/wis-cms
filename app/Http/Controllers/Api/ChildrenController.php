@@ -78,8 +78,8 @@ class ChildrenController extends Controller
 
     public function update(UpdateChildrenRequest $request, string $id): JsonResponse
     {
-        $child = Children::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $child = Children::findOrFail($id);
 
         $child->update($request->validated());
 
@@ -95,8 +95,8 @@ class ChildrenController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $child = Children::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $child = Children::findOrFail($id);
 
         $name = $child->full_name;
         $child->delete();
