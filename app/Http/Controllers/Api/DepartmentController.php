@@ -26,7 +26,8 @@ class DepartmentController extends Controller
     {
         $user = $request->user();
 
-        $query = Department::query()->where('branch_id', $user->branch_id);
+        // Branch scoping handled by BelongsToBranch trait on Department.
+        $query = Department::query();
 
         $seesAll = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
 
@@ -175,11 +176,8 @@ class DepartmentController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
-
-        $departments = Department::where('branch_id', $branchId)
-            ->withCount('members')
-            ->get();
+        // Branch scoping handled by BelongsToBranch trait on Department.
+        $departments = Department::withCount('members')->get();
 
         return response()->json([
             'data' => [
