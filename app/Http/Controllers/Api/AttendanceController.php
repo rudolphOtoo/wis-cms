@@ -20,8 +20,8 @@ class AttendanceController extends Controller
     // GET /api/attendance
     public function index(Request $request): JsonResponse
     {
+        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $sessions = AttendanceSession::query()
-            ->where('branch_id', $request->user()->branch_id)
             ->with(['serviceType', 'recorder', 'branch'])
             ->orderByDesc('service_date')
             ->paginate($request->get('per_page', 20));
@@ -70,8 +70,8 @@ class AttendanceController extends Controller
         $departmentId = $request->department_id;
         if ($departmentId) {
             $user = $request->user();
+            // Branch scoping handled by BelongsToBranch trait on Department.
             $leadsIt = Department::where('id', $departmentId)
-                ->where('branch_id', $user->branch_id)
                 ->where('leader_user_id', $user->id)
                 ->exists();
             $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
@@ -87,8 +87,8 @@ class AttendanceController extends Controller
         $cellId = $request->cell_id;
         if ($cellId) {
             $user = $request->user();
+            // Branch scoping handled by BelongsToBranch trait on Cell.
             $leadsCell = Cell::where('id', $cellId)
-                ->where('branch_id', $user->branch_id)
                 ->where('leader_user_id', $user->id)
                 ->exists();
             $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
@@ -100,8 +100,8 @@ class AttendanceController extends Controller
         }
 
         // Prevent duplicate session (scoped by the right axis: service / dept / cell)
-        $existing = AttendanceSession::where('branch_id', $request->user()->branch_id)
-            ->where('service_type_id', $request->service_type_id)
+        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
+        $existing = AttendanceSession::where('service_type_id', $request->service_type_id)
             ->where('department_id', $departmentId)
             ->where('cell_id', $cellId)
             ->whereDate('service_date', $request->service_date)
@@ -137,15 +137,14 @@ class AttendanceController extends Controller
     // GET /api/attendance/sessions/{id}
     public function showSession(Request $request, string $id): JsonResponse
     {
-        $session = AttendanceSession::where('branch_id', $request->user()->branch_id)
-            ->with(['serviceType', 'recorder', 'records', 'branch'])
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
+        $session = AttendanceSession::with(['serviceType', 'recorder', 'records', 'branch'])->findOrFail($id);
 
         // Get all members/children with their attendance status
         $serviceType = $session->serviceType;
 
         if ($serviceType->type === 'children') {
-            $people = Children::where('branch_id', $request->user()->branch_id)
+            $people = Children::query()
                 ->where('is_active', true)
                 ->orderBy('first_name')
                 ->get()
@@ -181,7 +180,7 @@ class AttendanceController extends Controller
                     'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
                 ])->values();
         } else {
-            $people = Member::where('branch_id', $request->user()->branch_id)
+            $people = Member::query()
                 ->where('status', 'active')
                 ->orderBy('first_name')
                 ->get()
@@ -212,8 +211,8 @@ class AttendanceController extends Controller
             'records.*.is_present' => ['required', 'boolean'],
         ]);
 
-        $session = AttendanceSession::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
+        $session = AttendanceSession::findOrFail($id);
 
         foreach ($request->records as $record) {
             $data = [
@@ -248,19 +247,18 @@ class AttendanceController extends Controller
     // GET /api/attendance/stats
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
 
-        $lastSession = AttendanceSession::where('branch_id', $branchId)
+        $lastSession = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', '!=', 'children'))
             ->with('records')
             ->latest('service_date')
             ->first();
 
         $lastSunday = $lastSession?->adult_count ?? 0;
-        $totalSessions = AttendanceSession::where('branch_id', $branchId)->count();
+        $totalSessions = AttendanceSession::query()->count();
 
         // Average adult attendance last 4 sessions
-        $recentSessions = AttendanceSession::where('branch_id', $branchId)
+        $recentSessions = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with('records')
             ->latest('service_date')
@@ -272,7 +270,7 @@ class AttendanceController extends Controller
             : 0;
 
         // Last 8 sessions for chart
-        $chartData = AttendanceSession::where('branch_id', $branchId)
+        $chartData = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with(['serviceType', 'records'])
             ->latest('service_date')
@@ -286,7 +284,7 @@ class AttendanceController extends Controller
             ->values();
 
         // Week-over-week: most recent adult session vs the one before it
-        $lastTwo = AttendanceSession::where('branch_id', $branchId)
+        $lastTwo = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with('records')
             ->latest('service_date')
@@ -302,7 +300,7 @@ class AttendanceController extends Controller
         }
 
         // Monthly trend: total attendance grouped by month, last 6 months
-        $monthlyTrend = AttendanceSession::where('branch_id', $branchId)
+        $monthlyTrend = AttendanceSession::query()
             ->where('service_date', '>=', now()->subMonths(6)->startOfMonth())
             ->with('records')
             ->get()
@@ -314,7 +312,7 @@ class AttendanceController extends Controller
             ->values();
 
         // Insights: real computed facts for leadership
-        $allAdult = AttendanceSession::where('branch_id', $branchId)
+        $allAdult = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with(['serviceType', 'records'])
             ->get();
