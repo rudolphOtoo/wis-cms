@@ -17,8 +17,8 @@ class VisitorController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        // Branch scoping handled by BelongsToBranch trait on Visitor.
         $query = Visitor::query()
-            ->where('branch_id', $request->user()->branch_id)
             ->with('convertedMember');
 
         if ($search = $request->get('search')) {
@@ -68,17 +68,16 @@ class VisitorController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $visitor = Visitor::where('branch_id', $request->user()->branch_id)
-            ->with('convertedMember')
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Visitor.
+        $visitor = Visitor::with('convertedMember')->findOrFail($id);
 
         return response()->json(['data' => new VisitorResource($visitor)]);
     }
 
     public function update(UpdateVisitorRequest $request, string $id): JsonResponse
     {
-        $visitor = Visitor::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Visitor.
+        $visitor = Visitor::findOrFail($id);
 
         $visitor->update($request->validated());
 
@@ -94,8 +93,8 @@ class VisitorController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $visitor = Visitor::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Visitor.
+        $visitor = Visitor::findOrFail($id);
 
         $name = $visitor->full_name;
         $visitor->delete();
@@ -108,15 +107,14 @@ class VisitorController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
 
         return response()->json([
             'data' => [
-                'total' => Visitor::where('branch_id', $branchId)->count(),
-                'pending' => Visitor::where('branch_id', $branchId)->where('follow_up_status', 'pending')->count(),
-                'contacted' => Visitor::where('branch_id', $branchId)->where('follow_up_status', 'contacted')->count(),
-                'joined' => Visitor::where('branch_id', $branchId)->where('follow_up_status', 'joined')->count(),
-                'this_month' => Visitor::where('branch_id', $branchId)
+                'total' => Visitor::query()->count(),
+                'pending' => Visitor::query()->where('follow_up_status', 'pending')->count(),
+                'contacted' => Visitor::query()->where('follow_up_status', 'contacted')->count(),
+                'joined' => Visitor::query()->where('follow_up_status', 'joined')->count(),
+                'this_month' => Visitor::query()
                     ->whereMonth('visit_date', now()->month)
                     ->whereYear('visit_date', now()->year)
                     ->count(),
@@ -141,8 +139,8 @@ class VisitorController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $visitor = Visitor::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Visitor.
+        $visitor = Visitor::findOrFail($id);
 
         if ($visitor->converted_member_id) {
             return response()->json([
