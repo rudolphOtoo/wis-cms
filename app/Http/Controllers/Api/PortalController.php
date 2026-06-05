@@ -22,8 +22,8 @@ class PortalController extends Controller
 
         abort_if(! $memberId, 403, 'Your account is not linked to a member profile.');
 
-        return Member::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($memberId);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        return Member::findOrFail($memberId);
     }
 
     public function profile(Request $request): JsonResponse
