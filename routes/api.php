@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BirthdayController;
 use App\Http\Controllers\Api\CellController;
 use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\DashboardController;
@@ -129,6 +130,18 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/finance/expense-by-category', [ReportsController::class, 'expenseByCategory']);
         Route::get('reports/attendance/trends', [ReportsController::class, 'attendanceTrends']);
         Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
+
+        // Birthday messages
+        Route::get('birthdays/settings', [BirthdayController::class, 'showSettings'])
+            ->middleware('permission:view birthday messages');
+        Route::put('birthdays/settings', [BirthdayController::class, 'updateSettings'])
+            ->middleware('permission:manage birthday messages');
+        Route::post('birthdays/preview', [BirthdayController::class, 'preview'])
+            ->middleware('permission:view birthday messages');
+        Route::get('birthdays/upcoming', [BirthdayController::class, 'upcoming'])
+            ->middleware('permission:view birthday messages');
+        Route::get('birthdays/log', [BirthdayController::class, 'log'])
+            ->middleware('permission:manage birthday messages');
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
