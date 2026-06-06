@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -18,6 +18,7 @@ const titles = {
   '/reports/finance/income-by-category': 'Income by Category',
   '/reports/finance/expense-by-category': 'Expense by Category',
   '/reports/cells/comparison': 'Cell Comparison',
+  '/birthdays': 'Birthday Messages',
   '/reports/attendance/trends': 'Attendance Trends',
 }
 
