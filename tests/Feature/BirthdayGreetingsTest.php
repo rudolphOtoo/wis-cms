@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BirthdayMessageLog;
 use App\Models\Branch;
 use App\Models\Member;
 use App\Models\Message;
@@ -104,6 +105,58 @@ class BirthdayGreetingsTest extends TestCase
         $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
 
         $this->assertSame(0, Message::where('recipient_group', 'birthday')->count());
+    }
+
+    public function test_idempotent_when_run_twice_same_day(): void
+    {
+        Mail::fake();
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->once()->andReturn(true));
+
+        $this->makeMember(['date_of_birth' => '1990-05-28']);
+
+        // First run sends
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+            ->expectsOutputToContain('dispatched to 1')
+            ->assertSuccessful();
+
+        // Second run on the same day should skip
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+            ->expectsOutputToContain('dispatched to 0')
+            ->assertSuccessful();
+
+        $this->assertSame(1, Message::where('recipient_group', 'birthday')->count(),
+            'Second run must not create a duplicate message');
+    }
+
+    public function test_member_without_phone_logged_as_no_phone(): void
+    {
+        Mail::fake();
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->never());
+
+        $member = $this->makeMember(['date_of_birth' => '1990-05-28', 'phone' => null]);
+
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+
+        $log = BirthdayMessageLog::where('member_id', $member->id)->first();
+        $this->assertNotNull($log);
+        $this->assertSame(BirthdayMessageLog::STATUS_NO_PHONE, $log->status);
+        $this->assertSame(0, Message::where('recipient_group', 'birthday')->count());
+    }
+
+    public function test_sent_messages_create_log_entries(): void
+    {
+        Mail::fake();
+        $this->mock(MnotifySmsService::class, fn ($m) => $m->shouldReceive('send')->andReturn(true));
+
+        $member = $this->makeMember(['date_of_birth' => '1990-05-28']);
+
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+
+        $log = BirthdayMessageLog::where('member_id', $member->id)->first();
+        $this->assertNotNull($log);
+        $this->assertSame(BirthdayMessageLog::STATUS_SENT, $log->status);
+        $this->assertSame('0241234567', $log->phone_used);
+        $this->assertStringContainsString('Ama', $log->message_body);
     }
 
     protected function tearDown(): void

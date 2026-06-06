@@ -13,7 +13,7 @@ return [
         'enabled' => env('BIRTHDAY_GREETINGS_ENABLED', true),
 
         // Channel: 'sms', 'email', or 'both'.
-        'channel' => env('BIRTHDAY_GREETINGS_CHANNEL', 'both'),
+        'channel' => env('BIRTHDAY_GREETINGS_CHANNEL', 'sms'),
 
         // {first_name} and {church} are substituted at send time.
         'message' => env(
