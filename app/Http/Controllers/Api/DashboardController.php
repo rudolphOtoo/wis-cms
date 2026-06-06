@@ -37,34 +37,33 @@ class DashboardController extends Controller
             ], 403);
         }
 
-        $branchId = $user->branch_id;
         $now = now();
 
         // === HERO STATS ===
-        $totalMembers = Member::where('branch_id', $branchId)
+        $totalMembers = Member::query()
             ->where('status', 'active')->count();
 
-        $lastSession = AttendanceSession::where('branch_id', $branchId)
+        $lastSession = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', '!=', 'children'))
             ->with('records')
             ->latest('service_date')
             ->first();
         $lastAttendance = $lastSession?->adult_count ?? 0;
 
-        $monthIncome = Transaction::where('branch_id', $branchId)
+        $monthIncome = Transaction::query()
             ->where('type', 'income')
             ->whereMonth('transaction_date', $now->month)
             ->whereYear('transaction_date', $now->year)
             ->sum('amount');
 
-        $monthVisitors = Visitor::where('branch_id', $branchId)
+        $monthVisitors = Visitor::query()
             ->whereMonth('visit_date', $now->month)
             ->whereYear('visit_date', $now->year)
             ->count();
 
         // Previous-month comparison for growth indicator
         $prevMonth = $now->copy()->subMonth();
-        $prevMonthIncome = Transaction::where('branch_id', $branchId)
+        $prevMonthIncome = Transaction::query()
             ->where('type', 'income')
             ->whereMonth('transaction_date', $prevMonth->month)
             ->whereYear('transaction_date', $prevMonth->year)
@@ -75,7 +74,7 @@ class DashboardController extends Controller
             : null;
 
         // === ATTENDANCE CHART — Last 8 adult sessions ===
-        $attendanceChart = AttendanceSession::where('branch_id', $branchId)
+        $attendanceChart = AttendanceSession::query()
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with(['serviceType', 'records'])
             ->latest('service_date')
@@ -92,12 +91,12 @@ class DashboardController extends Controller
         $financeChart = [];
         for ($i = 5; $i >= 0; $i--) {
             $m = $now->copy()->subMonths($i);
-            $income = Transaction::where('branch_id', $branchId)
+            $income = Transaction::query()
                 ->where('type', 'income')
                 ->whereMonth('transaction_date', $m->month)
                 ->whereYear('transaction_date', $m->year)
                 ->sum('amount');
-            $expense = Transaction::where('branch_id', $branchId)
+            $expense = Transaction::query()
                 ->where('type', 'expense')
                 ->whereMonth('transaction_date', $m->month)
                 ->whereYear('transaction_date', $m->year)
@@ -110,7 +109,7 @@ class DashboardController extends Controller
         }
 
         // === TOP CATEGORIES THIS MONTH ===
-        $topCategories = Transaction::where('branch_id', $branchId)
+        $topCategories = Transaction::query()
             ->whereMonth('transaction_date', $now->month)
             ->whereYear('transaction_date', $now->year)
             ->where('type', 'income')
@@ -126,11 +125,11 @@ class DashboardController extends Controller
             ]);
 
         // === GENDER SPLIT ===
-        $male = Member::where('branch_id', $branchId)->where('gender', 'male')->where('status', 'active')->count();
-        $female = Member::where('branch_id', $branchId)->where('gender', 'female')->where('status', 'active')->count();
+        $male = Member::query()->where('gender', 'male')->where('status', 'active')->count();
+        $female = Member::query()->where('gender', 'female')->where('status', 'active')->count();
 
         // === RECENT ACTIVITY ===
-        $recentMembers = Member::where('branch_id', $branchId)
+        $recentMembers = Member::query()
             ->latest()
             ->take(5)
             ->get()
@@ -140,7 +139,7 @@ class DashboardController extends Controller
                 'when' => $m->created_at->diffForHumans(),
             ]);
 
-        $recentTransactions = Transaction::where('branch_id', $branchId)
+        $recentTransactions = Transaction::query()
             ->with(['category', 'member'])
             ->latest()
             ->take(5)
@@ -154,8 +153,8 @@ class DashboardController extends Controller
 
         // === COUNTERS ===
         $counts = [
-            'departments' => Department::where('branch_id', $branchId)->where('is_active', true)->count(),
-            'pending_visitors' => Visitor::where('branch_id', $branchId)->where('follow_up_status', 'pending')->count(),
+            'departments' => Department::query()->where('is_active', true)->count(),
+            'pending_visitors' => Visitor::query()->where('follow_up_status', 'pending')->count(),
         ];
 
         return response()->json([
@@ -188,7 +187,7 @@ class DashboardController extends Controller
      */
     protected function leaderDashboard($user): JsonResponse
     {
-        $departments = Department::where('branch_id', $user->branch_id)
+        $departments = Department::query()
             ->where('leader_user_id', $user->id)
             ->with(['members' => fn ($q) => $q->orderBy('first_name')])
             ->get()
@@ -213,7 +212,7 @@ class DashboardController extends Controller
 
                 // Department-meeting attendance stats (real, from sessions
                 // scoped to this department).
-                $deptSessions = AttendanceSession::where('branch_id', $dept->branch_id)
+                $deptSessions = AttendanceSession::query()
                     ->where('department_id', $dept->id)
                     ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
                     ->orderByDesc('service_date')
@@ -251,7 +250,7 @@ class DashboardController extends Controller
         // Cells the user leads (one-to-many members via cell_id). Mirrors
         // the department mapping; cell attendance is scoped by cell_id and
         // is empty until cell meetings are recorded.
-        $cells = Cell::where('branch_id', $user->branch_id)
+        $cells = Cell::query()
             ->where('leader_user_id', $user->id)
             ->with(['members' => fn ($q) => $q->orderBy('first_name')])
             ->get()
@@ -263,7 +262,7 @@ class DashboardController extends Controller
                     'phone' => $m->phone,
                 ]);
 
-                $sessions = AttendanceSession::where('branch_id', $cell->branch_id)
+                $sessions = AttendanceSession::query()
                     ->where('cell_id', $cell->id)
                     ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
                     ->orderByDesc('service_date')
