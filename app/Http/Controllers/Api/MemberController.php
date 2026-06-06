@@ -25,8 +25,8 @@ class MemberController extends Controller
     // GET /api/members
     public function index(Request $request): JsonResponse
     {
-        $query = Member::query()
-            ->where('branch_id', $request->user()->branch_id);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        $query = Member::query();
 
         // Search
         if ($search = $request->get('search')) {
@@ -86,7 +86,7 @@ class MemberController extends Controller
     // GET /api/members/{id}
     public function show(Request $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
+        $member = Member::query()
             ->findOrFail($id);
 
         return response()->json(['data' => new MemberResource($member)]);
@@ -95,7 +95,7 @@ class MemberController extends Controller
     // PUT /api/members/{id}
     public function update(UpdateMemberRequest $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
+        $member = Member::query()
             ->findOrFail($id);
 
         $member->update($request->validated());
@@ -113,7 +113,7 @@ class MemberController extends Controller
     // DELETE /api/members/{id}
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
+        $member = Member::query()
             ->findOrFail($id);
 
         $name = $member->full_name;
@@ -129,8 +129,8 @@ class MemberController extends Controller
     // GET /api/members/export  — streams a CSV of the (optionally filtered) member list
     public function export(Request $request): StreamedResponse
     {
-        $query = Member::query()
-            ->where('branch_id', $request->user()->branch_id);
+        // Branch scoping handled by BelongsToBranch trait on Member.
+        $query = Member::query();
 
         // Mirror the same filters as index() so the export matches what
         // the user is looking at.
@@ -188,17 +188,16 @@ class MemberController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
 
         return response()->json([
             'data' => [
-                'total' => Member::where('branch_id', $branchId)->count(),
-                'active' => Member::where('branch_id', $branchId)->where('status', 'active')->count(),
-                'inactive' => Member::where('branch_id', $branchId)->where('status', 'inactive')->count(),
-                'transferred' => Member::where('branch_id', $branchId)->where('status', 'transferred')->count(),
-                'male' => Member::where('branch_id', $branchId)->where('gender', 'male')->count(),
-                'female' => Member::where('branch_id', $branchId)->where('gender', 'female')->count(),
-                'new_this_month' => Member::where('branch_id', $branchId)
+                'total' => Member::query()->count(),
+                'active' => Member::query()->where('status', 'active')->count(),
+                'inactive' => Member::query()->where('status', 'inactive')->count(),
+                'transferred' => Member::query()->where('status', 'transferred')->count(),
+                'male' => Member::query()->where('gender', 'male')->count(),
+                'female' => Member::query()->where('gender', 'female')->count(),
+                'new_this_month' => Member::query()
                     ->whereMonth('created_at', now()->month)
                     ->whereYear('created_at', now()->year)
                     ->count(),
@@ -208,7 +207,7 @@ class MemberController extends Controller
 
     public function giving(Request $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)->findOrFail($id);
+        $member = Member::query()->findOrFail($id);
         $year = $request->get('year', now()->format('Y'));
 
         $transactions = $member->transactions()
@@ -256,7 +255,7 @@ class MemberController extends Controller
 
     public function givingStatement(Request $request, string $id)
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
+        $member = Member::query()
             ->with('branch')->findOrFail($id);
         $year = $request->get('year', now()->format('Y'));
 
@@ -305,7 +304,7 @@ class MemberController extends Controller
     {
         $branchId = $request->user()->branch_id;
 
-        $member = Member::where('branch_id', $branchId)->findOrFail($id);
+        $member = Member::query()->findOrFail($id);
 
         $data = $request->validate([
             'leadership_type' => ['required', 'in:cell,department'],
@@ -321,7 +320,7 @@ class MemberController extends Controller
         }
 
         $unitClass = $data['leadership_type'] === 'cell' ? Cell::class : Department::class;
-        $unit = $unitClass::where('branch_id', $branchId)->findOrFail($data['target_id']);
+        $unit = $unitClass::query()->findOrFail($data['target_id']);
 
         if ($unit->leader_user_id) {
             return response()->json([
@@ -378,7 +377,7 @@ class MemberController extends Controller
     public function createLogin(Request $request, string $id): JsonResponse
     {
         $branchId = $request->user()->branch_id;
-        $member = Member::where('branch_id', $branchId)->findOrFail($id);
+        $member = Member::query()->findOrFail($id);
 
         $data = $request->validate([
             'email' => ['required', 'email', 'unique:users,email', 'max:150'],
