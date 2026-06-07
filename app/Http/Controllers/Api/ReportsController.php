@@ -33,6 +33,15 @@ class ReportsController extends Controller
     //   to_date   (optional, default: today)
     public function incomeByCategory(Request $request): JsonResponse
     {
+        return response()->json($this->buildIncomeData($request));
+    }
+
+    /**
+     * Build the income-by-category dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildIncomeData(Request $request): array
+    {
         $validated = $request->validate([
             'from_date' => 'nullable|date',
             'to_date' => 'nullable|date|after_or_equal:from_date',
@@ -45,8 +54,6 @@ class ReportsController extends Controller
         $from = isset($validated['from_date'])
             ? Carbon::parse($validated['from_date'])
             : $to->copy()->subMonthsNoOverflow(6)->startOfMonth();
-
-        $branchId = $request->user()->branch_id;
 
         // Pass A: month + category breakdown (drives chart and table)
         // Postgres TO_CHAR(date, 'YYYY-MM') groups by month cleanly.
@@ -101,12 +108,12 @@ class ReportsController extends Controller
 
         $topCategory = $categoryBreakdown[0]['category_name'] ?? null;
 
-        return response()->json([
+        return [
             'period' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
             ],
-            'rows' => $rows->values(),
+            'rows' => $rows->values()->all(),
             'summary' => [
                 'grand_total' => round($grandTotal, 2),
                 'monthly_average' => round($grandTotal / $monthCount, 2),
@@ -114,7 +121,7 @@ class ReportsController extends Controller
                 'top_category' => $topCategory,
                 'category_totals' => $categoryBreakdown,
             ],
-        ]);
+        ];
     }
 
     // GET /api/reports/attendance/trends
@@ -145,6 +152,15 @@ class ReportsController extends Controller
     //      smooths over this naturally.
     public function attendanceTrends(Request $request): JsonResponse
     {
+        return response()->json($this->buildAttendanceTrendsData($request));
+    }
+
+    /**
+     * Build the attendance-trends dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildAttendanceTrendsData(Request $request): array
+    {
         $validated = $request->validate([
             'from_date' => 'nullable|date',
             'to_date' => 'nullable|date|after_or_equal:from_date',
@@ -160,8 +176,6 @@ class ReportsController extends Controller
             : $to->copy()->subWeeks(12)->startOfWeek();
         $groupBy = $validated['group_by'] ?? 'week';
         $serviceTypeFilter = $validated['service_type_id'] ?? null;
-
-        $branchId = $request->user()->branch_id;
 
         // Postgres date_trunc gives us week-start or month-start as a
         // DATE - perfect for bucketing. Pass the unit as a literal,
@@ -251,7 +265,7 @@ class ReportsController extends Controller
             ? round($recordsPresent / $totalSessions, 1)
             : 0.0;
 
-        return response()->json([
+        return [
             'period' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
@@ -266,7 +280,7 @@ class ReportsController extends Controller
                 'avg_per_session' => $avgPerSession,
                 'trend' => $this->computeAttendanceTrend($periodRows),
             ],
-        ]);
+        ];
     }
 
     /**
@@ -341,6 +355,15 @@ class ReportsController extends Controller
     //   to_date   (optional, default: today)
     public function expenseByCategory(Request $request): JsonResponse
     {
+        return response()->json($this->buildExpenseData($request));
+    }
+
+    /**
+     * Build the expense-by-category dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildExpenseData(Request $request): array
+    {
         $validated = $request->validate([
             'from_date' => 'nullable|date',
             'to_date' => 'nullable|date|after_or_equal:from_date',
@@ -353,8 +376,6 @@ class ReportsController extends Controller
         $from = isset($validated['from_date'])
             ? Carbon::parse($validated['from_date'])
             : $to->copy()->subMonthsNoOverflow(6)->startOfMonth();
-
-        $branchId = $request->user()->branch_id;
 
         // Branch scoping handled by BelongsToBranch trait on Transaction.
         $rows = Transaction::query()
@@ -403,12 +424,12 @@ class ReportsController extends Controller
 
         $topCategory = $categoryBreakdown[0]['category_name'] ?? null;
 
-        return response()->json([
+        return [
             'period' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
             ],
-            'rows' => $rows->values(),
+            'rows' => $rows->values()->all(),
             'summary' => [
                 'grand_total' => round($grandTotal, 2),
                 'monthly_average' => round($grandTotal / $monthCount, 2),
@@ -416,7 +437,7 @@ class ReportsController extends Controller
                 'top_category' => $topCategory,
                 'category_totals' => $categoryBreakdown,
             ],
-        ]);
+        ];
     }
 
     // GET /api/reports/cells/comparison
@@ -437,12 +458,25 @@ class ReportsController extends Controller
     //   weeks (optional, default 4) - window for 'recent' signals
     public function cellComparison(Request $request): JsonResponse
     {
+        return response()->json($this->buildCellComparisonData($request));
+    }
+
+    /**
+     * Build the cell-comparison dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildCellComparisonData(Request $request): array
+    {
         $validated = $request->validate([
             'weeks' => 'nullable|integer|min:1|max:52',
         ]);
 
         $weeks = $validated['weeks'] ?? 4;
         $cutoff = Carbon::today()->subWeeks($weeks);
+
+        // Branch id is required for the DB::table() raw query below
+        // (Pass B). BelongsToBranch trait global scope doesn't apply
+        // to raw query builder, so the filter must be explicit.
         $branchId = $request->user()->branch_id;
 
         // Pass A: cells + leader + active member count
@@ -534,7 +568,7 @@ class ReportsController extends Controller
             ? round(array_sum($ratesAvailable) / count($ratesAvailable), 1)
             : null;
 
-        return response()->json([
+        return [
             'period' => [
                 'from' => $cutoff->toDateString(),
                 'to' => Carbon::today()->toDateString(),
@@ -551,6 +585,6 @@ class ReportsController extends Controller
                     : 0,
                 'avg_attendance_rate' => $avgRate,
             ],
-        ]);
+        ];
     }
 }
