@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { getAttendanceTrendsReport } from '../../api/reports'
+import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttendanceTrendsCsv } from '../../api/reports'
+import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -144,6 +145,12 @@ export default function AttendanceTrends() {
                 className="btn-primary px-6 py-2">
           {loading ? 'Loading...' : 'Update Report'}
         </button>
+        <DownloadReportMenu
+          pdfHandler={() => downloadAttendanceTrendsPdf({ from_date: fromDate, to_date: toDate })}
+          csvHandler={() => downloadAttendanceTrendsCsv({ from_date: fromDate, to_date: toDate })}
+          filenameBase={`attendance-trends-${fromDate}-to-${toDate}`}
+          disabled={loading || !data}
+        />
       </div>
 
       {error && (

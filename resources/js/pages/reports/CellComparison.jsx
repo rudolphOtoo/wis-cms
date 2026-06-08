@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { getCellComparisonReport } from '../../api/reports'
+import { getCellComparisonReport, downloadCellComparisonPdf, downloadCellComparisonCsv } from '../../api/reports'
+import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell as RechartsCell } from 'recharts'
 
 // Bar color per cell — assigned in order rather than by health.
@@ -76,6 +77,12 @@ export default function CellComparison() {
         <button onClick={load} disabled={loading} className="btn-primary px-6 py-2">
           {loading ? 'Loading...' : 'Update Report'}
         </button>
+        <DownloadReportMenu
+          pdfHandler={() => downloadCellComparisonPdf({ weeks })}
+          csvHandler={() => downloadCellComparisonCsv({ weeks })}
+          filenameBase={`cell-comparison-${new Date().toISOString().slice(0,10)}`}
+          disabled={loading || !data}
+        />
       </div>
 
       {error && (

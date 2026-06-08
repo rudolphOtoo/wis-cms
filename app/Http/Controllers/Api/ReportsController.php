@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceSession;
+use App\Models\Branch;
 use App\Models\Cell;
 use App\Models\Transaction;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\CSV\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Reporting endpoints for council monthly review.
@@ -586,5 +591,255 @@ class ReportsController extends Controller
                 'avg_attendance_rate' => $avgRate,
             ],
         ];
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // EXPORT ENDPOINTS — PDF + CSV downloads for each report
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/finance/income-by-category/export-pdf
+    public function incomeByCategoryPdf(Request $request)
+    {
+        $data = $this->buildIncomeData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-income-by-category', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        return $pdf->download("income-by-category-{$from}-to-{$to}.pdf");
+    }
+
+    // GET /api/reports/finance/income-by-category/export-csv
+    public function incomeByCategoryCsv(Request $request)
+    {
+        $data = $this->buildIncomeData($request);
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        $filename = "income-by-category-{$from}-to-{$to}.csv";
+
+        return new StreamedResponse(function () use ($data) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            // Per-row sheet: month + category + total
+            $writer->addRow(Row::fromValues(['Month', 'Category', 'Total (GHS)']));
+            foreach ($data['rows'] as $row) {
+                $writer->addRow(Row::fromValues([
+                    $row['month'],
+                    $row['category_name'],
+                    number_format($row['total'], 2, '.', ''),
+                ]));
+            }
+
+            // Blank line then category summary
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Category Totals (entire period)']));
+            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Percentage']));
+            foreach ($data['summary']['category_totals'] as $cat) {
+                $writer->addRow(Row::fromValues([
+                    $cat['category_name'],
+                    number_format($cat['total'], 2, '.', ''),
+                    $cat['percentage'].'%',
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Grand Total', number_format($data['summary']['grand_total'], 2, '.', '')]));
+            $writer->addRow(Row::fromValues(['Monthly Average', number_format($data['summary']['monthly_average'], 2, '.', '')]));
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // GET /api/reports/finance/expense-by-category/export-pdf
+    public function expenseByCategoryPdf(Request $request)
+    {
+        $data = $this->buildExpenseData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-expense-by-category', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        return $pdf->download("expense-by-category-{$from}-to-{$to}.pdf");
+    }
+
+    // GET /api/reports/finance/expense-by-category/export-csv
+    public function expenseByCategoryCsv(Request $request)
+    {
+        $data = $this->buildExpenseData($request);
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        $filename = "expense-by-category-{$from}-to-{$to}.csv";
+
+        return new StreamedResponse(function () use ($data) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues(['Month', 'Category', 'Total (GHS)']));
+            foreach ($data['rows'] as $row) {
+                $writer->addRow(Row::fromValues([
+                    $row['month'],
+                    $row['category_name'],
+                    number_format($row['total'], 2, '.', ''),
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Category Totals (entire period)']));
+            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Percentage']));
+            foreach ($data['summary']['category_totals'] as $cat) {
+                $writer->addRow(Row::fromValues([
+                    $cat['category_name'],
+                    number_format($cat['total'], 2, '.', ''),
+                    $cat['percentage'].'%',
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Grand Total', number_format($data['summary']['grand_total'], 2, '.', '')]));
+            $writer->addRow(Row::fromValues(['Monthly Average', number_format($data['summary']['monthly_average'], 2, '.', '')]));
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // GET /api/reports/attendance/trends/export-pdf
+    public function attendanceTrendsPdf(Request $request)
+    {
+        $data = $this->buildAttendanceTrendsData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-attendance-trends', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        return $pdf->download("attendance-trends-{$from}-to-{$to}.pdf");
+    }
+
+    // GET /api/reports/attendance/trends/export-csv
+    public function attendanceTrendsCsv(Request $request)
+    {
+        $data = $this->buildAttendanceTrendsData($request);
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        $filename = "attendance-trends-{$from}-to-{$to}.csv";
+
+        return new StreamedResponse(function () use ($data) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues([
+                'Period', 'Sessions', 'Present', 'Absent', 'Total Records', 'Attendance Rate (%)',
+            ]));
+            foreach ($data['rows'] as $row) {
+                $writer->addRow(Row::fromValues([
+                    $row['label'] ?? $row['period_start'] ?? '',
+                    (string) ($row['sessions'] ?? ''),
+                    (string) ($row['records_present'] ?? ''),
+                    (string) ($row['records_absent'] ?? ''),
+                    (string) ($row['records_total'] ?? ''),
+                    (string) ($row['attendance_rate'] ?? ''),
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Summary']));
+            $writer->addRow(Row::fromValues(['Total Sessions', (string) $data['summary']['total_sessions']]));
+            $writer->addRow(Row::fromValues(['Total Present', (string) $data['summary']['total_present']]));
+            $writer->addRow(Row::fromValues(['Total Absent', (string) $data['summary']['total_absent']]));
+            $writer->addRow(Row::fromValues(['Overall Rate (%)', (string) $data['summary']['overall_attendance_rate']]));
+            $writer->addRow(Row::fromValues(['Avg per Session', (string) $data['summary']['avg_per_session']]));
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // GET /api/reports/cells/comparison/export-pdf
+    public function cellComparisonPdf(Request $request)
+    {
+        $data = $this->buildCellComparisonData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-cell-comparison', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $today = now()->format('Y-m-d');
+
+        return $pdf->download("cell-comparison-{$today}.pdf");
+    }
+
+    // GET /api/reports/cells/comparison/export-csv
+    public function cellComparisonCsv(Request $request)
+    {
+        $data = $this->buildCellComparisonData($request);
+        $today = now()->format('Y-m-d');
+        $filename = "cell-comparison-{$today}.csv";
+
+        return new StreamedResponse(function () use ($data) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues([
+                'Cell', 'Leader', 'Members', 'Recent Sessions', 'Attendance Rate (%)',
+                'Last Session', 'Health Flags',
+            ]));
+            foreach ($data['cells'] as $cell) {
+                $writer->addRow(Row::fromValues([
+                    $cell['name'],
+                    $cell['leader']['name'] ?? '(no leader)',
+                    (string) $cell['member_count'],
+                    (string) ($cell['recent_sessions'] ?? 0),
+                    (string) ($cell['recent_attendance_rate'] ?? ''),
+                    $cell['last_session_date'] ?? '—',
+                    implode('; ', $cell['health_flags'] ?? []),
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Summary']));
+            $writer->addRow(Row::fromValues(['Total Cells', (string) $data['summary']['total_cells']]));
+            $writer->addRow(Row::fromValues(['Cells with Leader', (string) $data['summary']['cells_with_leader']]));
+            $writer->addRow(Row::fromValues(['Cells with Recent Attendance', (string) $data['summary']['cells_with_recent_attendance']]));
+            $writer->addRow(Row::fromValues(['Total Members', (string) $data['summary']['total_members']]));
+            $writer->addRow(Row::fromValues(['Avg Members per Cell', (string) $data['summary']['avg_members_per_cell']]));
+            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', (string) $data['summary']['avg_attendance_rate']]));
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 }

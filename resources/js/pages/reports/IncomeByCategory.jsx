@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { getIncomeByCategoryReport } from '../../api/reports'
+import { getIncomeByCategoryReport, downloadIncomeByCategoryPdf, downloadIncomeByCategoryCsv } from '../../api/reports'
+import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 // Color palette for category bars — distinct, accessible, navy-friendly
@@ -114,6 +115,12 @@ export default function IncomeByCategory() {
                 className="btn-primary px-6 py-2">
           {loading ? 'Loading...' : 'Update Report'}
         </button>
+        <DownloadReportMenu
+          pdfHandler={() => downloadIncomeByCategoryPdf({ from_date: fromDate, to_date: toDate })}
+          csvHandler={() => downloadIncomeByCategoryCsv({ from_date: fromDate, to_date: toDate })}
+          filenameBase={`income-by-category-${fromDate}-to-${toDate}`}
+          disabled={loading || !data}
+        />
       </div>
 
       {error && (
