@@ -196,19 +196,32 @@ class ReportsController extends Controller
             $base->where('service_type_id', $serviceTypeFilter);
         }
 
+        // Sunday cell meetings count toward Sunday Adult Service.
+        // Leadership rule: cell leaders take attendance during the
+        // service breakout; that cell register IS the Sunday service
+        // attendance for those members. Direct sunday_adult sessions
+        // ALSO count (dual-mode: legacy data + new flow both included).
+        // DOW: Postgres EXTRACT day-of-week, 0=Sunday.
+        $effectiveType = "CASE
+            WHEN service_types.slug = 'cell_meeting'
+                 AND EXTRACT(DOW FROM service_date) = 0
+            THEN 'Sunday Adult Service'
+            ELSE service_types.name
+        END";
+
         $rows = (clone $base)
             ->join('attendance_records', 'attendance_sessions.id', '=', 'attendance_records.session_id')
             ->join('service_types', 'attendance_sessions.service_type_id', '=', 'service_types.id')
             ->select([
                 DB::raw("{$bucket} AS period_start"),
-                'service_types.name AS service_type_name',
+                DB::raw("{$effectiveType} AS service_type_name"),
                 DB::raw('COUNT(DISTINCT attendance_sessions.id) AS sessions_count'),
                 DB::raw('COUNT(attendance_records.id) AS records_total'),
                 DB::raw('SUM(CASE WHEN attendance_records.is_present THEN 1 ELSE 0 END) AS records_present'),
             ])
-            ->groupBy('period_start', 'service_types.name')
+            ->groupBy(DB::raw('period_start'), DB::raw($effectiveType))
             ->orderBy('period_start')
-            ->orderBy('service_types.name')
+            ->orderBy(DB::raw($effectiveType))
             ->get();
 
         // Reshape: one row per period, service types as sub-map.

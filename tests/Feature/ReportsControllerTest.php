@@ -280,6 +280,28 @@ class ReportsControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * Create a service type with an EXACT slug. Used by tests that
+     * verify slug-dependent business rules (e.g. the Sunday cell
+     * aggregation rule looks for slug='cell_meeting').
+     */
+    protected function makeServiceTypeWithSlug(string $name, string $slug): ServiceType
+    {
+        // Migrations pre-seed the 7 default service types (cell_meeting,
+        // sunday_adult, etc.). Use firstOrCreate so tests that need
+        // those exact slugs work whether they exist already or not.
+        // The branch_id is set on create only; existing rows keep theirs.
+        return ServiceType::firstOrCreate(
+            ['slug' => $slug],
+            [
+                'branch_id' => $this->branch->id,
+                'name' => $name,
+                'type' => 'adult',
+                'is_active' => true,
+            ]
+        );
+    }
+
     protected function makeSession(ServiceType $serviceType, string $date, array $attrs = []): AttendanceSession
     {
         return AttendanceSession::create(array_merge([
@@ -442,6 +464,109 @@ class ReportsControllerTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/reports/attendance/trends?from_date=2026-06-30&to_date=2026-06-01');
         $response->assertStatus(422);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // SUNDAY CELL AGGREGATION RULE
+    //
+    // Cell leaders take attendance during the Sunday service breakout.
+    // That cell register IS the Sunday Adult Service attendance for
+    // their members. The query rolls cell_meeting sessions on Sundays
+    // into the Sunday Adult Service bucket; cell meetings on other
+    // days stay under Cell Meeting.
+    // ──────────────────────────────────────────────────────────
+
+    public function test_sunday_cell_meeting_rolls_into_sunday_adult_service(): void
+    {
+        $cell = $this->makeServiceTypeWithSlug('Cell Meeting', 'cell_meeting');
+
+        // 2026-03-08 is a Sunday.
+        $session = $this->makeSession($cell, '2026-03-08', ['cell_id' => null]);
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, false);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-08&to_date=2026-03-08');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $this->assertNotEmpty($rows);
+
+        $byType = $rows[0]['by_service_type'];
+        $this->assertArrayHasKey('Sunday Adult Service', $byType,
+            'Cell meeting on Sunday should aggregate into Sunday Adult Service');
+        $this->assertArrayNotHasKey('Cell Meeting', $byType,
+            'Cell Meeting bucket should be empty when only Sunday cells exist');
+        $this->assertSame(2, $byType['Sunday Adult Service']['present']);
+        $this->assertSame(3, $byType['Sunday Adult Service']['total']);
+    }
+
+    public function test_weekday_cell_meeting_stays_under_cell_meeting(): void
+    {
+        $cell = $this->makeServiceTypeWithSlug('Cell Meeting', 'cell_meeting');
+
+        // 2026-03-10 is a Tuesday.
+        $session = $this->makeSession($cell, '2026-03-10', ['cell_id' => null]);
+        $this->makeMemberAndRecord($session, true);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-09&to_date=2026-03-15');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $this->assertNotEmpty($rows);
+
+        $byType = $rows[0]['by_service_type'];
+        $this->assertArrayHasKey('Cell Meeting', $byType,
+            'Weekday cell meeting should retain its Cell Meeting label');
+        $this->assertArrayNotHasKey('Sunday Adult Service', $byType,
+            'Weekday cell meeting should NOT roll into Sunday Adult Service');
+    }
+
+    public function test_sunday_department_meeting_does_not_get_special_treatment(): void
+    {
+        $dept = $this->makeServiceTypeWithSlug('Department Meeting', 'department_meeting');
+
+        $session = $this->makeSession($dept, '2026-03-08');
+        $this->makeMemberAndRecord($session, true);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-08&to_date=2026-03-08');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $byType = $rows[0]['by_service_type'];
+
+        $this->assertArrayHasKey('Department Meeting', $byType,
+            'Sunday department meeting should retain its Department Meeting label');
+        $this->assertArrayNotHasKey('Sunday Adult Service', $byType,
+            'Department meeting on Sunday should NOT roll into Sunday Adult Service');
+    }
+
+    public function test_direct_sunday_adult_session_still_counts(): void
+    {
+        $sunday = $this->makeServiceTypeWithSlug('Sunday Adult Service', 'sunday_adult');
+
+        $session = $this->makeSession($sunday, '2026-03-08');
+        $this->makeMemberAndRecord($session, true);
+        $this->makeMemberAndRecord($session, false);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/trends?from_date=2026-03-08&to_date=2026-03-08');
+
+        $response->assertStatus(200);
+        $rows = $response->json('rows');
+        $byType = $rows[0]['by_service_type'];
+
+        $this->assertArrayHasKey('Sunday Adult Service', $byType,
+            'Direct sunday_adult sessions still appear under Sunday Adult Service');
+        $this->assertSame(1, $byType['Sunday Adult Service']['present']);
+        $this->assertSame(2, $byType['Sunday Adult Service']['total']);
     }
 
     // ──────────────────────────────────────────────────────────
