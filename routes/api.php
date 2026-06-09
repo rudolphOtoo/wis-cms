@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\ServiceReminderController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
@@ -152,6 +153,21 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
             ->middleware('permission:view birthday messages');
         Route::get('birthdays/log', [BirthdayController::class, 'log'])
             ->middleware('permission:manage birthday messages');
+
+        // Per-service-type SMS reminders (e.g. Sunday-service Saturday-evening
+        // reminder, midweek-service Wednesday-morning reminder). Scheduled
+        // command (reminders:send) does the actual sending; these endpoints
+        // are the admin UI surface.
+        Route::get('reminders/settings', [ServiceReminderController::class, 'index'])
+            ->middleware('permission:view service reminders');
+        Route::put('reminders/settings/{serviceTypeId}', [ServiceReminderController::class, 'upsert'])
+            ->middleware('permission:manage service reminders');
+        Route::post('reminders/preview', [ServiceReminderController::class, 'preview'])
+            ->middleware('permission:view service reminders');
+        Route::get('reminders/upcoming', [ServiceReminderController::class, 'upcoming'])
+            ->middleware('permission:view service reminders');
+        Route::get('reminders/log', [ServiceReminderController::class, 'log'])
+            ->middleware('permission:manage service reminders');
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
