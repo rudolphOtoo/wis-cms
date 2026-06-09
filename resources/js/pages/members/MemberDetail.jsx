@@ -358,7 +358,7 @@ function PromoteModal({ member, onClose, onSuccess }) {
       if (cancelled) return
       const all = res.data.data ?? []
       // Only show units without a current leader (matches backend hard-reject rule)
-      setUnits(all.filter(u => !u.leader_user_id && !u.leader_name))
+      setUnits(all.filter(u => !u.leader_user_id && !u.leader))
     }).catch(() => !cancelled && setServerErr('Could not load units.'))
     return () => { cancelled = true }
   }, [type])

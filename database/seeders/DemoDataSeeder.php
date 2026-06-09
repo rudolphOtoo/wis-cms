@@ -4,6 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\AttendanceRecord;
 use App\Models\AttendanceSession;
+use App\Models\BirthdayMessageLog;
+use App\Models\Cell;
+use App\Models\Children;
 use App\Models\Department;
 use App\Models\FinanceCategory;
 use App\Models\Member;
@@ -54,6 +57,25 @@ class DemoDataSeeder extends Seeder
                 'status' => collect(['active', 'active', 'active', 'active', 'active', 'active', 'active', 'inactive', 'transferred'])->random(),
             ]);
             $allMembers[] = $member;
+        }
+
+        // ===== CELL ASSIGNMENT =====
+        // CellSeeder runs before this seeder, so cells exist but were unable
+        // to assign members (members didn't exist yet). Distribute now using
+        // the same realistic uneven sizing.
+        $cells = Cell::all();
+        if ($cells->isNotEmpty()) {
+            $distribution = [11, 9, 8, 7, 6, 4]; // sums to 45 of ~47 active → ~2 unassigned
+            $activeMembers = collect($allMembers)->where('status', 'active')->values();
+            $cursor = 0;
+            foreach ($cells as $i => $cell) {
+                $take = $distribution[$i] ?? 0;
+                $slice = $activeMembers->slice($cursor, $take);
+                foreach ($slice as $member) {
+                    $member->update(['cell_id' => $cell->id]);
+                }
+                $cursor += $take;
+            }
         }
 
         // ===== DEPARTMENTS =====
@@ -145,7 +167,7 @@ class DemoDataSeeder extends Seeder
         $incomeCategories = FinanceCategory::where('type', 'income')->get();
         $expenseCategories = FinanceCategory::where('type', 'expense')->get();
         $tithe = $incomeCategories->where('name', 'Tithe')->first();
-        $sundayOffering = $incomeCategories->where('name', 'Sunday Offering')->first();
+        $sundayOffering = $incomeCategories->where('name', 'Offertory')->first();
 
         for ($month = 5; $month >= 0; $month--) {
             $monthDate = now()->subMonths($month);
@@ -198,10 +220,213 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        // ─────────────────────────────────────────────────────────
+        // EXTENSION: COUNCIL DEMO ENHANCEMENTS
+        // Added to complete the demo story for the four shipped
+        // features (cell aggregation, downloads, flags, birthdays).
+        // ─────────────────────────────────────────────────────────
+
+        $this->seedCellAttendance($branchId, $admin);
+        $this->seedTodaysBirthdays($branchId);
+        $this->seedUpcomingBirthdays($branchId);
+        $this->seedChildren($branchId);
+        $this->seedBirthdayLogHistory($branchId);
+
         $this->command->info('   ✓ 60 members created');
         $this->command->info('   ✓ 8 departments with assigned members');
         $this->command->info('   ✓ 20 visitors');
-        $this->command->info('   ✓ 10 weeks of attendance');
+        $this->command->info('   ✓ 10 weeks of Sunday Adult Service attendance');
         $this->command->info('   ✓ 6 months of transactions');
+        $this->command->info('   ✓ 12 weeks of cell-meeting attendance (varied health)');
+        $this->command->info('   ✓ Birthdays seeded for today + this week');
+        $this->command->info('   ✓ 12 children records');
+        $this->command->info('   ✓ Historic birthday SMS log entries');
+    }
+
+    /**
+     * Twelve weeks of cell-meeting attendance per cell.
+     *
+     * Each cell follows a "health profile" so the Cell Comparison
+     * report tells a real story:
+     *   - Bethel:     meets EVERY Sunday, 85-95% attendance (HEALTHY)
+     *   - Spintex:    meets 6 of 12 Sundays, 65-80% (DECLINING)
+     *   - Dansoman:   no recent meetings (FLAGGED no_recent_attendance)
+     *   - Tema:       no recent meetings (FLAGGED no_recent_attendance)
+     *   - Young:      no recent meetings (FLAGGED no_recent_attendance)
+     *   - Seniors:    no recent meetings (FLAGGED + small + no leader)
+     *
+     * The Sunday cell-meeting service type is used so the new
+     * aggregation rule (Item 1) rolls these into Sunday Adult Service.
+     */
+    protected function seedCellAttendance(string $branchId, $admin): void
+    {
+        $cellService = ServiceType::where('slug', 'cell_meeting')->first();
+        if (! $cellService) {
+            return;
+        }
+
+        $cells = Cell::with('members')->get();
+
+        // Health profile per cell — tunes attendance density.
+        $profiles = [
+            'Bethel Fellowship' => ['weeks' => 12, 'rate_min' => 85, 'rate_max' => 95],
+            'Spintex Cell' => ['weeks' => 6,  'rate_min' => 65, 'rate_max' => 80],
+            'Dansoman Cell' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
+            'Tema Community Cell' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
+            'Young Adults (18–35)' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
+            'Senior Saints (60+)' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
+        ];
+
+        foreach ($cells as $cell) {
+            $profile = $profiles[$cell->name] ?? ['weeks' => 0, 'rate_min' => 0, 'rate_max' => 0];
+            if ($profile['weeks'] === 0 || $cell->members->isEmpty()) {
+                continue;
+            }
+
+            $members = $cell->members->where('status', 'active');
+            if ($members->isEmpty()) {
+                continue;
+            }
+
+            // Pick the N most recent Sundays. Start from the most-recent
+            // past Sunday and walk backwards 7 days at a time to guarantee
+            // unique dates (avoids unique-constraint violations).
+            $lastSunday = now()->copy()->startOfDay();
+            while ($lastSunday->dayOfWeek !== Carbon::SUNDAY || $lastSunday->isFuture()) {
+                $lastSunday->subDay();
+            }
+
+            for ($week = 0; $week < $profile['weeks']; $week++) {
+                $sunday = $lastSunday->copy()->subWeeks($week);
+
+                $session = AttendanceSession::create([
+                    'branch_id' => $branchId,
+                    'service_type_id' => $cellService->id,
+                    'service_date' => $sunday,
+                    'cell_id' => $cell->id,
+                    'recorded_by' => $admin->id,
+                ]);
+
+                $attendingCount = (int) ($members->count() * (rand($profile['rate_min'], $profile['rate_max']) / 100));
+                $attending = $members->random(min($attendingCount, $members->count()));
+
+                foreach ($members as $member) {
+                    AttendanceRecord::create([
+                        'session_id' => $session->id,
+                        'member_id' => $member->id,
+                        'is_present' => $attending->contains('id', $member->id),
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Override 2 members to have a birthday TODAY so birthdays:send
+     * has someone to text during a live demo.
+     */
+    protected function seedTodaysBirthdays(string $branchId): void
+    {
+        $today = now();
+
+        Member::where('branch_id', $branchId)
+            ->where('status', 'active')
+            ->whereNotNull('phone')
+            ->limit(2)
+            ->get()
+            ->each(function ($m) use ($today) {
+                $m->update([
+                    'date_of_birth' => $today->copy()->subYears(rand(25, 50)),
+                ]);
+            });
+    }
+
+    /**
+     * Override 4 more members to have birthdays in the next 7 days
+     * so the /birthdays "Upcoming This Week" panel is populated.
+     */
+    protected function seedUpcomingBirthdays(string $branchId): void
+    {
+        $offsets = [1, 2, 4, 6]; // days from today
+
+        Member::where('branch_id', $branchId)
+            ->where('status', 'active')
+            ->whereNotNull('phone')
+            ->offset(2)
+            ->limit(4)
+            ->get()
+            ->each(function ($m, $i) use ($offsets) {
+                $offset = $offsets[$i] ?? 5;
+                $m->update([
+                    'date_of_birth' => now()->copy()->addDays($offset)->subYears(rand(20, 60)),
+                ]);
+            });
+    }
+
+    /**
+     * 12 children records, each linked to a random parent member.
+     * Mix of ages 4-12, mostly active.
+     */
+    protected function seedChildren(string $branchId): void
+    {
+        $parents = Member::where('branch_id', $branchId)
+            ->where('status', 'active')
+            ->where('marital_status', 'married')
+            ->limit(10)
+            ->get();
+
+        if ($parents->isEmpty()) {
+            return;
+        }
+
+        $childFirstNames = ['Kwame', 'Adwoa', 'Yaw', 'Akua', 'Kofi', 'Abena', 'Kwesi', 'Esi', 'Nana', 'Yaa', 'Kojo', 'Afua'];
+        $classGroups = ['Nursery', 'Beginners', 'Primary', 'Juniors'];
+
+        for ($i = 0; $i < 12; $i++) {
+            $parent = $parents->random();
+            Children::create([
+                'branch_id' => $branchId,
+                'guardian_member_id' => $parent->id,
+                'first_name' => $childFirstNames[array_rand($childFirstNames)],
+                'last_name' => $parent->last_name,
+                'gender' => rand(0, 1) ? 'male' : 'female',
+                'date_of_birth' => now()->subYears(rand(4, 12))->subDays(rand(0, 365)),
+                'class_group' => $classGroups[array_rand($classGroups)],
+                'is_active' => rand(0, 10) > 1,
+            ]);
+        }
+    }
+
+    /**
+     * Historic birthday SMS log entries showing the audit trail
+     * has been in use. Distributed across the past 4 weeks.
+     */
+    protected function seedBirthdayLogHistory(string $branchId): void
+    {
+        $members = Member::where('branch_id', $branchId)
+            ->where('status', 'active')
+            ->whereNotNull('phone')
+            ->limit(6)
+            ->get();
+
+        if ($members->isEmpty()) {
+            return;
+        }
+
+        $churchName = config('church.name', 'Wesleyan International Society');
+
+        foreach ($members as $i => $member) {
+            $daysAgo = ($i + 1) * 5; // 5, 10, 15, 20, 25, 30 days ago
+            $body = "Happy birthday {$member->first_name}! {$churchName} family is celebrating you today. May God bless your new year of life and grant you grace, health, and joy. — Your church family";
+
+            BirthdayMessageLog::create([
+                'branch_id' => $branchId,
+                'member_id' => $member->id,
+                'sent_at' => now()->subDays($daysAgo),
+                'status' => BirthdayMessageLog::STATUS_SENT,
+                'phone_used' => $member->phone,
+                'message_body' => $body,
+            ]);
+        }
     }
 }

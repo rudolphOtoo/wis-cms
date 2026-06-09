@@ -65,7 +65,10 @@ class CellSeeder extends Seeder
             $cursor += $take;
         }
 
-        $assigned = $cursor;
-        $this->command->info("CellSeeder: {$assigned} members assigned across ".count($cells).' cells.');
+        // Actual count (cursor was the planned distribution, not what was assigned).
+        // CellSeeder runs before DemoDataSeeder so on a fresh DB there are no
+        // members yet — distribution will run again from DemoDataSeeder.
+        $assigned = Member::where('branch_id', $branch->id)->whereNotNull('cell_id')->count();
+        $this->command->info("CellSeeder: {$assigned} of ".$active->count().' available members assigned across '.count($cells).' cells.');
     }
 }

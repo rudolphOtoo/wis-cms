@@ -64,8 +64,14 @@ export default function FollowUpSettings() {
   useEffect(() => {
     getFollowUpSettings()
       .then(res => {
-        setForm(res.data.data)
-        setInitial(res.data.data)
+        const data = res.data.data
+        const normalized = {
+          ...data,
+          follow_up_present_template: data.follow_up_present_template ?? '',
+          follow_up_absent_template: data.follow_up_absent_template ?? '',
+        }
+        setForm(normalized)
+        setInitial(normalized)
       })
       .catch(err => console.error(err))
       .finally(() => setLoading(false))
@@ -91,8 +97,14 @@ export default function FollowUpSettings() {
     setErrors({})
     try {
       const res = await updateFollowUpSettings(form)
-      setForm(res.data.data)
-      setInitial(res.data.data)
+      const data = res.data.data
+      const normalized = {
+        ...data,
+        follow_up_present_template: data.follow_up_present_template ?? '',
+        follow_up_absent_template: data.follow_up_absent_template ?? '',
+      }
+      setForm(normalized)
+      setInitial(normalized)
       setSavedAt(new Date())
     } catch (err) {
       if (err.response?.status === 422) {
@@ -181,11 +193,11 @@ export default function FollowUpSettings() {
               Sent to each member who was marked present.
             </p>
             <textarea className="input-field" rows={4}
-                      value={form.follow_up_present_template}
+                      value={form.follow_up_present_template ?? ''}
                       onChange={set('follow_up_present_template')}
                       maxLength={1000}/>
             <div className="flex justify-between text-xs mt-1" style={{color:'#9ca3af'}}>
-              <span>{form.follow_up_present_template.length} / 1000 characters</span>
+              <span>{(form.follow_up_present_template ?? '').length} / 1000 characters</span>
               <span>Use placeholders like {'{name}'} or {'{cell}'} — see right panel</span>
             </div>
             {errors.follow_up_present_template && (
@@ -199,11 +211,11 @@ export default function FollowUpSettings() {
               Sent to each member who was marked absent.
             </p>
             <textarea className="input-field" rows={4}
-                      value={form.follow_up_absent_template}
+                      value={form.follow_up_absent_template ?? ''}
                       onChange={set('follow_up_absent_template')}
                       maxLength={1000}/>
             <div className="flex justify-between text-xs mt-1" style={{color:'#9ca3af'}}>
-              <span>{form.follow_up_absent_template.length} / 1000 characters</span>
+              <span>{(form.follow_up_absent_template ?? '').length} / 1000 characters</span>
             </div>
             {errors.follow_up_absent_template && (
               <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.follow_up_absent_template[0]}</p>
