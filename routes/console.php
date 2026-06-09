@@ -31,3 +31,12 @@ Schedule::command('app:audit-fk-relationships')->weeklyOn(1, '08:30');
 // (branch.follow_up_enabled = true AND now >= created_at + delay_hours).
 // Idempotent; safe to re-run.
 Schedule::command('attendance:process-follow-ups')->everyFifteenMinutes();
+
+// Council-requested feature: pre-service SMS reminders. Runs every
+// hour on the hour. The command itself filters by the configured
+// day-of-week + hour for each ServiceReminderSettings row, so most
+// hourly runs are no-ops. Configured slots (e.g. Saturday 20:00 for
+// Sunday service, Wednesday 09:00 for midweek service) trigger the
+// actual fan-out to all active branch members. Idempotent: a member
+// is never sent the same reminder twice for the same service date.
+Schedule::command('reminders:send')->hourly();
