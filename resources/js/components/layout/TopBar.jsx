@@ -19,6 +19,7 @@ const titles = {
   '/reports/finance/expense-by-category': 'Expense by Category',
   '/reports/cells/comparison': 'Cell Comparison',
   '/birthdays': 'Birthday Messages',
+  '/reminders': 'Service Reminders',
   '/reports/attendance/trends': 'Attendance Trends',
 }
 

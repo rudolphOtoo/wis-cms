@@ -31,6 +31,7 @@ import AuditLog          from '../pages/admin/AuditLog'
 import FollowUpSettings from '../pages/settings/FollowUpSettings'
 import AttendanceTrends from '../pages/reports/AttendanceTrends'
 import Birthdays from '../pages/birthdays/Birthdays'
+import Reminders from '../pages/reminders/Reminders'
 import CellComparison from '../pages/reports/CellComparison'
 import ExpenseByCategory from '../pages/reports/ExpenseByCategory'
 import IncomeByCategory from '../pages/reports/IncomeByCategory'
@@ -85,6 +86,7 @@ export default function AppRouter() {
             <Route path="/reports/finance/expense-by-category" element={<ExpenseByCategory />} />
             <Route path="/reports/cells/comparison" element={<CellComparison />} />
             <Route path="/birthdays" element={<Birthdays />} />
+            <Route path="/reminders" element={<Reminders />} />
             <Route path="/reports/attendance/trends" element={<AttendanceTrends />} />
           </Route>
         </Route>
