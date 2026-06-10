@@ -24,7 +24,8 @@ class ServiceTypeSeeder extends Seeder
         $services = [
             ['name' => 'Sunday Adult Service',    'slug' => 'sunday_adult',       'type' => 'adult',    'description' => 'Main Sunday worship service for adults'],
             ['name' => 'Sunday Children Service', 'slug' => 'sunday_children',    'type' => 'children', 'description' => 'Sunday service for children'],
-            ['name' => 'Bible Study',             'slug' => 'bible_study',        'type' => 'combined', 'description' => 'Midweek Bible study session'],
+            ['name' => 'Bible Study',             'slug' => 'bible_study',        'type' => 'combined', 'description' => 'Bible study session'],
+            ['name' => 'Midweek Service',         'slug' => 'midweek_service',    'type' => 'combined', 'description' => 'Wednesday evening midweek worship service'],
             ['name' => 'Prayer Meeting',          'slug' => 'prayer_meeting',     'type' => 'combined', 'description' => 'Weekly prayer and intercession meeting'],
             ['name' => 'Special Service',         'slug' => 'special_service',    'type' => 'combined', 'description' => 'Special events and services'],
             ['name' => 'Cell Meeting',            'slug' => 'cell_meeting',       'type' => 'combined', 'description' => 'Weekly cell group fellowship meeting'],

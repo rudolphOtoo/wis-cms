@@ -249,7 +249,7 @@ class SendServiceReminders extends Command
     {
         return match ($slug) {
             'sunday_adult', 'sunday_children' => Carbon::SUNDAY,
-            'bible_study' => Carbon::WEDNESDAY,
+            'midweek_service', 'bible_study' => Carbon::WEDNESDAY,
             'prayer_meeting' => Carbon::FRIDAY,
             default => Carbon::SUNDAY,
         };

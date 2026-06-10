@@ -85,7 +85,7 @@ class ServiceReminderSettings extends Model
     {
         return match ($serviceTypeSlug) {
             'sunday_adult' => self::DEFAULT_SUNDAY_TEMPLATE,
-            'bible_study', 'prayer_meeting' => self::DEFAULT_MIDWEEK_TEMPLATE,
+            'midweek_service', 'bible_study', 'prayer_meeting' => self::DEFAULT_MIDWEEK_TEMPLATE,
             default => self::DEFAULT_GENERIC_TEMPLATE,
         };
     }
