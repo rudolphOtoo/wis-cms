@@ -41,4 +41,11 @@ return [
         ],
     ],
 
+    'google_form_webhook' => [
+        // Shared secret required in the X-Webhook-Secret header on
+        // POST /api/webhooks/member-submission. Generated once, stored
+        // in .env. Treat like a password.
+        'secret' => env('GOOGLE_FORM_WEBHOOK_SECRET'),
+    ],
+
 ];

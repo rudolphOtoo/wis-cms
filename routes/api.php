@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\MemberSubmissionWebhookController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
@@ -25,6 +26,16 @@ Route::prefix('auth')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
 });
+
+// ─────────────────────────────────────────────────────────────────
+// PUBLIC WEBHOOKS (no Sanctum auth — uses shared secret instead)
+//
+// Throttled per-IP to deter abuse: 60 submissions/minute is generous
+// for legitimate form use, restrictive for spam.
+// ─────────────────────────────────────────────────────────────────
+Route::post('/webhooks/member-submission',
+    [MemberSubmissionWebhookController::class, 'store']
+)->middleware('throttle:60,1');
 
 Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(function () {
 
