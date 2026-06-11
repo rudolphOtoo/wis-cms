@@ -30,6 +30,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'access portal',
             'view birthday messages', 'manage birthday messages',
             'view service reminders', 'manage service reminders',
+            'view member submissions', 'manage member submissions',
         ];
 
         foreach ($permissions as $permission) {
@@ -46,6 +47,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'export reports', 'export members', 'export finance',
             'view birthday messages', 'manage birthday messages',
             'view service reminders', 'manage service reminders',
+            'view member submissions', 'manage member submissions',
         ]);
 
         $secretary = Role::firstOrCreate(['name' => 'secretary']);
@@ -61,6 +63,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view reports', 'export reports',
             'view birthday messages',
             'view service reminders',
+            'view member submissions', 'manage member submissions',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance_officer']);

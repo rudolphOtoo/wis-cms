@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\MemberSubmissionController;
 use App\Http\Controllers\Api\MemberSubmissionWebhookController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PortalController;
@@ -179,6 +180,18 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
             ->middleware('permission:view service reminders');
         Route::get('reminders/log', [ServiceReminderController::class, 'log'])
             ->middleware('permission:manage service reminders');
+
+        // Member submissions queue — admin review of self-service form
+        // responses. Each submission must be explicitly approved before it
+        // becomes a Member (and thus eligible for SMS dispatch).
+        Route::get('submissions', [MemberSubmissionController::class, 'index'])
+            ->middleware('permission:view member submissions');
+        Route::get('submissions/{id}', [MemberSubmissionController::class, 'show'])
+            ->middleware('permission:view member submissions');
+        Route::post('submissions/{id}/approve', [MemberSubmissionController::class, 'approve'])
+            ->middleware('permission:manage member submissions');
+        Route::post('submissions/{id}/reject', [MemberSubmissionController::class, 'reject'])
+            ->middleware('permission:manage member submissions');
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
