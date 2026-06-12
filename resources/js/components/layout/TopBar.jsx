@@ -20,6 +20,7 @@ const titles = {
   '/reports/cells/comparison': 'Cell Comparison',
   '/birthdays': 'Birthday Messages',
   '/reminders': 'Service Reminders',
+  '/admin/submissions': 'Member Submissions',
   '/reports/attendance/trends': 'Attendance Trends',
 }
 
