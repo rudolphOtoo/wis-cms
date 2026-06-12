@@ -82,7 +82,7 @@ class MemberSubmissionWebhookController extends Controller
             'last_name' => ['required', 'string', 'max:100'],
             'phone' => ['required', 'string', 'min:9', 'max:20'],
             'email' => ['nullable', 'email', 'max:255'],
-            'gender' => ['nullable', 'string', 'in:male,female,other'],
+            'gender' => ['required', 'string', 'in:male,female,other'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'address' => ['nullable', 'string', 'max:255'],
             'occupation' => ['nullable', 'string', 'max:100'],

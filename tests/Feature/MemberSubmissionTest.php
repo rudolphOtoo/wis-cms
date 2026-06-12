@@ -88,6 +88,23 @@ class MemberSubmissionTest extends TestCase
         $this->assertSame(0, MemberSubmission::count());
     }
 
+    public function test_webhook_requires_gender(): void
+    {
+        // Gender is required because members.gender is NOT NULL and
+        // the approval flow doesn't insert silent defaults. Without
+        // this requirement, an approve call would 500 in production.
+        $response = $this->postJson('/api/webhooks/member-submission', [
+            'first_name' => 'NoGender', 'last_name' => 'Test', 'phone' => '0241112233',
+            // gender omitted
+        ], [
+            'X-Webhook-Secret' => $this->secret,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['gender']);
+        $this->assertSame(0, MemberSubmission::count());
+    }
+
     public function test_webhook_creates_pending_submission_and_normalizes_phone(): void
     {
         $response = $this->postJson('/api/webhooks/member-submission', [
