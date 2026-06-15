@@ -64,6 +64,22 @@ class AttendanceController extends Controller
             ], 422);
         }
 
+        // Architecture B rule: for ADULT service types (Sunday Adult Service, etc.),
+        // attendance MUST be recorded per cell. The church-wide Sunday total is
+        // computed by summing all cell sessions for that Sunday date. This prevents
+        // double-counting (no separate service-wide session + cell sessions).
+        // Non-adult service types (Children, Midweek, Prayer Meeting) still allow
+        // service-wide sessions because they're typically not cell-organized.
+        $serviceType = ServiceType::find($request->service_type_id);
+        if ($serviceType && $serviceType->type === 'adult' && ! $request->cell_id && ! $request->department_id) {
+            return response()->json([
+                'message' => 'Adult service attendance must be recorded per cell. Please select a cell.',
+                'errors' => [
+                    'cell_id' => ['Adult service attendance must be recorded per cell.'],
+                ],
+            ], 422);
+        }
+
         // If a department is given, the user must actually lead it
         // (unless they're an admin-type role). Prevents recording meetings
         // for departments you don't lead.
@@ -247,83 +263,141 @@ class AttendanceController extends Controller
     // GET /api/attendance/stats
     public function stats(Request $request): JsonResponse
     {
+        $branchId = $request->user()->branch_id;
 
-        $lastSession = AttendanceSession::query()
-            ->whereHas('serviceType', fn ($q) => $q->where('type', '!=', 'children'))
-            ->with('records')
-            ->latest('service_date')
-            ->first();
+        // ─────────────────────────────────────────────────────────
+        // Architecture B rollup helper: for any service_date, the
+        // adult attendance total is the SUM of all cell sessions'
+        // adult_count for that date (we never double-count by mixing
+        // service-wide + cell sessions, because createSession enforces
+        // per-cell sessions for adult types).
+        // ─────────────────────────────────────────────────────────
 
-        $lastSunday = $lastSession?->adult_count ?? 0;
-        $totalSessions = AttendanceSession::query()->count();
-
-        // Average adult attendance last 4 sessions
-        $recentSessions = AttendanceSession::query()
+        // ─── LAST SUNDAY (most recent date with adult-attendance data) ───
+        $latestAdultDate = AttendanceSession::query()
+            ->where('branch_id', $branchId)
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->with('records')
-            ->latest('service_date')
-            ->take(4)
-            ->get();
+            ->max('service_date');
 
-        $avgAttendance = $recentSessions->count() > 0
-            ? round($recentSessions->avg(fn ($s) => $s->adult_count))
+        $lastSundayTotal = 0;
+        $lastSundayByCell = [];
+        $lastSundayDate = null;
+        if ($latestAdultDate) {
+            $lastSundayDate = $latestAdultDate;
+            $sessionsForDate = AttendanceSession::query()
+                ->where('branch_id', $branchId)
+                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+                ->whereDate('service_date', $latestAdultDate)
+                ->with(['records', 'cell:id,name'])
+                ->get();
+
+            foreach ($sessionsForDate as $session) {
+                $count = $session->adult_count;
+                $lastSundayTotal += $count;
+                $cellName = $session->cell?->name ?? 'Unassigned';
+                $lastSundayByCell[$cellName] = ($lastSundayByCell[$cellName] ?? 0) + $count;
+            }
+        }
+
+        // ─── TOTAL SESSIONS (all attendance sessions) ───
+        $totalSessions = AttendanceSession::query()
+            ->where('branch_id', $branchId)
+            ->count();
+
+        // ─── AVERAGE (last 4 Sundays, each Sunday is a total across cells) ───
+        $recentDates = AttendanceSession::query()
+            ->where('branch_id', $branchId)
+            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+            ->select('service_date')
+            ->distinct()
+            ->orderByDesc('service_date')
+            ->take(4)
+            ->pluck('service_date');
+
+        $sundayTotals = [];
+        foreach ($recentDates as $date) {
+            $total = AttendanceSession::query()
+                ->where('branch_id', $branchId)
+                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+                ->whereDate('service_date', $date)
+                ->with('records')
+                ->get()
+                ->sum(fn ($s) => $s->adult_count);
+            $sundayTotals[] = ['date' => $date, 'total' => $total];
+        }
+
+        $avgAttendance = count($sundayTotals) > 0
+            ? round(collect($sundayTotals)->avg('total'))
             : 0;
 
-        // Last 8 sessions for chart
-        $chartData = AttendanceSession::query()
+        // ─── CHART (last 8 Sundays as data points, total per date) ───
+        $chartDates = AttendanceSession::query()
+            ->where('branch_id', $branchId)
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->with(['serviceType', 'records'])
-            ->latest('service_date')
+            ->select('service_date')
+            ->distinct()
+            ->orderByDesc('service_date')
             ->take(8)
-            ->get()
+            ->pluck('service_date')
             ->reverse()
-            ->map(fn ($s) => [
-                'date' => $s->service_date->format('d M'),
-                'count' => $s->adult_count,
-            ])
             ->values();
 
-        // Week-over-week: most recent adult session vs the one before it
-        $lastTwo = AttendanceSession::query()
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->with('records')
-            ->latest('service_date')
-            ->take(2)
-            ->get();
+        $chartData = $chartDates->map(function ($date) use ($branchId) {
+            $total = AttendanceSession::query()
+                ->where('branch_id', $branchId)
+                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
+                ->whereDate('service_date', $date)
+                ->with('records')
+                ->get()
+                ->sum(fn ($s) => $s->adult_count);
+
+            return [
+                'date' => Carbon::parse($date)->format('d M'),
+                'count' => $total,
+            ];
+        });
+
+        // ─── WEEK-OVER-WEEK (last 2 Sundays' totals) ───
         $weekOverWeek = null;
-        if ($lastTwo->count() === 2) {
-            $current = $lastTwo[0]->adult_count;
-            $previous = $lastTwo[1]->adult_count;
+        if (count($sundayTotals) >= 2) {
+            $current = $sundayTotals[0]['total'];
+            $previous = $sundayTotals[1]['total'];
             if ($previous > 0) {
                 $weekOverWeek = round((($current - $previous) / $previous) * 100, 1);
             }
         }
 
-        // Monthly trend: total attendance grouped by month, last 6 months
+        // ─── MONTHLY TREND (sum of all adult sessions in each of last 6 months) ───
         $monthlyTrend = AttendanceSession::query()
+            ->where('branch_id', $branchId)
+            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->where('service_date', '>=', now()->subMonths(6)->startOfMonth())
             ->with('records')
             ->get()
             ->groupBy(fn ($s) => $s->service_date->format('Y-m'))
             ->map(fn ($group, $key) => [
                 'month' => Carbon::createFromFormat('Y-m', $key)->format('M'),
-                'total' => $group->sum(fn ($s) => $s->total_count),
+                'total' => $group->sum(fn ($s) => $s->adult_count),
             ])
             ->values();
 
-        // Insights: real computed facts for leadership
+        // ─── INSIGHTS ───
         $allAdult = AttendanceSession::query()
+            ->where('branch_id', $branchId)
             ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
             ->with(['serviceType', 'records'])
             ->get();
+
         $topService = $allAdult
             ->groupBy(fn ($s) => $s->serviceType?->name ?? 'Service')
             ->map(fn ($group) => $group->avg(fn ($s) => $s->adult_count))
             ->sortDesc()
             ->keys()
             ->first();
+
         $avgAdults = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->adult_count)) : 0;
         $avgChildren = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->children_count)) : 0;
+
         $trendDirection = 'flat';
         if ($monthlyTrend->count() >= 2) {
             $last = $monthlyTrend->last()['total'];
@@ -333,7 +407,11 @@ class AttendanceController extends Controller
 
         return response()->json([
             'data' => [
-                'last_sunday' => $lastSunday,
+                'last_sunday' => [
+                    'total' => $lastSundayTotal,
+                    'by_cell' => $lastSundayByCell,
+                    'date' => $lastSundayDate,
+                ],
                 'average' => $avgAttendance,
                 'total_sessions' => $totalSessions,
                 'chart' => $chartData,
