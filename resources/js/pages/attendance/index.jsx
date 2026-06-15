@@ -64,8 +64,9 @@ export default function AttendancePage() {
 
   const statCards = [
     {
-      label:'Last Sunday Attendance', value: stats?.last_sunday ?? '—', icon: ICONS.groups,
+      label:'Last Sunday Attendance', value: stats?.last_sunday?.total ?? '—', icon: ICONS.groups,
       badge: wow !== null && wow !== undefined ? wow : null,
+      sub: stats?.last_sunday?.date ? new Date(stats.last_sunday.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : null,
     },
     { label:'Average Attendance',      value: stats?.average ?? '—', icon: ICONS.equalizer, sub:'Recent services' },
     { label:'Total Sessions',          value: stats?.total_sessions ?? '—', icon: ICONS.calendar, sub:'All time' },
