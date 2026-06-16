@@ -60,106 +60,108 @@ class DashboardController extends Controller
         $departments = Department::query()
             ->where('leader_user_id', $user->id)
             ->with(['members' => fn ($q) => $q->orderBy('first_name')])
+            ->get();
+
+        $departmentSessions = AttendanceSession::query()
+            ->whereIn('department_id', $departments->pluck('id')->all())
+            ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
+            ->orderByDesc('service_date')
             ->get()
-            ->map(function (Department $dept) {
-                $members = $dept->members->map(fn ($m) => [
-                    'id' => $m->id,
+            ->groupBy('department_id');
+
+        $departments = $departments->map(function (Department $dept) use ($departmentSessions) {
+            $members = $dept->members->map(fn ($m) => [
+                'id' => $m->id,
+                'name' => $m->full_name,
+                'member_number' => $m->member_number,
+                'phone' => $m->phone,
+                'role' => $m->pivot->role ?? 'member',
+            ]);
+
+            $recent = $dept->members
+                ->sortByDesc(fn ($m) => $m->pivot->joined_at)
+                ->take(5)
+                ->map(fn ($m) => [
                     'name' => $m->full_name,
                     'member_number' => $m->member_number,
-                    'phone' => $m->phone,
-                    'role' => $m->pivot->role ?? 'member',
-                ]);
+                    'joined_at' => $m->pivot->joined_at,
+                ])
+                ->values();
 
-                $recent = $dept->members
-                    ->sortByDesc(fn ($m) => $m->pivot->joined_at)
-                    ->take(5)
-                    ->map(fn ($m) => [
-                        'name' => $m->full_name,
-                        'member_number' => $m->member_number,
-                        'joined_at' => $m->pivot->joined_at,
-                    ])
-                    ->values();
+            $deptSessions = $departmentSessions->get($dept->id, collect());
+            $memberCount = $dept->members->count();
+            $lastMeeting = $deptSessions->first();
+            $lastPresent = $lastMeeting?->present_count ?? 0;
+            $attendanceRate = ($memberCount > 0 && $lastMeeting)
+                ? round(($lastPresent / $memberCount) * 100)
+                : 0;
+            $meetingsThisMonth = $deptSessions->filter(fn ($s) => $s->service_date->isSameMonth(now()))->count();
+            $trend = $deptSessions->take(6)->reverse()->map(fn ($s) => [
+                'date' => $s->service_date->format('d M'),
+                'count' => $s->present_count,
+            ])->values();
 
-                $deptSessions = AttendanceSession::query()
-                    ->where('department_id', $dept->id)
-                    ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
-                    ->orderByDesc('service_date')
-                    ->get();
-
-                $memberCount = $dept->members->count();
-                $lastMeeting = $deptSessions->first();
-                $lastPresent = $lastMeeting?->present_count ?? 0;
-                $attendanceRate = ($memberCount > 0 && $lastMeeting)
-                    ? round(($lastPresent / $memberCount) * 100)
-                    : 0;
-                $meetingsThisMonth = $deptSessions
-                    ->filter(fn ($s) => $s->service_date->isSameMonth(now()))
-                    ->count();
-                $trend = $deptSessions->take(6)->reverse()->map(fn ($s) => [
-                    'date' => $s->service_date->format('d M'),
-                    'count' => $s->present_count,
-                ])->values();
-
-                return [
-                    'id' => $dept->id,
-                    'name' => $dept->name,
-                    'active_members' => $memberCount,
-                    'members' => $members->values(),
-                    'recent_members' => $recent,
-                    'attendance' => [
-                        'last_present' => $lastPresent,
-                        'attendance_rate' => $attendanceRate,
-                        'meetings_this_month' => $meetingsThisMonth,
-                        'trend' => $trend,
-                    ],
-                ];
-            });
+            return [
+                'id' => $dept->id,
+                'name' => $dept->name,
+                'active_members' => $memberCount,
+                'members' => $members->values(),
+                'recent_members' => $recent,
+                'attendance' => [
+                    'last_present' => $lastPresent,
+                    'attendance_rate' => $attendanceRate,
+                    'meetings_this_month' => $meetingsThisMonth,
+                    'trend' => $trend,
+                ],
+            ];
+        });
 
         $cells = Cell::query()
             ->where('leader_user_id', $user->id)
             ->with(['members' => fn ($q) => $q->orderBy('first_name')])
+            ->get();
+
+        $cellSessions = AttendanceSession::query()
+            ->whereIn('cell_id', $cells->pluck('id')->all())
+            ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
+            ->orderByDesc('service_date')
             ->get()
-            ->map(function (Cell $cell) {
-                $members = $cell->members->map(fn ($m) => [
-                    'id' => $m->id,
-                    'name' => $m->full_name,
-                    'member_number' => $m->member_number,
-                    'phone' => $m->phone,
-                ]);
+            ->groupBy('cell_id');
 
-                $sessions = AttendanceSession::query()
-                    ->where('cell_id', $cell->id)
-                    ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
-                    ->orderByDesc('service_date')
-                    ->get();
+        $cells = $cells->map(function (Cell $cell) use ($cellSessions) {
+            $members = $cell->members->map(fn ($m) => [
+                'id' => $m->id,
+                'name' => $m->full_name,
+                'member_number' => $m->member_number,
+                'phone' => $m->phone,
+            ]);
 
-                $memberCount = $cell->members->count();
-                $lastMeeting = $sessions->first();
-                $lastPresent = $lastMeeting?->present_count ?? 0;
-                $attendanceRate = ($memberCount > 0 && $lastMeeting)
-                    ? round(($lastPresent / $memberCount) * 100)
-                    : 0;
-                $meetingsThisMonth = $sessions
-                    ->filter(fn ($s) => $s->service_date->isSameMonth(now()))
-                    ->count();
-                $trend = $sessions->take(6)->reverse()->map(fn ($s) => [
-                    'date' => $s->service_date->format('d M'),
-                    'count' => $s->present_count,
-                ])->values();
+            $sessions = $cellSessions->get($cell->id, collect());
+            $memberCount = $cell->members->count();
+            $lastMeeting = $sessions->first();
+            $lastPresent = $lastMeeting?->present_count ?? 0;
+            $attendanceRate = ($memberCount > 0 && $lastMeeting)
+                ? round(($lastPresent / $memberCount) * 100)
+                : 0;
+            $meetingsThisMonth = $sessions->filter(fn ($s) => $s->service_date->isSameMonth(now()))->count();
+            $trend = $sessions->take(6)->reverse()->map(fn ($s) => [
+                'date' => $s->service_date->format('d M'),
+                'count' => $s->present_count,
+            ])->values();
 
-                return [
-                    'id' => $cell->id,
-                    'name' => $cell->name,
-                    'active_members' => $memberCount,
-                    'members' => $members->values(),
-                    'attendance' => [
-                        'last_present' => $lastPresent,
-                        'attendance_rate' => $attendanceRate,
-                        'meetings_this_month' => $meetingsThisMonth,
-                        'trend' => $trend,
-                    ],
-                ];
-            });
+            return [
+                'id' => $cell->id,
+                'name' => $cell->name,
+                'active_members' => $memberCount,
+                'members' => $members->values(),
+                'attendance' => [
+                    'last_present' => $lastPresent,
+                    'attendance_rate' => $attendanceRate,
+                    'meetings_this_month' => $meetingsThisMonth,
+                    'trend' => $trend,
+                ],
+            ];
+        });
 
         return response()->json([
             'data' => [

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
+use App\Http\Resources\TransactionResource;
 use App\Models\Cell;
 use App\Models\Department;
 use App\Models\Member;
@@ -218,9 +219,10 @@ class MemberController extends Controller
             ->whereYear('transaction_date', $year)
             ->with('category')
             ->orderByDesc('transaction_date')
-            ->get();
+            ->paginate(25);
 
         $byCategory = $transactions
+            ->getCollection()
             ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
             ->map(fn ($group) => [
                 'category' => $group->first()->category?->name ?? 'Uncategorised',
@@ -245,13 +247,19 @@ class MemberController extends Controller
                 'available_years' => $availableYears,
                 'total' => round($transactions->sum('amount'), 2),
                 'by_category' => $byCategory,
-                'transactions' => $transactions->map(fn ($t) => [
-                    'id' => $t->id,
-                    'date' => $t->transaction_date->format('Y-m-d'),
-                    'category' => $t->category?->name ?? 'Uncategorised',
-                    'amount' => round($t->amount, 2),
-                    'reference' => $t->reference,
-                ]),
+                'transactions' => TransactionResource::collection($transactions),
+                'meta' => [
+                    'total' => $transactions->total(),
+                    'per_page' => $transactions->perPage(),
+                    'current_page' => $transactions->currentPage(),
+                    'last_page' => $transactions->lastPage(),
+                    'from' => $transactions->firstItem(),
+                    'to' => $transactions->lastItem(),
+                ],
+                'links' => [
+                    'prev' => $transactions->previousPageUrl(),
+                    'next' => $transactions->nextPageUrl(),
+                ],
             ],
         ]);
     }
