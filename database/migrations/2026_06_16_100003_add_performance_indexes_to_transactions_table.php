@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 /**
  * PERF-04: Add missing performance indexes to the transactions table.
@@ -36,19 +35,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('transactions', function (Blueprint $table) {
-            $table->index(['branch_id', 'type', 'transaction_date'], 'tx_branch_type_date_idx');
-            $table->index(['branch_id', 'category_id'], 'tx_branch_category_idx');
-            $table->index(['member_id', 'type', 'transaction_date'], 'tx_member_type_date_idx');
-        });
+        DB::statement('CREATE INDEX IF NOT EXISTS tx_branch_type_date_idx ON transactions (branch_id, type, transaction_date)');
+        DB::statement('CREATE INDEX IF NOT EXISTS tx_branch_category_idx  ON transactions (branch_id, category_id)');
+        DB::statement('CREATE INDEX IF NOT EXISTS tx_member_type_date_idx ON transactions (member_id, type, transaction_date)');
     }
 
     public function down(): void
     {
-        Schema::table('transactions', function (Blueprint $table) {
-            $table->dropIndex('tx_branch_type_date_idx');
-            $table->dropIndex('tx_branch_category_idx');
-            $table->dropIndex('tx_member_type_date_idx');
-        });
+        DB::statement('DROP INDEX IF EXISTS tx_branch_type_date_idx');
+        DB::statement('DROP INDEX IF EXISTS tx_branch_category_idx');
+        DB::statement('DROP INDEX IF EXISTS tx_member_type_date_idx');
     }
 };

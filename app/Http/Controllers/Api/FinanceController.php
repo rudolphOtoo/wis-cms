@@ -99,7 +99,7 @@ class FinanceController extends Controller
 
         activity()->causedBy($request->user())
             ->performedOn($transaction)
-            ->log("Recorded {$transaction->type} of GHS ".number_format($transaction->amount, 2));
+            ->log("Recorded {$transaction->type} of GHS ".number_format((float) $transaction->amount, 2));
 
         return response()->json([
             'message' => 'Transaction recorded successfully.',

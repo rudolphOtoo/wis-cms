@@ -43,16 +43,16 @@ class AssignableRole implements ValidationRule
         if ($user->hasRole('super_admin')) {
             return [
                 'super_admin', 'pastor', 'secretary', 'finance_officer',
-                'department_leader', 'cell_leader', 'member',
+                'department_leader', 'cell_leader', 'usher', 'member',
             ];
         }
 
         if ($user->hasRole('pastor')) {
-            return ['secretary', 'finance_officer', 'department_leader', 'cell_leader', 'member'];
+            return ['secretary', 'finance_officer', 'department_leader', 'cell_leader', 'usher', 'member'];
         }
 
         if ($user->hasAnyRole(['secretary', 'finance_officer'])) {
-            return ['department_leader', 'cell_leader', 'member'];
+            return ['department_leader', 'cell_leader', 'usher', 'member'];
         }
 
         // department_leader / cell_leader / member: cannot create other users
