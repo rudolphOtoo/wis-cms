@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getAuditLog } from '../../api/audit'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -30,10 +31,12 @@ export default function AuditLog() {
   const [page,     setPage]     = useState(1)
   const [meta,     setMeta]     = useState(null)
 
+  const debouncedSearch = useDebounce(search, 400)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await getAuditLog({ search, from, to, subject_type: subType, page, per_page: 25 })
+      const res = await getAuditLog({ search: debouncedSearch, from, to, subject_type: subType, page, per_page: 25 })
       setLogs(res.data.data)
       setMeta(res.data.meta)
     } catch (err) {
@@ -41,13 +44,9 @@ export default function AuditLog() {
     } finally {
       setLoading(false)
     }
-  }, [search, from, to, subType, page])
+  }, [debouncedSearch, from, to, subType, page])
 
   useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
-    return () => clearTimeout(t)
-  }, [search])
 
   return (
     <div className="space-y-6" style={{maxWidth:'1440px'}}>

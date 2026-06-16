@@ -22,18 +22,18 @@ class UserController extends Controller
             ->where('branch_id', $request->user()->branch_id)
             ->with(['roles', 'member']);
 
-        if ($search = $request->get('search')) {
+        if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
                     ->orWhere('email', 'ilike', "%{$search}%");
             });
         }
 
-        if ($role = $request->get('role')) {
+        if ($role = $request->input('role')) {
             $query->whereHas('roles', fn ($q) => $q->where('name', $role));
         }
 
-        $users = $query->orderBy('name')->paginate($request->get('per_page', 15));
+        $users = $query->orderBy('name')->paginate($request->integer('per_page', 15));
 
         return response()->json([
             'data' => collect($users->items())->map(fn ($u) => $this->transform($u)),
@@ -49,7 +49,10 @@ class UserController extends Controller
     public function roles(): JsonResponse
     {
         return response()->json([
-            'data' => Role::orderBy('name')->get()->map(fn ($r) => [
+            // PERF FIX: with('permissions') eager-loads the Spatie MorphToMany
+            // pivot in a single JOIN query. Without it, $r->permissions fires
+            // one SELECT per role (N+1 across 7 system roles).
+            'data' => Role::with('permissions')->orderBy('name')->get()->map(fn ($r) => [
                 'name' => $r->name,
                 'label' => ucwords(str_replace('_', ' ', $r->name)),
                 'permissions' => $r->permissions->pluck('name'),

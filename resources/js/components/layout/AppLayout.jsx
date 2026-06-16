@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import TopBar  from './TopBar'
@@ -52,7 +52,25 @@ export default function AppLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar onMenuClick={() => setMobileSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
+          {/*
+            Suspense lives here — NOT in the route tree.
+            React Router v6 requires all children of <Route> to be <Route>
+            elements; wrapping them in <Suspense> breaks the route-config
+            traversal and produces a blank page.
+            Placing Suspense around the Outlet means the sidebar and topbar
+            stay mounted while any lazy page chunk is fetching.
+          */}
+          <Suspense fallback={
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
+              <svg style={{ width:32, height:32, color:'var(--color-navy)', animation:'spin 1s linear infinite' }}
+                   fill="none" viewBox="0 0 24 24">
+                <circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path  style={{ opacity:0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+          }>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

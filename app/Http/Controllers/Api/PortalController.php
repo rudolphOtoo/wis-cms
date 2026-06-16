@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -12,17 +14,16 @@ class PortalController extends Controller
 {
     /**
      * Resolve the authenticated user's OWN member record.
+     *
      * SECURITY: never accepts an ID from the request. The member_id
-     * comes only from the authenticated user. A member cannot ask
-     * for anyone else's data because there is no parameter to change.
+     * comes only from the authenticated user's session. A member cannot
+     * ask for anyone else's data because there is no parameter to change.
      */
     protected function currentMember(Request $request): Member
     {
         $memberId = $request->user()->member_id;
-
         abort_if(! $memberId, 403, 'Your account is not linked to a member profile.');
 
-        // Branch scoping handled by BelongsToBranch trait on Member.
         return Member::findOrFail($memberId);
     }
 
@@ -49,10 +50,22 @@ class PortalController extends Controller
         ]);
     }
 
+    /**
+     * GET /portal/giving
+     *
+     * HIGH-02 FIX: `year` is now validated as an integer within a
+     * sensible range before being used in date queries. The previous
+     * `$request->get('year', ...)` accepted arbitrary strings without
+     * any bounds check.
+     */
     public function giving(Request $request): JsonResponse
     {
+        $request->validate([
+            'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
         $member = $this->currentMember($request);
-        $year = $request->get('year', now()->format('Y'));
+        $year = $request->integer('year', (int) now()->format('Y'));
 
         $transactions = $member->transactions()
             ->where('type', 'income')
@@ -77,7 +90,7 @@ class PortalController extends Controller
 
         return response()->json([
             'data' => [
-                'year' => (int) $year,
+                'year' => $year,
                 'available_years' => $availableYears,
                 'total' => round($transactions->sum('amount'), 2),
                 'by_category' => $byCategory,
@@ -96,7 +109,6 @@ class PortalController extends Controller
     {
         $member = $this->currentMember($request);
 
-        // Pull the member's attendance records joined to sessions
         $records = AttendanceRecord::query()
             ->where('member_id', $member->id)
             ->where('is_present', true)

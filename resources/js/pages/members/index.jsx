@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMembers, deleteMember, getMemberStats, exportMembers } from '../../api/members'
 import { usePermission } from '../../hooks/usePermission'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const STATUS_COLORS = {
   active:      { bg: '#dcfce7', text: '#15803d' },
@@ -42,6 +43,11 @@ export default function MembersPage() {
   const [deleting,   setDeleting]   = useState(null)
   const [exporting,  setExporting]  = useState(false)
 
+  // Debounce search: the settled value is what drives the API call dep array.
+  // This replaces the dual-useEffect pattern (one immediate + one debounced)
+  // that previously fired two concurrent requests on every keystroke.
+  const debouncedSearch = useDebounce(search, 400)
+
   const handleExport = async () => {
     setExporting(true)
     try {
@@ -66,7 +72,7 @@ export default function MembersPage() {
     setLoading(true)
     try {
       const [membersRes, statsRes] = await Promise.all([
-        getMembers({ search, status: statusFilter, gender: genderFilter, page, per_page: 15 }),
+        getMembers({ search: debouncedSearch, status: statusFilter, gender: genderFilter, page, per_page: 15 }),
         getMemberStats(),
       ])
       setMembers(membersRes.data.data)
@@ -77,14 +83,12 @@ export default function MembersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, genderFilter, page])
+  }, [debouncedSearch, statusFilter, genderFilter, page])
 
+  // Single effect: fires when debouncedSearch settles (after 400 ms of silence)
+  // or when any other filter / page changes (immediately, because those are not
+  // debounced). This replaces the broken dual-effect pattern.
   useEffect(() => { fetchMembers() }, [fetchMembers])
-
-  useEffect(() => {
-    const timer = setTimeout(() => fetchMembers(), 400)
-    return () => clearTimeout(timer)
-  }, [search])
 
   const handleDelete = async (member) => {
     if (!confirm(`Delete ${member.full_name}? This cannot be undone.`)) return

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -47,86 +49,7 @@ class ReportsController extends Controller
      */
     protected function buildIncomeData(Request $request): array
     {
-        $validated = $request->validate([
-            'from_date' => 'nullable|date',
-            'to_date' => 'nullable|date|after_or_equal:from_date',
-        ]);
-
-        $to = isset($validated['to_date'])
-            ? Carbon::parse($validated['to_date'])
-            : Carbon::today();
-
-        $from = isset($validated['from_date'])
-            ? Carbon::parse($validated['from_date'])
-            : $to->copy()->subMonthsNoOverflow(6)->startOfMonth();
-
-        // Pass A: month + category breakdown (drives chart and table)
-        // Postgres TO_CHAR(date, 'YYYY-MM') groups by month cleanly.
-        // Branch scoping handled by BelongsToBranch trait on Transaction.
-        $rows = Transaction::query()
-            ->where('type', 'income')
-            ->whereBetween('transaction_date', [$from, $to])
-            ->select([
-                DB::raw("TO_CHAR(transaction_date, 'YYYY-MM') AS month"),
-                'category_id',
-                DB::raw('SUM(amount) AS total'),
-            ])
-            ->groupBy('month', 'category_id')
-            ->orderBy('month')
-            ->orderBy('category_id')
-            ->with('category:id,name')
-            ->get()
-            ->map(fn ($r) => [
-                'month' => $r->month,
-                'category_id' => $r->category_id,
-                'category_name' => $r->category?->name ?? '(unknown)',
-                'total' => (float) $r->total,
-            ]);
-
-        // Pass B: category totals (for summary percentages + top)
-        $categoryTotals = Transaction::query()
-            ->where('type', 'income')
-            ->whereBetween('transaction_date', [$from, $to])
-            ->select(['category_id', DB::raw('SUM(amount) AS total')])
-            ->groupBy('category_id')
-            ->with('category:id,name')
-            ->get();
-
-        $grandTotal = (float) $categoryTotals->sum('total');
-
-        // Count distinct months in range for monthly_average
-        // (use the rows we already have to avoid another query)
-        $monthCount = $rows->pluck('month')->unique()->count() ?: 1;
-
-        $categoryBreakdown = $categoryTotals
-            ->map(fn ($c) => [
-                'category_id' => $c->category_id,
-                'category_name' => $c->category?->name ?? '(unknown)',
-                'total' => (float) $c->total,
-                'percentage' => $grandTotal > 0
-                    ? round(((float) $c->total / $grandTotal) * 100, 1)
-                    : 0.0,
-            ])
-            ->sortByDesc('total')
-            ->values()
-            ->all();
-
-        $topCategory = $categoryBreakdown[0]['category_name'] ?? null;
-
-        return [
-            'period' => [
-                'from' => $from->toDateString(),
-                'to' => $to->toDateString(),
-            ],
-            'rows' => $rows->values()->all(),
-            'summary' => [
-                'grand_total' => round($grandTotal, 2),
-                'monthly_average' => round($grandTotal / $monthCount, 2),
-                'month_count' => $monthCount,
-                'top_category' => $topCategory,
-                'category_totals' => $categoryBreakdown,
-            ],
-        ];
+        return $this->buildTransactionCategoryData($request, 'income');
     }
 
     // GET /api/reports/attendance/trends
@@ -382,6 +305,21 @@ class ReportsController extends Controller
      */
     protected function buildExpenseData(Request $request): array
     {
+        return $this->buildTransactionCategoryData($request, 'expense');
+    }
+
+    /**
+     * SMELL-02 FIX: Single builder for income AND expense category reports.
+     *
+     * The old code had two ~70-line methods (`buildIncomeData` and
+     * `buildExpenseData`) that were structurally identical — only the
+     * `type` filter differed. All six callers (JSON, PDF, CSV × 2)
+     * now route through this single method via the thin wrappers above.
+     *
+     * @param  string  $type  'income' | 'expense'
+     */
+    private function buildTransactionCategoryData(Request $request, string $type): array
+    {
         $validated = $request->validate([
             'from_date' => 'nullable|date',
             'to_date' => 'nullable|date|after_or_equal:from_date',
@@ -390,14 +328,15 @@ class ReportsController extends Controller
         $to = isset($validated['to_date'])
             ? Carbon::parse($validated['to_date'])
             : Carbon::today();
-
         $from = isset($validated['from_date'])
             ? Carbon::parse($validated['from_date'])
             : $to->copy()->subMonthsNoOverflow(6)->startOfMonth();
 
-        // Branch scoping handled by BelongsToBranch trait on Transaction.
+        // Pass A: month + category breakdown (drives chart and table).
+        // TO_CHAR(date, 'YYYY-MM') groups by month cleanly in Postgres.
+        // BelongsToBranch trait applies the branch_id global scope.
         $rows = Transaction::query()
-            ->where('type', 'expense')
+            ->where('type', $type)
             ->whereBetween('transaction_date', [$from, $to])
             ->select([
                 DB::raw("TO_CHAR(transaction_date, 'YYYY-MM') AS month"),
@@ -416,8 +355,9 @@ class ReportsController extends Controller
                 'total' => (float) $r->total,
             ]);
 
+        // Pass B: category totals for summary percentages and top-category.
         $categoryTotals = Transaction::query()
-            ->where('type', 'expense')
+            ->where('type', $type)
             ->whereBetween('transaction_date', [$from, $to])
             ->select(['category_id', DB::raw('SUM(amount) AS total')])
             ->groupBy('category_id')
@@ -440,8 +380,6 @@ class ReportsController extends Controller
             ->values()
             ->all();
 
-        $topCategory = $categoryBreakdown[0]['category_name'] ?? null;
-
         return [
             'period' => [
                 'from' => $from->toDateString(),
@@ -452,7 +390,7 @@ class ReportsController extends Controller
                 'grand_total' => round($grandTotal, 2),
                 'monthly_average' => round($grandTotal / $monthCount, 2),
                 'month_count' => $monthCount,
-                'top_category' => $topCategory,
+                'top_category' => $categoryBreakdown[0]['category_name'] ?? null,
                 'category_totals' => $categoryBreakdown,
             ],
         ];

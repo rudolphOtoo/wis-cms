@@ -22,4 +22,22 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 3000,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Vite 8 uses Rolldown which requires manualChunks to be a function.
+        // Split vendor libraries into stable named chunks so the browser can
+        // cache them independently of application code — React and Recharts
+        // don't change on every deploy, but page chunks do.
+        manualChunks(id) {
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'vendor-charts'
+          }
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+            return 'vendor-react'
+          }
+        },
+      },
+    },
+  },
 })
