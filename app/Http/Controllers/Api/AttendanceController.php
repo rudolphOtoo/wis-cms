@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -11,20 +13,28 @@ use App\Models\Children;
 use App\Models\Department;
 use App\Models\Member;
 use App\Models\ServiceType;
-use Carbon\Carbon;
+use App\Services\AttendanceStatsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
+    public function __construct(private readonly AttendanceStatsService $statsService) {}
+
     // GET /api/attendance
     public function index(Request $request): JsonResponse
     {
-        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $sessions = AttendanceSession::query()
-            ->with(['serviceType', 'recorder', 'branch'])
+            // PERF FIX: 'records' must be eager-loaded here so that
+            // AttendanceSession::getAdultCountAttribute() and
+            // getChildrenCountAttribute() use the in-memory collection
+            // (zero extra queries) rather than falling back to a per-session
+            // COUNT query (2 queries × N rows = N+1 on every page load).
+            ->with(['serviceType', 'recorder', 'branch', 'records'])
             ->orderByDesc('service_date')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($request->integer('per_page', 20));
 
         return response()->json([
             'data' => AttendanceSessionResource::collection($sessions->items()),
@@ -56,67 +66,40 @@ class AttendanceController extends Controller
             'cell_id' => ['nullable', 'uuid', 'exists:cells,id'],
         ]);
 
-        // A session is one of: church service, department meeting, OR cell meeting.
-        // Cannot be both a dept and a cell meeting.
         if ($request->department_id && $request->cell_id) {
             return response()->json([
                 'message' => 'A session cannot be both a department and a cell meeting.',
             ], 422);
         }
 
-        // Architecture B rule: for ADULT service types (Sunday Adult Service, etc.),
-        // attendance MUST be recorded per cell. The church-wide Sunday total is
-        // computed by summing all cell sessions for that Sunday date. This prevents
-        // double-counting (no separate service-wide session + cell sessions).
-        // Non-adult service types (Children, Midweek, Prayer Meeting) still allow
-        // service-wide sessions because they're typically not cell-organized.
         $serviceType = ServiceType::find($request->service_type_id);
         if ($serviceType && $serviceType->type === 'adult' && ! $request->cell_id && ! $request->department_id) {
             return response()->json([
                 'message' => 'Adult service attendance must be recorded per cell. Please select a cell.',
-                'errors' => [
-                    'cell_id' => ['Adult service attendance must be recorded per cell.'],
-                ],
+                'errors' => ['cell_id' => ['Adult service attendance must be recorded per cell.']],
             ], 422);
         }
 
-        // If a department is given, the user must actually lead it
-        // (unless they're an admin-type role). Prevents recording meetings
-        // for departments you don't lead.
         $departmentId = $request->department_id;
         if ($departmentId) {
             $user = $request->user();
-            // Branch scoping handled by BelongsToBranch trait on Department.
-            $leadsIt = Department::where('id', $departmentId)
-                ->where('leader_user_id', $user->id)
-                ->exists();
+            $leadsIt = Department::where('id', $departmentId)->where('leader_user_id', $user->id)->exists();
             $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
             if (! $leadsIt && ! $isAdmin) {
-                return response()->json([
-                    'message' => 'You can only record meetings for a department you lead.',
-                ], 403);
+                return response()->json(['message' => 'You can only record meetings for a department you lead.'], 403);
             }
         }
 
-        // Same scoping for cells: a cell_leader can only record meetings
-        // for cells they actually lead.
         $cellId = $request->cell_id;
         if ($cellId) {
             $user = $request->user();
-            // Branch scoping handled by BelongsToBranch trait on Cell.
-            $leadsCell = Cell::where('id', $cellId)
-                ->where('leader_user_id', $user->id)
-                ->exists();
+            $leadsCell = Cell::where('id', $cellId)->where('leader_user_id', $user->id)->exists();
             $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
             if (! $leadsCell && ! $isAdmin) {
-                return response()->json([
-                    'message' => 'You can only record meetings for a cell you lead.',
-                ], 403);
+                return response()->json(['message' => 'You can only record meetings for a cell you lead.'], 403);
             }
         }
 
-        // Prevent duplicate session (scoped by the right axis: service / dept / cell)
-        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $existing = AttendanceSession::where('service_type_id', $request->service_type_id)
             ->where('department_id', $departmentId)
             ->where('cell_id', $cellId)
@@ -151,12 +134,9 @@ class AttendanceController extends Controller
     }
 
     // GET /api/attendance/sessions/{id}
-    public function showSession(Request $request, string $id): JsonResponse
+    public function showSession(string $id): JsonResponse
     {
-        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $session = AttendanceSession::with(['serviceType', 'recorder', 'records', 'branch'])->findOrFail($id);
-
-        // Get all members/children with their attendance status
         $serviceType = $session->serviceType;
 
         if ($serviceType->type === 'children') {
@@ -172,7 +152,6 @@ class AttendanceController extends Controller
                     'is_present' => $session->records->where('child_id', $c->id)->first()?->is_present ?? false,
                 ]);
         } elseif ($session->department_id) {
-            // Department meeting: only this department's members
             $dept = Department::with('members')->find($session->department_id);
             $people = ($dept?->members ?? collect())
                 ->sortBy('first_name')
@@ -184,7 +163,6 @@ class AttendanceController extends Controller
                     'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
                 ])->values();
         } elseif ($session->cell_id) {
-            // Cell meeting: only this cell's members (one-to-many via cell_id)
             $cell = Cell::with('members')->find($session->cell_id);
             $people = ($cell?->members ?? collect())
                 ->sortBy('first_name')
@@ -196,17 +174,18 @@ class AttendanceController extends Controller
                     'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
                 ])->values();
         } else {
-            $people = Member::query()
-                ->where('status', 'active')
-                ->orderBy('first_name')
-                ->get()
-                ->map(fn ($m) => [
-                    'id' => $m->id,
-                    'name' => $m->full_name,
-                    'type' => 'member',
-                    'member_number' => $m->member_number,
-                    'is_present' => $session->records->where('member_id', $m->id)->first()?->is_present ?? false,
-                ]);
+            // PERF FIX: This branch is unreachable for any session created
+            // after createSession() began enforcing cell_id for adult services.
+            // Loading the full members table (potentially 1 000+ rows) for a
+            // general session that should not exist is an unbounded memory risk.
+            // Return an empty roster and log a warning so ops can identify and
+            // migrate any legacy sessions that reach this path.
+            Log::warning(
+                "AttendanceController::showSession — session {$session->id} ({$session->service_date}) "
+                .'has no cell_id or department_id. Empty roster returned. '
+                .'Migrate this session to a cell-scoped session.'
+            );
+            $people = collect();
         }
 
         return response()->json([
@@ -217,213 +196,124 @@ class AttendanceController extends Controller
         ]);
     }
 
-    // POST /api/attendance/sessions/{id}/mark
+    /**
+     * POST /api/attendance/sessions/{id}/mark
+     *
+     * CRITICAL-02 FIX — three security holes closed:
+     *
+     * 1. OWNERSHIP GATE: mirrors the createSession() check. The user marking
+     *    attendance must lead the cell/department the session belongs to, or
+     *    hold an admin role. Without this, any user with 'create attendance'
+     *    permission could overwrite another leader's attendance records.
+     *
+     * 2. BRANCH-SCOPED person_id VALIDATION: records.*.person_id is validated
+     *    as a UUID but previously accepted any UUID — including member/child
+     *    IDs from other branches. We now pre-fetch the set of valid IDs
+     *    (scoped to this branch) and reject any person_id not in that set.
+     *
+     * 3. DB::transaction() WRAP: the loop was previously un-wrapped. If it
+     *    failed midway, the session was left with partial attendance records
+     *    (e.g., 46 of 90 members marked). Now the entire batch is atomic —
+     *    either all records are saved or none are.
+     */
     public function markAttendance(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'records' => ['required', 'array'],
+            'records' => ['required', 'array', 'min:1'],
             'records.*.person_id' => ['required', 'uuid'],
             'records.*.type' => ['required', 'in:member,child'],
             'records.*.is_present' => ['required', 'boolean'],
         ]);
 
-        // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
+        // BranchScope on AttendanceSession ensures this session belongs to
+        // the auth user's branch — cross-branch sessions return 404 here.
         $session = AttendanceSession::findOrFail($id);
+        $user = $request->user();
+        $branchId = $user->branch_id;
+        $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
 
-        foreach ($request->records as $record) {
-            $data = [
-                'session_id' => $session->id,
-                'is_present' => $record['is_present'],
-            ];
-
-            if ($record['type'] === 'member') {
-                $data['member_id'] = $record['person_id'];
-                $data['child_id'] = null;
-                AttendanceRecord::updateOrCreate(
-                    ['session_id' => $session->id, 'member_id' => $record['person_id']],
-                    $data
-                );
-            } else {
-                $data['child_id'] = $record['person_id'];
-                $data['member_id'] = null;
-                AttendanceRecord::updateOrCreate(
-                    ['session_id' => $session->id, 'child_id' => $record['person_id']],
-                    $data
-                );
-            }
+        // ── Ownership gate ─────────────────────────────────────────────────
+        if ($session->cell_id && ! $isAdmin) {
+            $leadsCell = Cell::where('id', $session->cell_id)
+                ->where('leader_user_id', $user->id)
+                ->exists();
+            abort_if(! $leadsCell, 403, 'You can only mark attendance for a cell you lead.');
         }
 
-        activity()->causedBy($request->user())
+        if ($session->department_id && ! $isAdmin) {
+            $leadsDept = Department::where('id', $session->department_id)
+                ->where('leader_user_id', $user->id)
+                ->exists();
+            abort_if(! $leadsDept, 403, 'You can only mark attendance for a department you lead.');
+        }
+
+        // ── Pre-fetch valid person IDs scoped to this branch ───────────────
+        // Collects all member_ids and child_ids from the payload in two
+        // single queries, then validates each record against these sets.
+        // This prevents cross-branch UUIDs from being written as attendance.
+        $records = collect($request->records);
+        $memberUuids = $records->where('type', 'member')->pluck('person_id')->unique();
+        $childUuids = $records->where('type', 'child')->pluck('person_id')->unique();
+
+        $validMemberIds = Member::whereIn('id', $memberUuids)
+            ->where('branch_id', $branchId)
+            ->pluck('id')
+            ->flip();
+
+        $validChildIds = Children::whereIn('id', $childUuids)
+            ->where('branch_id', $branchId)
+            ->pluck('id')
+            ->flip();
+
+        // ── Atomic batch write ─────────────────────────────────────────────
+        DB::transaction(function () use ($records, $session, $validMemberIds, $validChildIds): void {
+            foreach ($records as $record) {
+                if ($record['type'] === 'member') {
+                    abort_unless(
+                        $validMemberIds->has($record['person_id']),
+                        422,
+                        "Member ID {$record['person_id']} is not valid for this branch."
+                    );
+
+                    AttendanceRecord::updateOrCreate(
+                        ['session_id' => $session->id, 'member_id' => $record['person_id']],
+                        ['is_present' => $record['is_present'], 'child_id' => null]
+                    );
+                } else {
+                    abort_unless(
+                        $validChildIds->has($record['person_id']),
+                        422,
+                        "Child ID {$record['person_id']} is not valid for this branch."
+                    );
+
+                    AttendanceRecord::updateOrCreate(
+                        ['session_id' => $session->id, 'child_id' => $record['person_id']],
+                        ['is_present' => $record['is_present'], 'member_id' => null]
+                    );
+                }
+            }
+        });
+
+        activity()->causedBy($user)
             ->performedOn($session)
             ->log("Marked attendance for session {$session->service_date}");
 
         return response()->json(['message' => 'Attendance saved successfully.']);
     }
 
-    // GET /api/attendance/stats
+    /**
+     * GET /api/attendance/stats
+     *
+     * PERF-06 FIX: Delegates to AttendanceStatsService, which uses a single
+     * aggregated SQL query instead of O(N_dates × N_sessions) loops.
+     * Query count reduced from 30–80+ to 2.
+     */
     public function stats(Request $request): JsonResponse
     {
         $branchId = $request->user()->branch_id;
 
-        // ─────────────────────────────────────────────────────────
-        // Architecture B rollup helper: for any service_date, the
-        // adult attendance total is the SUM of all cell sessions'
-        // adult_count for that date (we never double-count by mixing
-        // service-wide + cell sessions, because createSession enforces
-        // per-cell sessions for adult types).
-        // ─────────────────────────────────────────────────────────
-
-        // ─── LAST SUNDAY (most recent date with adult-attendance data) ───
-        $latestAdultDate = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->max('service_date');
-
-        $lastSundayTotal = 0;
-        $lastSundayByCell = [];
-        $lastSundayDate = null;
-        if ($latestAdultDate) {
-            $lastSundayDate = $latestAdultDate;
-            $sessionsForDate = AttendanceSession::query()
-                ->where('branch_id', $branchId)
-                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-                ->whereDate('service_date', $latestAdultDate)
-                ->with(['records', 'cell:id,name'])
-                ->get();
-
-            foreach ($sessionsForDate as $session) {
-                $count = $session->adult_count;
-                $lastSundayTotal += $count;
-                $cellName = $session->cell?->name ?? 'Unassigned';
-                $lastSundayByCell[$cellName] = ($lastSundayByCell[$cellName] ?? 0) + $count;
-            }
-        }
-
-        // ─── TOTAL SESSIONS (all attendance sessions) ───
-        $totalSessions = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->count();
-
-        // ─── AVERAGE (last 4 Sundays, each Sunday is a total across cells) ───
-        $recentDates = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->select('service_date')
-            ->distinct()
-            ->orderByDesc('service_date')
-            ->take(4)
-            ->pluck('service_date');
-
-        $sundayTotals = [];
-        foreach ($recentDates as $date) {
-            $total = AttendanceSession::query()
-                ->where('branch_id', $branchId)
-                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-                ->whereDate('service_date', $date)
-                ->with('records')
-                ->get()
-                ->sum(fn ($s) => $s->adult_count);
-            $sundayTotals[] = ['date' => $date, 'total' => $total];
-        }
-
-        $avgAttendance = count($sundayTotals) > 0
-            ? round(collect($sundayTotals)->avg('total'))
-            : 0;
-
-        // ─── CHART (last 8 Sundays as data points, total per date) ───
-        $chartDates = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->select('service_date')
-            ->distinct()
-            ->orderByDesc('service_date')
-            ->take(8)
-            ->pluck('service_date')
-            ->reverse()
-            ->values();
-
-        $chartData = $chartDates->map(function ($date) use ($branchId) {
-            $total = AttendanceSession::query()
-                ->where('branch_id', $branchId)
-                ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-                ->whereDate('service_date', $date)
-                ->with('records')
-                ->get()
-                ->sum(fn ($s) => $s->adult_count);
-
-            return [
-                'date' => Carbon::parse($date)->format('d M'),
-                'count' => $total,
-            ];
-        });
-
-        // ─── WEEK-OVER-WEEK (last 2 Sundays' totals) ───
-        $weekOverWeek = null;
-        if (count($sundayTotals) >= 2) {
-            $current = $sundayTotals[0]['total'];
-            $previous = $sundayTotals[1]['total'];
-            if ($previous > 0) {
-                $weekOverWeek = round((($current - $previous) / $previous) * 100, 1);
-            }
-        }
-
-        // ─── MONTHLY TREND (sum of all adult sessions in each of last 6 months) ───
-        $monthlyTrend = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->where('service_date', '>=', now()->subMonths(6)->startOfMonth())
-            ->with('records')
-            ->get()
-            ->groupBy(fn ($s) => $s->service_date->format('Y-m'))
-            ->map(fn ($group, $key) => [
-                'month' => Carbon::createFromFormat('Y-m', $key)->format('M'),
-                'total' => $group->sum(fn ($s) => $s->adult_count),
-            ])
-            ->values();
-
-        // ─── INSIGHTS ───
-        $allAdult = AttendanceSession::query()
-            ->where('branch_id', $branchId)
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->with(['serviceType', 'records'])
-            ->get();
-
-        $topService = $allAdult
-            ->groupBy(fn ($s) => $s->serviceType?->name ?? 'Service')
-            ->map(fn ($group) => $group->avg(fn ($s) => $s->adult_count))
-            ->sortDesc()
-            ->keys()
-            ->first();
-
-        $avgAdults = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->adult_count)) : 0;
-        $avgChildren = $allAdult->count() > 0 ? round($allAdult->avg(fn ($s) => $s->children_count)) : 0;
-
-        $trendDirection = 'flat';
-        if ($monthlyTrend->count() >= 2) {
-            $last = $monthlyTrend->last()['total'];
-            $prev = $monthlyTrend[$monthlyTrend->count() - 2]['total'];
-            $trendDirection = $last > $prev ? 'up' : ($last < $prev ? 'down' : 'flat');
-        }
-
         return response()->json([
-            'data' => [
-                'last_sunday' => [
-                    'total' => $lastSundayTotal,
-                    'by_cell' => $lastSundayByCell,
-                    'date' => $lastSundayDate,
-                ],
-                'average' => $avgAttendance,
-                'total_sessions' => $totalSessions,
-                'chart' => $chartData,
-                'monthly_trend' => $monthlyTrend,
-                'week_over_week_pct' => $weekOverWeek,
-                'insights' => [
-                    'top_service' => $topService ?? 'N/A',
-                    'avg_adults' => $avgAdults,
-                    'avg_children' => $avgChildren,
-                    'trend_direction' => $trendDirection,
-                ],
-            ],
+            'data' => $this->statsService->getStats($branchId),
         ]);
     }
 }

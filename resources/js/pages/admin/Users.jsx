@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { getUsers, getUserRoles, createUser, updateUser, deleteUser, linkMember, createAndLinkMember, unlinkMember } from '../../api/users'
 import { getMembers } from '../../api/members'
 import { useAuth } from '../../context/AuthContext'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -34,11 +35,13 @@ export default function UsersPage() {
   const [editing,  setEditing]  = useState(null)
   const [deleting, setDeleting] = useState(null)
 
+  const debouncedSearch = useDebounce(search, 400)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [uRes, rRes] = await Promise.all([
-        getUsers({ search, role: roleFilter, page, per_page: 15 }),
+        getUsers({ search: debouncedSearch, role: roleFilter, page, per_page: 15 }),
         getUserRoles(),
       ])
       setUsers(uRes.data.data)
@@ -49,13 +52,9 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, roleFilter, page])
+  }, [debouncedSearch, roleFilter, page])
 
   useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleDelete = async (user) => {
     if (!confirm(`Delete ${user.name}? This will remove their account permanently.`)) return

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getVisitors, deleteVisitor, getVisitorStats, convertVisitor } from '../../api/visitors'
 import { usePermission } from '../../hooks/usePermission'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const STATUS_COLORS = {
   pending:        { bg: '#fef9c3', text: '#854d0e' },
@@ -46,11 +47,13 @@ export default function VisitorsPage() {
   const [deleting,    setDeleting]    = useState(null)
   const [converting,  setConverting]  = useState(null)
 
+  const debouncedSearch = useDebounce(search, 400)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [vRes, sRes] = await Promise.all([
-        getVisitors({ search, follow_up_status: statusFilter, page, per_page: 15 }),
+        getVisitors({ search: debouncedSearch, follow_up_status: statusFilter, page, per_page: 15 }),
         getVisitorStats(),
       ])
       setVisitors(vRes.data.data)
@@ -61,13 +64,9 @@ export default function VisitorsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, page])
+  }, [debouncedSearch, statusFilter, page])
 
   useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleDelete = async (visitor) => {
     if (!confirm(`Delete ${visitor.full_name}?`)) return

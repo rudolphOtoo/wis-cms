@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { getTransactions, getFinanceStats, getFinanceCategories, deleteTransaction, exportTransactions, downloadLedgerPdf } from '../../api/finance'
 import { usePermission } from '../../hooks/usePermission'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtShort = (n) => {
@@ -104,11 +105,13 @@ export default function FinancePage() {
     }
   }
 
+  const debouncedSearch = useDebounce(search, 400)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [tRes, sRes, cRes] = await Promise.all([
-        getTransactions({ search, type: typeFilter, category_id: catFilter, page, per_page: 15 }),
+        getTransactions({ search: debouncedSearch, type: typeFilter, category_id: catFilter, page, per_page: 15 }),
         getFinanceStats(),
         getFinanceCategories(),
       ])
@@ -121,14 +124,9 @@ export default function FinancePage() {
     } finally {
       setLoading(false)
     }
-  }, [search, typeFilter, catFilter, page])
+  }, [debouncedSearch, typeFilter, catFilter, page])
 
   useEffect(() => { fetchData() }, [fetchData])
-
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleDelete = async (txn) => {
     if (!confirm(`Delete this ${txn.type} of ${fmt(txn.amount)}?`)) return
