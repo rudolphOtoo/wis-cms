@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
-    use HasUuids;
+    use BelongsToBranch, HasUuids;
 
     protected $keyType = 'string';
 
@@ -15,7 +16,7 @@ class Message extends Model
 
     protected $fillable = [
         'branch_id', 'sender_id', 'subject', 'body', 'channel',
-        'status', 'recipient_group', 'department_id', 'sent_at',
+        'status', 'recipient_group', 'department_id', 'cell_id', 'sent_at',
     ];
 
     protected function casts(): array
@@ -26,6 +27,16 @@ class Message extends Model
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function cell()
+    {
+        return $this->belongsTo(Cell::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function recipients()

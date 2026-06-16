@@ -19,12 +19,18 @@ class RolesAndPermissionsSeeder extends Seeder
             'view visitors', 'create visitors', 'edit visitors', 'delete visitors',
             'view attendance', 'create attendance', 'edit attendance', 'delete attendance',
             'view departments', 'create departments', 'edit departments', 'delete departments',
+            'view cells', 'create cells', 'edit cells', 'delete cells',
+            'manage cell members', 'message own cell',
             'manage department members',
             'view finance', 'create transactions', 'edit transactions', 'delete transactions', 'export finance',
-            'view messages', 'send messages',
+            'view messages', 'send messages', 'message own department',
             'view reports', 'export reports',
             'manage users', 'manage roles', 'manage branches', 'manage service types',
             'manage finance categories', 'view audit log',
+            'access portal',
+            'view birthday messages', 'manage birthday messages',
+            'view service reminders', 'manage service reminders',
+            'view member submissions', 'manage member submissions',
         ];
 
         foreach ($permissions as $permission) {
@@ -37,8 +43,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $pastor = Role::firstOrCreate(['name' => 'pastor']);
         $pastor->syncPermissions([
             'view members', 'view children', 'view visitors', 'view attendance',
-            'view departments', 'view finance', 'view messages', 'view reports',
+            'view departments', 'view cells', 'view finance', 'view messages', 'view reports',
             'export reports', 'export members', 'export finance',
+            'view birthday messages', 'manage birthday messages',
+            'view service reminders', 'manage service reminders',
+            'view member submissions', 'manage member submissions',
         ]);
 
         $secretary = Role::firstOrCreate(['name' => 'secretary']);
@@ -49,8 +58,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'view attendance', 'create attendance', 'edit attendance',
             'view departments', 'create departments', 'edit departments',
             'manage department members',
+            'view cells', 'create cells', 'edit cells', 'delete cells',
             'view messages', 'send messages',
             'view reports', 'export reports',
+            'view birthday messages',
+            'view service reminders',
+            'view member submissions', 'manage member submissions',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance_officer']);
@@ -64,11 +77,24 @@ class RolesAndPermissionsSeeder extends Seeder
         $deptLeader->syncPermissions([
             'view members', 'view departments', 'manage department members',
             'view attendance', 'create attendance', 'view reports',
+            'message own department',
+        ]);
+
+        $cellLeader = Role::firstOrCreate(['name' => 'cell_leader']);
+        $cellLeader->syncPermissions([
+            'view members', 'view cells', 'manage cell members',
+            'view attendance', 'create attendance', 'view reports',
+            'message own cell',
+            'view birthday messages',
+            'view service reminders',
         ]);
 
         $usher = Role::firstOrCreate(['name' => 'usher']);
         $usher->syncPermissions([
             'view members', 'view children', 'create attendance', 'view attendance',
         ]);
+
+        $member = Role::firstOrCreate(['name' => 'member']);
+        $member->syncPermissions(['access portal']);
     }
 }

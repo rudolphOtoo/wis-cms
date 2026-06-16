@@ -22,6 +22,9 @@ api.interceptors.response.use(
       localStorage.removeItem('wis_user')
       window.location.href = '/login'
     }
+    if (error.response?.status === 423 && window.location.pathname !== '/change-password') {
+      window.location.href = '/change-password'
+    }
     return Promise.reject(error)
   }
 )

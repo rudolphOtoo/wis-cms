@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Department extends Model
 {
-    use HasFactory, HasUuids;
+    use BelongsToBranch, HasFactory, HasUuids;
 
     protected $keyType = 'string';
 
@@ -23,11 +24,6 @@ class Department extends Model
         return ['is_active' => 'boolean'];
     }
 
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
-    }
-
     public function leader()
     {
         return $this->belongsTo(User::class, 'leader_user_id');
@@ -36,6 +32,7 @@ class Department extends Model
     public function members()
     {
         return $this->belongsToMany(Member::class, 'department_members')
+            ->using(DepartmentMember::class)
             ->withPivot('role', 'joined_at')
             ->withTimestamps();
     }

@@ -24,6 +24,15 @@ class AttendanceSessionResource extends JsonResource
             'recorded_by' => $this->whenLoaded('recorder', fn () => $this->recorder?->name),
             'branch_id' => $this->branch_id,
             'created_at' => $this->created_at->format('Y-m-d'),
+
+            // Follow-up SMS lifecycle (Part 4 of the council's request).
+            // The leader sees a badge showing whether the follow-up is
+            // scheduled, sent, or unavailable for this session.
+            'follow_up_status' => $this->follow_up_status,
+            'follow_up_sent_at' => $this->follow_up_sent_at?->toIso8601String(),
+            'follow_up_scheduled_for' => $this->follow_up_status === 'not_sent' && $this->branch
+                ? $this->created_at->copy()->addHours($this->branch->follow_up_delay_hours)->toIso8601String()
+                : null,
         ];
     }
 }

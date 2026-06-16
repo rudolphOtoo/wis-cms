@@ -1,55 +1,61 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreTransactionRequest;
 use App\Http\Requests\Finance\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
+use App\Models\Branch;
 use App\Models\FinanceCategory;
 use App\Models\Transaction;
+use App\Services\FinanceStatsService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\CSV\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
 {
+    public function __construct(private readonly FinanceStatsService $statsService) {}
+
     // GET /api/finance/transactions
     public function index(Request $request): JsonResponse
     {
-        $query = Transaction::query()
-            ->where('branch_id', $request->user()->branch_id)
-            ->with(['category', 'member', 'recorder']);
+        $query = Transaction::query()->with(['category', 'member', 'recorder']);
 
-        if ($search = $request->get('search')) {
+        if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('reference', 'ilike', "%{$search}%")
                     ->orWhere('notes', 'ilike', "%{$search}%")
-                    ->orWhereHas('member', fn ($m) => $m->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhereHas('member', fn ($m) => $m
+                        ->where('first_name', 'ilike', "%{$search}%")
                         ->orWhere('last_name', 'ilike', "%{$search}%")
                     );
             });
         }
 
-        if ($type = $request->get('type')) {
+        if ($type = $request->input('type')) {
             $query->where('type', $type);
         }
-
-        if ($categoryId = $request->get('category_id')) {
+        if ($categoryId = $request->input('category_id')) {
             $query->where('category_id', $categoryId);
         }
-
-        if ($from = $request->get('from')) {
+        if ($from = $request->input('from')) {
             $query->whereDate('transaction_date', '>=', $from);
         }
-
-        if ($to = $request->get('to')) {
+        if ($to = $request->input('to')) {
             $query->whereDate('transaction_date', '<=', $to);
         }
 
         $transactions = $query
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($request->input('per_page', 20));
 
         return response()->json([
             'data' => TransactionResource::collection($transactions->items()),
@@ -65,28 +71,35 @@ class FinanceController extends Controller
     // GET /api/finance/categories
     public function categories(Request $request): JsonResponse
     {
-        $type = $request->get('type'); // income | expense | null
-        $query = FinanceCategory::where('is_active', true)->orderBy('name');
-        if ($type) {
+        $query = FinanceCategory::where('is_active', true)->orderBy('display_order')->orderBy('name');
+
+        if ($type = $request->input('type')) {
             $query->where('type', $type);
         }
 
         return response()->json(['data' => $query->get()]);
     }
 
-    // POST /api/finance/transactions
+    /**
+     * POST /api/finance/transactions
+     *
+     * MEDIUM-01 FIX: Controller now uses $request->validated() exclusively.
+     * The old code overrode 'currency' with $request->input('currency', 'GHS'),
+     * bypassing the Form Request's max:3/in: rules. The default is now
+     * injected in StoreTransactionRequest::prepareForValidation() so
+     * validated() always contains a valid currency string.
+     */
     public function store(StoreTransactionRequest $request): JsonResponse
     {
         $transaction = Transaction::create([
             ...$request->validated(),
             'branch_id' => $request->user()->branch_id,
-            'currency' => $request->get('currency', 'GHS'),
             'recorded_by' => $request->user()->id,
         ]);
 
         activity()->causedBy($request->user())
             ->performedOn($transaction)
-            ->log("Recorded {$transaction->type} of GHS ".number_format($transaction->amount, 2));
+            ->log("Recorded {$transaction->type} of GHS ".number_format((float) $transaction->amount, 2));
 
         return response()->json([
             'message' => 'Transaction recorded successfully.',
@@ -95,11 +108,9 @@ class FinanceController extends Controller
     }
 
     // GET /api/finance/transactions/{id}
-    public function show(Request $request, string $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->with(['category', 'member', 'recorder'])
-            ->findOrFail($id);
+        $transaction = Transaction::with(['category', 'member', 'recorder'])->findOrFail($id);
 
         return response()->json(['data' => new TransactionResource($transaction)]);
     }
@@ -107,9 +118,7 @@ class FinanceController extends Controller
     // PUT /api/finance/transactions/{id}
     public function update(UpdateTransactionRequest $request, string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
-
+        $transaction = Transaction::findOrFail($id);
         $transaction->update($request->validated());
 
         activity()->causedBy($request->user())
@@ -125,9 +134,7 @@ class FinanceController extends Controller
     // DELETE /api/finance/transactions/{id}
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $transaction = Transaction::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
-
+        $transaction = Transaction::findOrFail($id);
         $transaction->delete();
 
         activity()->causedBy($request->user())
@@ -136,75 +143,118 @@ class FinanceController extends Controller
         return response()->json(['message' => 'Transaction deleted successfully.']);
     }
 
-    // GET /api/finance/stats
-    public function stats(Request $request): JsonResponse
+    // GET /api/finance/transactions/export
+    public function export(Request $request): StreamedResponse
     {
-        $branchId = $request->user()->branch_id;
-        $now = now();
+        $query = Transaction::query()->with(['category', 'member']);
 
-        $thisMonth = Transaction::where('branch_id', $branchId)
-            ->whereMonth('transaction_date', $now->month)
-            ->whereYear('transaction_date', $now->year);
-
-        $income = (clone $thisMonth)->where('type', 'income')->sum('amount');
-        $expenses = (clone $thisMonth)->where('type', 'expense')->sum('amount');
-        $balance = $income - $expenses;
-        $totalCount = (clone $thisMonth)->count();
-
-        // Total income/expenses all time
-        $totalIncome = Transaction::where('branch_id', $branchId)->where('type', 'income')->sum('amount');
-        $totalExpenses = Transaction::where('branch_id', $branchId)->where('type', 'expense')->sum('amount');
-
-        // Last 6 months chart
-        $chart = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = $now->copy()->subMonths($i);
-            $monthIncome = Transaction::where('branch_id', $branchId)
-                ->where('type', 'income')
-                ->whereMonth('transaction_date', $month->month)
-                ->whereYear('transaction_date', $month->year)
-                ->sum('amount');
-            $monthExpenses = Transaction::where('branch_id', $branchId)
-                ->where('type', 'expense')
-                ->whereMonth('transaction_date', $month->month)
-                ->whereYear('transaction_date', $month->year)
-                ->sum('amount');
-
-            $chart[] = [
-                'month' => $month->format('M'),
-                'income' => (float) $monthIncome,
-                'expenses' => (float) $monthExpenses,
-            ];
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference', 'ilike', "%{$search}%")
+                    ->orWhere('notes', 'ilike', "%{$search}%");
+            });
+        }
+        if ($type = $request->input('type')) {
+            $query->where('type', $type);
+        }
+        if ($categoryId = $request->input('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
+        if ($from = $request->input('from')) {
+            $query->whereDate('transaction_date', '>=', $from);
+        }
+        if ($to = $request->input('to')) {
+            $query->whereDate('transaction_date', '<=', $to);
         }
 
-        // Top categories this month
-        $topCategories = Transaction::where('branch_id', $branchId)
-            ->whereMonth('transaction_date', $now->month)
-            ->whereYear('transaction_date', $now->year)
-            ->where('type', 'income')
-            ->selectRaw('category_id, SUM(amount) as total')
-            ->groupBy('category_id')
-            ->orderByDesc('total')
-            ->take(5)
-            ->with('category:id,name')
-            ->get()
-            ->map(fn ($t) => [
-                'name' => $t->category?->name,
-                'total' => (float) $t->total,
-            ]);
+        $query->orderByDesc('transaction_date');
+        $filename = 'transactions-'.now()->format('Y-m-d').'.csv';
 
+        return new StreamedResponse(function () use ($query) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+            $writer->addRow(Row::fromValues(['Date', 'Type', 'Category', 'Amount', 'Currency', 'Member', 'Reference', 'Notes']));
+
+            $query->lazy()->each(function ($t) use ($writer) {
+                $writer->addRow(Row::fromValues([
+                    optional($t->transaction_date)->toDateString(),
+                    ucfirst($t->type),
+                    $t->category?->name ?? '',
+                    (string) $t->amount,
+                    $t->currency ?? 'GHS',
+                    $t->member?->full_name ?? '',
+                    $t->reference,
+                    $t->notes,
+                ]));
+            });
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // GET /api/finance/reports/ledger
+    public function ledger(Request $request): mixed
+    {
+        $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        $transactions = Transaction::query()
+            ->whereBetween('transaction_date', [$from, $to])
+            ->with('category')
+            ->orderBy('transaction_date')
+            ->get();
+
+        $groupByCategory = fn ($items) => $items
+            ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
+            ->map(fn ($group) => [
+                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'count' => $group->count(),
+                'total' => round($group->sum('amount'), 2),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        $income = $transactions->where('type', 'income');
+        $expense = $transactions->where('type', 'expense');
+
+        $totalIncome = round($income->sum('amount'), 2);
+        $totalExpense = round($expense->sum('amount'), 2);
+
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.financial-ledger', [
+            'period' => ['from' => $from, 'to' => $to],
+            'incomeByCategory' => $groupByCategory($income),
+            'expenseByCategory' => $groupByCategory($expense),
+            'totalIncome' => $totalIncome,
+            'totalExpense' => $totalExpense,
+            'net' => round($totalIncome - $totalExpense, 2),
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y'),
+        ]);
+
+        return $pdf->download("financial-ledger-{$from}-to-{$to}.pdf");
+    }
+
+    /**
+     * GET /api/finance/stats
+     *
+     * PERF-02 FIX: Delegates to FinanceStatsService, which uses 3 aggregated
+     * queries instead of the original 16+. The 12-query-per-chart loop is
+     * replaced by a single GROUP BY query.
+     */
+    public function stats(): JsonResponse
+    {
         return response()->json([
-            'data' => [
-                'this_month_income' => (float) $income,
-                'this_month_expenses' => (float) $expenses,
-                'this_month_balance' => (float) $balance,
-                'this_month_count' => $totalCount,
-                'total_income' => (float) $totalIncome,
-                'total_expenses' => (float) $totalExpenses,
-                'total_balance' => (float) ($totalIncome - $totalExpenses),
-                'chart' => $chart,
-                'top_categories' => $topCategories,
-            ],
+            'data' => $this->statsService->getStats(),
         ]);
     }
 }

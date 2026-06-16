@@ -28,11 +28,24 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'mnotify' => [
+        'api_key' => env('MNOTIFY_API_KEY'),
+        'sender_id' => env('MNOTIFY_SENDER_ID', 'WIS'),
+        'base_url' => env('MNOTIFY_BASE_URL', 'https://api.mnotify.com/api'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+    'google_form_webhook' => [
+        // Shared secret required in the X-Webhook-Secret header on
+        // POST /api/webhooks/member-submission. Generated once, stored
+        // in .env. Treat like a password.
+        'secret' => env('GOOGLE_FORM_WEBHOOK_SECRET'),
     ],
 
 ];

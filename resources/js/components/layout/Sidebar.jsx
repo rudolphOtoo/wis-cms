@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
@@ -10,16 +10,25 @@ const nav = [
   { to: '/attendance',    label: 'Attendance',  permission: 'view attendance',   d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   { to: '/finance',       label: 'Finance',     permission: 'view finance',      d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { to: '/departments',   label: 'Departments', permission: 'view departments',  d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { to: '/cells',         label: 'Cells',       permission: 'view cells',        d: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
   { to: '/visitors',      label: 'Visitors',    permission: 'view visitors',     d: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
   { to: '/communication', label: 'Messages',    permission: 'view messages',     d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { to: '/birthdays',     label: 'Birthdays',   permission: 'view birthday messages', d: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
+  { to: '/reminders',     label: 'Reminders',   permission: 'view service reminders', d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
+  { to: '/admin/submissions', label: 'Submissions', permission: 'view member submissions', d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
 ]
 
 const adminNav = [
   { to: '/admin/users', label: 'Users',     permission: 'manage users',   d: 'M9 7a3 3 0 11-6 0 3 3 0 016 0zM6 21v-1a4 4 0 014-4h2m6-5v6m-3-3h6' },
   { to: '/admin/audit', label: 'Audit Log', permission: 'view audit log', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+  { to: '/admin/settings/follow-up', label: 'Follow-up SMS', permission: 'manage users', d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { to: '/reports/finance/income-by-category', label: 'Income Report', permission: 'view finance', d: 'M9 17v-2a4 4 0 00-4-4H3m18 6v-2a4 4 0 00-4-4h-2m-4-6a4 4 0 11-8 0 4 4 0 018 0zM12 21v-4m0 0a4 4 0 014-4h2a4 4 0 014 4v4M5 17h.01M5 11h.01' },
+  { to: '/reports/finance/expense-by-category', label: 'Expense Report', permission: 'view finance', d: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
+  { to: '/reports/cells/comparison', label: 'Cell Comparison', permission: 'view finance', d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { to: '/reports/attendance/trends', label: 'Attendance Trends', permission: 'view finance', d: 'M3 3v18h18M7 12l4-4 4 4 6-6' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const { user, logout } = useAuth()
   const { can }          = usePermission()
 
@@ -27,19 +36,22 @@ export default function Sidebar() {
   const visibleAdminNav = adminNav.filter(item => can(item.permission))
 
   return (
-    <div className="w-64 flex flex-col h-full flex-shrink-0" style={{backgroundColor:'var(--color-navy-deeper)'}}>
-      <div className="px-6 py-5" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+    <div className={`w-64 flex flex-col flex-shrink-0 z-40 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{backgroundColor:'var(--color-navy-deeper)', height:'100dvh'}}>
+      <div className="px-6 py-5 flex items-center justify-between" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor:'var(--color-gold)'}}>
-            <svg className="w-5 h-5" style={{color:'var(--color-navy-deeper)'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18L20 8.5v7L12 19.82 4 15.5v-7l8-4.32z"/>
-            </svg>
-          </div>
+          <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
             <div className="text-white text-sm font-bold" style={{fontFamily:'var(--font-display)'}}>WIS-CMS</div>
             <div className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Methodist Church Ghana</div>
           </div>
         </div>
+        <button onClick={onMobileClose}
+                className="mobile-close-btn md:hidden text-white p-1"
+                aria-label="Close menu">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

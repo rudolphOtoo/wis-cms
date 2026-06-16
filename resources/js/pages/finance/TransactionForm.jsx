@@ -26,6 +26,8 @@ export default function TransactionForm() {
 
   const [categories, setCats]      = useState([])
   const [members,    setMembers]   = useState([])
+  const [memberSearch, setMemberSearch] = useState('')
+  const [memberOpen,   setMemberOpen]   = useState(false)
   const [errors,     setErrors]    = useState({})
   const [loading,    setLoading]   = useState(false)
   const [fetching,   setFetching]  = useState(isEdit)
@@ -190,15 +192,57 @@ export default function TransactionForm() {
 
           {form.type === 'income' && (
             <FIELD label="Member (for personal contributions like tithe)" error={errors.member_id?.[0]}>
-              <select className="input-field" value={form.member_id}
-                      onChange={set('member_id')}>
-                <option value="">Anonymous / General</option>
-                {members.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.member_number})
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const selected = members.find(m => m.id === form.member_id)
+                const q = memberSearch.trim().toLowerCase()
+                const filtered = q
+                  ? members.filter(m =>
+                      (m.full_name || '').toLowerCase().includes(q) ||
+                      (m.member_number || '').toLowerCase().includes(q))
+                      .slice(0, 8)
+                  : members.slice(0, 8)
+                return (
+                  <div style={{position:'relative'}}>
+                    {selected ? (
+                      <div className="input-field flex items-center justify-between"
+                           style={{cursor:'pointer'}}
+                           onClick={() => { setMemberOpen(true); setMemberSearch('') }}>
+                        <span>{selected.full_name} <span style={{color:'#9ca3af'}}>({selected.member_number})</span></span>
+                        <button type="button" aria-label="Clear selection"
+                                onClick={(e) => { e.stopPropagation(); setForm(f => ({...f, member_id:''})); setMemberSearch(''); setMemberOpen(false) }}
+                                style={{color:'#6b7280',padding:'0 8px',fontSize:'18px',lineHeight:1}}>×</button>
+                      </div>
+                    ) : (
+                      <input type="text" className="input-field"
+                             placeholder="Anonymous / General — type to search by name or number..."
+                             value={memberSearch}
+                             onChange={e => { setMemberSearch(e.target.value); setMemberOpen(true) }}
+                             onFocus={() => setMemberOpen(true)}
+                             onBlur={() => setTimeout(() => setMemberOpen(false), 150)}/>
+                    )}
+                    {memberOpen && !selected && (
+                      <div style={{position:'absolute',top:'100%',left:0,right:0,marginTop:'4px',
+                                   backgroundColor:'white',border:'1px solid var(--color-surface-border)',
+                                   borderRadius:'8px',boxShadow:'0 4px 12px rgba(0,0,0,0.08)',
+                                   maxHeight:'260px',overflowY:'auto',zIndex:20}}>
+                        {filtered.length === 0 ? (
+                          <div style={{padding:'10px 12px',color:'#9ca3af',fontSize:'13px'}}>No members match that search.</div>
+                        ) : filtered.map(m => (
+                          <div key={m.id}
+                               onMouseDown={(e) => { e.preventDefault(); setForm(f => ({...f, member_id: m.id})); setMemberOpen(false); setMemberSearch('') }}
+                               style={{padding:'10px 12px',cursor:'pointer',fontSize:'14px',
+                                       borderBottom:'1px solid #f3f4f6'}}
+                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fc'}
+                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}>
+                            <div style={{fontWeight:600,color:'var(--color-navy)'}}>{m.full_name}</div>
+                            <div style={{fontSize:'12px',color:'#6b7280'}}>{m.member_number}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </FIELD>
           )}
 

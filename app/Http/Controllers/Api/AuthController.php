@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -9,8 +11,10 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -81,7 +85,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'current_password' => ['required', 'string'],
-            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+            'new_password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->mixedCase()->numbers()->uncompromised()],
         ]);
 
         if (! Hash::check($request->current_password, $request->user()->password)) {
@@ -92,11 +96,62 @@ class AuthController extends Controller
 
         $request->user()->update([
             'password' => Hash::make($request->new_password),
+            'must_change_password' => false,
         ]);
 
         activity()->causedBy($request->user())->log('User changed their password');
 
         return response()->json(['message' => 'Password changed successfully.']);
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        // Generic response either way — never reveal whether an email exists.
+        $generic = response()->json([
+            'message' => 'If that email is registered, a password reset link has been sent.',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        // Silently no-op for unknown or deactivated accounts.
+        if (! $user || ! $user->is_active) {
+            return $generic;
+        }
+
+        Password::sendResetLink(['email' => $request->email]);
+
+        return $generic;
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->mixedCase()->numbers()->uncompromised()],
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->update([
+                    'password' => Hash::make($password),
+                    'must_change_password' => false,
+                ]);
+
+                activity()->causedBy($user)->log('User reset their password');
+            }
+        );
+
+        if ($status !== Password::PasswordReset) {
+            throw ValidationException::withMessages([
+                'email' => ['This password reset link is invalid or has expired.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Your password has been reset. You can now sign in.']);
     }
 
     /**

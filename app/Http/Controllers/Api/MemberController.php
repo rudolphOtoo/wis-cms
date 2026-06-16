@@ -1,26 +1,35 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
+use App\Models\Cell;
+use App\Models\Department;
 use App\Models\Member;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\CSV\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberController extends Controller
 {
     // GET /api/members
     public function index(Request $request): JsonResponse
     {
-        $query = Member::query()
-            ->where('branch_id', $request->user()->branch_id);
+        $query = Member::query();
 
-        // Search
-        if ($search = $request->get('search')) {
+        if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'ilike', "%{$search}%")
                     ->orWhere('last_name', 'ilike', "%{$search}%")
@@ -30,18 +39,22 @@ class MemberController extends Controller
             });
         }
 
-        // Filters
-        if ($status = $request->get('status')) {
+        if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
-        if ($gender = $request->get('gender')) {
+        if ($gender = $request->input('gender')) {
             $query->where('gender', $gender);
         }
 
         $members = $query
+            // PERF FIX: withExists() adds a single correlated sub-select for
+            // the entire page, injecting `user_exists` as a boolean column.
+            // MemberResource reads $this->user_exists, eliminating the N+1
+            // $this->user()->exists() call that previously fired once per row.
+            ->withExists('user')
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($request->integer('per_page', 20));
 
         return response()->json([
             'data' => MemberResource::collection($members->items()),
@@ -60,7 +73,7 @@ class MemberController extends Controller
         $member = Member::create([
             ...$request->validated(),
             'branch_id' => $request->user()->branch_id,
-            'status' => $request->get('status', 'active'),
+            'status' => $request->input('status', 'active'),
             'is_baptised' => $request->boolean('is_baptised'),
         ]);
 
@@ -75,10 +88,9 @@ class MemberController extends Controller
     }
 
     // GET /api/members/{id}
-    public function show(Request $request, string $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        $member = Member::query()->withExists('user')->findOrFail($id);
 
         return response()->json(['data' => new MemberResource($member)]);
     }
@@ -86,9 +98,7 @@ class MemberController extends Controller
     // PUT /api/members/{id}
     public function update(UpdateMemberRequest $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
-
+        $member = Member::query()->findOrFail($id);
         $member->update($request->validated());
 
         activity()->causedBy($request->user())
@@ -104,9 +114,7 @@ class MemberController extends Controller
     // DELETE /api/members/{id}
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
-
+        $member = Member::query()->findOrFail($id);
         $name = $member->full_name;
         $member->delete();
 
@@ -116,20 +124,71 @@ class MemberController extends Controller
         return response()->json(['message' => 'Member deleted successfully.']);
     }
 
-    // GET /api/members/stats
-    public function stats(Request $request): JsonResponse
+    // GET /api/members/export
+    public function export(Request $request): StreamedResponse
     {
-        $branchId = $request->user()->branch_id;
+        $query = Member::query();
 
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                    ->orWhere('other_names', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'ilike', "%{$search}%")
+                    ->orWhere('member_number', 'ilike', "%{$search}%");
+            });
+        }
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+        if ($gender = $request->input('gender')) {
+            $query->where('gender', $gender);
+        }
+
+        $query->orderBy('first_name')->orderBy('last_name');
+        $filename = 'members-'.now()->format('Y-m-d').'.csv';
+
+        return new StreamedResponse(function () use ($query) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+            $writer->addRow(Row::fromValues([
+                'Member Number', 'First Name', 'Last Name', 'Other Names',
+                'Phone', 'Email', 'Gender', 'Status', 'Join Date',
+            ]));
+
+            $query->lazy()->each(function ($m) use ($writer) {
+                $writer->addRow(Row::fromValues([
+                    $m->member_number,
+                    $m->first_name,
+                    $m->last_name,
+                    $m->other_names,
+                    $m->phone,
+                    $m->email,
+                    $m->gender,
+                    $m->status,
+                    optional($m->join_date)->toDateString(),
+                ]));
+            });
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // GET /api/members/stats
+    public function stats(): JsonResponse
+    {
         return response()->json([
             'data' => [
-                'total' => Member::where('branch_id', $branchId)->count(),
-                'active' => Member::where('branch_id', $branchId)->where('status', 'active')->count(),
-                'inactive' => Member::where('branch_id', $branchId)->where('status', 'inactive')->count(),
-                'transferred' => Member::where('branch_id', $branchId)->where('status', 'transferred')->count(),
-                'male' => Member::where('branch_id', $branchId)->where('gender', 'male')->count(),
-                'female' => Member::where('branch_id', $branchId)->where('gender', 'female')->count(),
-                'new_this_month' => Member::where('branch_id', $branchId)
+                'total' => Member::query()->count(),
+                'active' => Member::query()->where('status', 'active')->count(),
+                'inactive' => Member::query()->where('status', 'inactive')->count(),
+                'transferred' => Member::query()->where('status', 'transferred')->count(),
+                'male' => Member::query()->where('gender', 'male')->count(),
+                'female' => Member::query()->where('gender', 'female')->count(),
+                'new_this_month' => Member::query()
                     ->whereMonth('created_at', now()->month)
                     ->whereYear('created_at', now()->year)
                     ->count(),
@@ -137,10 +196,22 @@ class MemberController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/members/{id}/giving
+     *
+     * HIGH-02 FIX: The `year` query parameter is validated before use.
+     * Previously `$request->get('year', ...)` accepted arbitrary values
+     * (year=0, year=99999, year=foobar) without any bounds check.
+     */
     public function giving(Request $request, string $id): JsonResponse
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)->findOrFail($id);
-        $year = $request->get('year', now()->format('Y'));
+        // HIGH-02 FIX: validate year before using it in date queries.
+        $request->validate([
+            'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        $member = Member::query()->findOrFail($id);
+        $year = $request->integer('year', (int) now()->format('Y'));
 
         $transactions = $member->transactions()
             ->where('type', 'income')
@@ -170,7 +241,7 @@ class MemberController extends Controller
                     'full_name' => $member->full_name,
                     'member_number' => $member->member_number,
                 ],
-                'year' => (int) $year,
+                'year' => $year,
                 'available_years' => $availableYears,
                 'total' => round($transactions->sum('amount'), 2),
                 'by_category' => $byCategory,
@@ -185,11 +256,19 @@ class MemberController extends Controller
         ]);
     }
 
-    public function givingStatement(Request $request, string $id)
+    /**
+     * GET /api/members/{id}/giving-statement
+     *
+     * HIGH-02 FIX: year parameter validated, consistent with giving().
+     */
+    public function givingStatement(Request $request, string $id): mixed
     {
-        $member = Member::where('branch_id', $request->user()->branch_id)
-            ->with('branch')->findOrFail($id);
-        $year = $request->get('year', now()->format('Y'));
+        $request->validate([
+            'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        $member = Member::query()->with('branch')->findOrFail($id);
+        $year = $request->integer('year', (int) now()->format('Y'));
 
         $transactions = $member->transactions()
             ->where('type', 'income')
@@ -216,5 +295,104 @@ class MemberController extends Controller
         ]);
 
         return $pdf->download("giving-statement-{$member->member_number}-{$year}.pdf");
+    }
+
+    public function promoteToLeader(Request $request, string $id): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+        $member = Member::query()->findOrFail($id);
+
+        $data = $request->validate([
+            'leadership_type' => ['required', 'in:cell,department'],
+            'target_id' => ['required', 'uuid'],
+            'email' => ['required', 'email', 'unique:users,email', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        if (User::where('member_id', $member->id)->exists()) {
+            return response()->json([
+                'message' => 'This member already has a user account. Edit their roles directly.',
+            ], 422);
+        }
+
+        $unitClass = $data['leadership_type'] === 'cell' ? Cell::class : Department::class;
+        $unit = $unitClass::query()->findOrFail($data['target_id']);
+
+        if ($unit->leader_user_id) {
+            return response()->json([
+                'message' => "This {$data['leadership_type']} already has a leader. Demote them first.",
+            ], 422);
+        }
+
+        $tempPassword = Str::password(12);
+        $roleName = $data['leadership_type'] === 'cell' ? 'cell_leader' : 'department_leader';
+
+        $user = DB::transaction(function () use ($member, $unit, $data, $tempPassword, $roleName, $branchId) {
+            $newUser = User::create([
+                'branch_id' => $branchId,
+                'name' => $data['name'] ?? trim("{$member->first_name} {$member->last_name}"),
+                'email' => $data['email'],
+                'password' => Hash::make($tempPassword),
+                'is_active' => true,
+                'must_change_password' => true,
+                'member_id' => $member->id,
+            ]);
+            $newUser->assignRole($roleName);
+            $unit->update(['leader_user_id' => $newUser->id]);
+
+            return $newUser;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Promoted member {$member->first_name} {$member->last_name} to {$roleName} of {$unit->name}");
+
+        return response()->json([
+            'message' => "{$member->first_name} promoted to {$roleName} of {$unit->name}.",
+            'data' => ['user_id' => $user->id, 'role' => $roleName, 'unit' => ['id' => $unit->id, 'name' => $unit->name]],
+            'temp_password' => $tempPassword,
+        ], 201);
+    }
+
+    public function createLogin(Request $request, string $id): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+        $member = Member::query()->findOrFail($id);
+
+        $data = $request->validate([
+            'email' => ['required', 'email', 'unique:users,email', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        if (User::where('member_id', $member->id)->exists()) {
+            return response()->json(['message' => 'This member already has a user account.'], 422);
+        }
+
+        $tempPassword = Str::password(12);
+
+        $user = DB::transaction(function () use ($member, $data, $tempPassword, $branchId) {
+            $newUser = User::create([
+                'branch_id' => $branchId,
+                'name' => $data['name'] ?? trim("{$member->first_name} {$member->last_name}"),
+                'email' => $data['email'],
+                'password' => Hash::make($tempPassword),
+                'is_active' => true,
+                'must_change_password' => true,
+                'member_id' => $member->id,
+            ]);
+            $newUser->assignRole('member');
+
+            return $newUser;
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($user)
+            ->log("Created member-portal login for {$member->first_name} {$member->last_name}");
+
+        return response()->json([
+            'message' => "Login created for {$member->first_name}.",
+            'data' => ['user_id' => $user->id, 'role' => 'member'],
+            'temp_password' => $tempPassword,
+        ], 201);
     }
 }

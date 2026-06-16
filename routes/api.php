@@ -3,21 +3,42 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BirthdayController;
+use App\Http\Controllers\Api\CellController;
 use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\MemberController;
+use App\Http\Controllers\Api\MemberSubmissionController;
+use App\Http\Controllers\Api\MemberSubmissionWebhookController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\PortalController;
+use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\ServiceReminderController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
+use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('reset-password', [AuthController::class, 'resetPassword']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+// ─────────────────────────────────────────────────────────────────
+// PUBLIC WEBHOOKS (no Sanctum auth — uses shared secret instead)
+//
+// Throttled per-IP to deter abuse: 60 submissions/minute is generous
+// for legitimate form use, restrictive for spam.
+// ─────────────────────────────────────────────────────────────────
+Route::post('/webhooks/member-submission',
+    [MemberSubmissionWebhookController::class, 'store']
+)->middleware('throttle:60,1');
+
+Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(function () {
 
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
@@ -33,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('members/{id}/giving', [MemberController::class, 'giving']);
         Route::get('members/{id}/giving-statement', [MemberController::class, 'givingStatement']);
         Route::get('members', [MemberController::class, 'index']);
+        Route::get('members/export', [MemberController::class, 'export'])->middleware('permission:export members');
         Route::get('members/{id}', [MemberController::class, 'show']);
     });
     Route::middleware('permission:create members')->post('members', [MemberController::class, 'store']);
@@ -72,6 +94,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:create departments')->post('departments', [DepartmentController::class, 'store']);
     Route::middleware('permission:edit departments')->put('departments/{id}', [DepartmentController::class, 'update']);
     Route::middleware('permission:delete departments')->delete('departments/{id}', [DepartmentController::class, 'destroy']);
+
+    // Cells (classes) — a member belongs to exactly one cell.
+    Route::middleware('permission:view cells')->group(function () {
+        Route::get('cells', [CellController::class, 'index']);
+        Route::get('cells/{id}', [CellController::class, 'show']);
+    });
+    Route::middleware('permission:create cells')->post('cells', [CellController::class, 'store']);
+    Route::middleware('permission:edit cells')->put('cells/{id}', [CellController::class, 'update']);
+    Route::middleware('permission:delete cells')->delete('cells/{id}', [CellController::class, 'destroy']);
+    Route::middleware('permission:edit cells')->group(function () {
+        Route::post('cells/{id}/members/{memberId}', [CellController::class, 'assignMember']);
+        Route::delete('cells/{id}/members/{memberId}', [CellController::class, 'unassignMember']);
+    });
+    Route::middleware('permission:message own department')->post('departments/{id}/message', [DepartmentController::class, 'message']);
+    Route::middleware('permission:message own cell')->post('cells/{id}/message', [CellController::class, 'message']);
     Route::middleware('permission:manage department members')->group(function () {
         Route::post('departments/{id}/members', [DepartmentController::class, 'addMember']);
         Route::delete('departments/{id}/members/{memberId}', [DepartmentController::class, 'removeMember']);
@@ -94,7 +131,67 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('finance/stats', [FinanceController::class, 'stats']);
         Route::get('finance/categories', [FinanceController::class, 'categories']);
         Route::get('finance/transactions', [FinanceController::class, 'index']);
+        Route::get('finance/transactions/export', [FinanceController::class, 'export'])->middleware('permission:export finance');
+        Route::get('finance/reports/ledger', [FinanceController::class, 'ledger'])->middleware('permission:export finance');
         Route::get('finance/transactions/{id}', [FinanceController::class, 'show']);
+
+        // REPORTS — read-only aggregations for council monthly review.
+        // Each report is a discrete endpoint; aggregation logic lives
+        // in ReportsController. Same 'view finance' permission as other
+        // finance read endpoints. New reports get added to this group.
+        Route::get('reports/finance/income-by-category', [ReportsController::class, 'incomeByCategory']);
+        Route::get('reports/finance/expense-by-category', [ReportsController::class, 'expenseByCategory']);
+        Route::get('reports/attendance/trends', [ReportsController::class, 'attendanceTrends']);
+        Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
+
+        // Report exports — PDF + CSV downloads (gated by 'export reports')
+        Route::get('reports/finance/income-by-category/export-pdf', [ReportsController::class, 'incomeByCategoryPdf'])->middleware('permission:export reports');
+        Route::get('reports/finance/income-by-category/export-csv', [ReportsController::class, 'incomeByCategoryCsv'])->middleware('permission:export reports');
+        Route::get('reports/finance/expense-by-category/export-pdf', [ReportsController::class, 'expenseByCategoryPdf'])->middleware('permission:export reports');
+        Route::get('reports/finance/expense-by-category/export-csv', [ReportsController::class, 'expenseByCategoryCsv'])->middleware('permission:export reports');
+        Route::get('reports/attendance/trends/export-pdf', [ReportsController::class, 'attendanceTrendsPdf'])->middleware('permission:export reports');
+        Route::get('reports/attendance/trends/export-csv', [ReportsController::class, 'attendanceTrendsCsv'])->middleware('permission:export reports');
+        Route::get('reports/cells/comparison/export-pdf', [ReportsController::class, 'cellComparisonPdf'])->middleware('permission:export reports');
+        Route::get('reports/cells/comparison/export-csv', [ReportsController::class, 'cellComparisonCsv'])->middleware('permission:export reports');
+
+        // Birthday messages
+        Route::get('birthdays/settings', [BirthdayController::class, 'showSettings'])
+            ->middleware('permission:view birthday messages');
+        Route::put('birthdays/settings', [BirthdayController::class, 'updateSettings'])
+            ->middleware('permission:manage birthday messages');
+        Route::post('birthdays/preview', [BirthdayController::class, 'preview'])
+            ->middleware('permission:view birthday messages');
+        Route::get('birthdays/upcoming', [BirthdayController::class, 'upcoming'])
+            ->middleware('permission:view birthday messages');
+        Route::get('birthdays/log', [BirthdayController::class, 'log'])
+            ->middleware('permission:manage birthday messages');
+
+        // Per-service-type SMS reminders (e.g. Sunday-service Saturday-evening
+        // reminder, midweek-service Wednesday-morning reminder). Scheduled
+        // command (reminders:send) does the actual sending; these endpoints
+        // are the admin UI surface.
+        Route::get('reminders/settings', [ServiceReminderController::class, 'index'])
+            ->middleware('permission:view service reminders');
+        Route::put('reminders/settings/{serviceTypeId}', [ServiceReminderController::class, 'upsert'])
+            ->middleware('permission:manage service reminders');
+        Route::post('reminders/preview', [ServiceReminderController::class, 'preview'])
+            ->middleware('permission:view service reminders');
+        Route::get('reminders/upcoming', [ServiceReminderController::class, 'upcoming'])
+            ->middleware('permission:view service reminders');
+        Route::get('reminders/log', [ServiceReminderController::class, 'log'])
+            ->middleware('permission:manage service reminders');
+
+        // Member submissions queue — admin review of self-service form
+        // responses. Each submission must be explicitly approved before it
+        // becomes a Member (and thus eligible for SMS dispatch).
+        Route::get('submissions', [MemberSubmissionController::class, 'index'])
+            ->middleware('permission:view member submissions');
+        Route::get('submissions/{id}', [MemberSubmissionController::class, 'show'])
+            ->middleware('permission:view member submissions');
+        Route::post('submissions/{id}/approve', [MemberSubmissionController::class, 'approve'])
+            ->middleware('permission:manage member submissions');
+        Route::post('submissions/{id}/reject', [MemberSubmissionController::class, 'reject'])
+            ->middleware('permission:manage member submissions');
     });
     Route::middleware('permission:create transactions')->post('finance/transactions', [FinanceController::class, 'store']);
     Route::middleware('permission:edit transactions')->put('finance/transactions/{id}', [FinanceController::class, 'update']);
@@ -119,10 +216,32 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('users/{id}', [UserController::class, 'show']);
         Route::put('users/{id}', [UserController::class, 'update']);
         Route::delete('users/{id}', [UserController::class, 'destroy']);
+
+        // Member linking — for the User <-> Member architecture.
+        Route::post('users/{id}/link-member', [UserController::class, 'linkMember']);
+        Route::post('users/{id}/create-and-link', [UserController::class, 'createAndLinkMember']);
+        Route::delete('users/{id}/link-member', [UserController::class, 'unlinkMember']);
+
+        // Branch-level system settings: follow-up SMS templates, delay, toggle.
+        // Same admin gate as user management ('manage users').
+        Route::get('settings/follow-up', [SettingsController::class, 'show']);
+        Route::put('settings/follow-up', [SettingsController::class, 'updateFollowUp']);
+
+        // Promote a Member to leadership of a specific cell or department.
+        // Atomic: creates User + assigns role + links member + sets unit leader.
+        Route::post('members/{id}/promote-to-leader', [MemberController::class, 'promoteToLeader']);
+        Route::post('members/{id}/create-login', [MemberController::class, 'createLogin']);
     });
 
     // AUDIT
     Route::middleware('permission:view audit log')->group(function () {
         Route::get('audit', [AuditController::class, 'index']);
+    });
+
+    // MEMBER PORTAL — scoped to the authenticated member's own data
+    Route::middleware('permission:access portal')->prefix('portal')->group(function () {
+        Route::get('profile', [PortalController::class, 'profile']);
+        Route::get('giving', [PortalController::class, 'giving']);
+        Route::get('attendance', [PortalController::class, 'attendance']);
     });
 });

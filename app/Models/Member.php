@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,14 +11,14 @@ use Illuminate\Support\Facades\DB;
 
 class Member extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use BelongsToBranch, HasFactory, HasUuids, SoftDeletes;
 
     protected $keyType = 'string';
 
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'member_number', 'first_name', 'last_name',
+        'branch_id', 'cell_id', 'member_number', 'first_name', 'last_name',
         'other_names', 'gender', 'date_of_birth', 'phone', 'email',
         'address', 'occupation', 'marital_status', 'join_date',
         'is_baptised', 'baptism_date', 'status', 'photo_path', 'notes',
@@ -46,7 +47,11 @@ class Member extends Model
 
                 DB::transaction(function () use ($member, $year) {
                     // Acquire row lock on the highest-numbered member this year
-                    $last = static::where('member_number', 'like', "WIS-{$year}-%")
+                    // withTrashed: soft-deleted members KEEP their member_number,
+                    // so we must consider them when generating the next number to
+                    // avoid collisions with the (still present, soft-deleted) row.
+                    $last = static::withTrashed()
+                        ->where('member_number', 'like', "WIS-{$year}-%")
                         ->orderByDesc('member_number')
                         ->lockForUpdate()
                         ->first();
@@ -61,14 +66,25 @@ class Member extends Model
         });
     }
 
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
-    }
-
     public function children()
     {
         return $this->hasMany(Children::class, 'guardian_member_id');
+    }
+
+    public function cell()
+    {
+        // A member belongs to exactly ONE cell (or none) via cell_id.
+        return $this->belongsTo(Cell::class);
+    }
+
+    /**
+     * The User account linked to this Member, if any.
+     * At most one User per Member (enforced by UNIQUE constraint on
+     * users.member_id). NULL for members who don't have a login.
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class);
     }
 
     public function departments()
@@ -85,7 +101,7 @@ class Member extends Model
 
     public function getFullNameAttribute(): string
     {
-        return trim("{$this->first_name} {$this->other_names} {$this->last_name}");
+        return trim(preg_replace('/\\s+/', ' ', "{$this->first_name} {$this->other_names} {$this->last_name}"));
     }
 
     public function getAgeAttribute(): ?int

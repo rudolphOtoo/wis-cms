@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Transaction extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use BelongsToBranch, HasFactory, HasUuids, SoftDeletes;
 
     protected $keyType = 'string';
 
@@ -26,11 +27,6 @@ class Transaction extends Model
             'amount' => 'decimal:2',
             'transaction_date' => 'date',
         ];
-    }
-
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
     }
 
     public function category()

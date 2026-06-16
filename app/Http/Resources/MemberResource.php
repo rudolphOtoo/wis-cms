@@ -31,6 +31,12 @@ class MemberResource extends JsonResource
             'photo_path' => $this->photo_path,
             'notes' => $this->notes,
             'branch_id' => $this->branch_id,
+            // Whether this Member has a linked User account (login).
+            // Used by the UI to decide whether to show 'Promote to Leader'.
+            // Populated by ->withExists('user') on the query; falls back to
+            // a single exists() query when the resource is used for a single
+            // model that was not loaded through the list query.
+            'has_user_account' => $this->user_exists ?? $this->user()->exists(),
             'created_at' => $this->created_at->format('Y-m-d'),
         ];
     }

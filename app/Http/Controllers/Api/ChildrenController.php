@@ -14,8 +14,8 @@ class ChildrenController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        // Branch scoping handled by BelongsToBranch trait on Children.
         $query = Children::query()
-            ->where('branch_id', $request->user()->branch_id)
             ->with('guardian');
 
         if ($search = $request->get('search')) {
@@ -70,17 +70,16 @@ class ChildrenController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $child = Children::where('branch_id', $request->user()->branch_id)
-            ->with('guardian')
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $child = Children::with('guardian')->findOrFail($id);
 
         return response()->json(['data' => new ChildrenResource($child)]);
     }
 
     public function update(UpdateChildrenRequest $request, string $id): JsonResponse
     {
-        $child = Children::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $child = Children::findOrFail($id);
 
         $child->update($request->validated());
 
@@ -96,8 +95,8 @@ class ChildrenController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $child = Children::where('branch_id', $request->user()->branch_id)
-            ->findOrFail($id);
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $child = Children::findOrFail($id);
 
         $name = $child->full_name;
         $child->delete();
@@ -110,8 +109,8 @@ class ChildrenController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $branchId = $request->user()->branch_id;
-        $all = Children::where('branch_id', $branchId)->get();
+        // Branch scoping handled by BelongsToBranch trait on Children.
+        $all = Children::all();
 
         return response()->json([
             'data' => [

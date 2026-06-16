@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             ServiceTypeSeeder::class,
             FinanceCategorySeeder::class,
             SuperAdminSeeder::class,
+            CellSeeder::class,
         ]);
     }
 }

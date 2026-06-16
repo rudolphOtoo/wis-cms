@@ -29,3 +29,7 @@ docker-compose.override.yml
 npm-debug.log
 yarn-error.log
 /.fleet
+# Vim swap files
+*.swp
+*.swo
+*~

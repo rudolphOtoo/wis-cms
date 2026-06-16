@@ -15,12 +15,16 @@ class Branch extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'name', 'location', 'address', 'phone', 'email', 'is_active',
+        'name', 'location', 'address', 'phone', 'email', 'is_active', 'follow_up_enabled', 'follow_up_delay_hours', 'follow_up_present_template', 'follow_up_absent_template',
     ];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            'is_active' => 'boolean',
+            'follow_up_enabled' => 'boolean',
+            'follow_up_delay_hours' => 'integer',
+        ];
     }
 
     public function users()

@@ -18,6 +18,7 @@ class UserResource extends JsonResource
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name'),
             'last_login' => $this->last_login_at?->diffForHumans(),
+            'must_change_password' => (bool) $this->must_change_password,
         ];
     }
 }
