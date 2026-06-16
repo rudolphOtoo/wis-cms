@@ -30,9 +30,9 @@ return new class extends Migration
     {
         DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
-        DB::statement('CREATE INDEX members_first_name_trgm ON members USING GIN (first_name gin_trgm_ops)');
-        DB::statement('CREATE INDEX members_last_name_trgm  ON members USING GIN (last_name  gin_trgm_ops)');
-        DB::statement('CREATE INDEX members_phone_trgm      ON members USING GIN (phone      gin_trgm_ops)');
+        DB::statement('CREATE INDEX IF NOT EXISTS members_first_name_trgm ON members USING GIN (first_name gin_trgm_ops)');
+        DB::statement('CREATE INDEX IF NOT EXISTS members_last_name_trgm  ON members USING GIN (last_name  gin_trgm_ops)');
+        DB::statement('CREATE INDEX IF NOT EXISTS members_phone_trgm      ON members USING GIN (phone      gin_trgm_ops)');
     }
 
     public function down(): void

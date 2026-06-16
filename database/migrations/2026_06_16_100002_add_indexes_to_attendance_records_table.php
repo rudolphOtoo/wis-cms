@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 /**
  * PERF-03: Add missing indexes to attendance_records.
@@ -28,22 +27,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('attendance_records', function (Blueprint $table) {
-            $table->index('session_id');
-            $table->index('member_id');
-            $table->index('child_id');
-            // The hot path for adult_count / children_count and stats queries.
-            $table->index(['session_id', 'is_present'], 'ar_session_present_idx');
-        });
+        DB::statement('CREATE INDEX IF NOT EXISTS attendance_records_session_id_index ON attendance_records (session_id)');
+        DB::statement('CREATE INDEX IF NOT EXISTS attendance_records_member_id_index ON attendance_records (member_id)');
+        DB::statement('CREATE INDEX IF NOT EXISTS attendance_records_child_id_index   ON attendance_records (child_id)');
+        // Composite for adult_count / children_count and stats aggregation.
+        DB::statement('CREATE INDEX IF NOT EXISTS ar_session_present_idx ON attendance_records (session_id, is_present)');
     }
 
     public function down(): void
     {
-        Schema::table('attendance_records', function (Blueprint $table) {
-            $table->dropIndex(['session_id']);
-            $table->dropIndex(['member_id']);
-            $table->dropIndex(['child_id']);
-            $table->dropIndex('ar_session_present_idx');
-        });
+        DB::statement('DROP INDEX IF EXISTS attendance_records_session_id_index');
+        DB::statement('DROP INDEX IF EXISTS attendance_records_member_id_index');
+        DB::statement('DROP INDEX IF EXISTS attendance_records_child_id_index');
+        DB::statement('DROP INDEX IF EXISTS ar_session_present_idx');
     }
 };
