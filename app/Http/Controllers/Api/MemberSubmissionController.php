@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyAdminOfApprovalJob;
 use App\Models\Cell;
 use App\Models\Member;
 use App\Models\MemberSubmission;
@@ -11,23 +14,24 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Admin-side management of member_submissions queue.
+ * Admin-side management of the member_submissions review queue.
  *
- * Submissions arrive via the public webhook (untrusted input)
- * and accumulate as 'pending'. Admin reviews each:
+ * Submissions arrive via the public webhook (untrusted input) and
+ * accumulate as 'pending'. An authorised admin reviews each one:
  *   - approve: promote to Member, optionally assign a cell
- *   - reject:  mark rejected, optionally with notes
+ *   - reject:  mark rejected with optional notes
  *
- * Approved members are eligible for SMS dispatch and all the
- * standard member workflows.
+ * Approved members become eligible for SMS dispatch, cell assignment,
+ * reports, and all other standard member workflows.
  */
 class MemberSubmissionController extends Controller
 {
     /**
      * GET /api/submissions
-     * List submissions filtered by status (default pending).
-     * Each row includes a duplicate-detection hint: any existing
-     * member with the same phone in the same branch.
+     *
+     * List submissions filtered by status (defaults to 'pending').
+     * Each row includes a duplicate-detection hint: any existing Member
+     * in the same branch whose phone matches the submission.
      */
     public function index(Request $request): JsonResponse
     {
@@ -49,8 +53,7 @@ class MemberSubmissionController extends Controller
 
         $paginated = $query->paginate(15);
 
-        // Build duplicate-detection map: phone → existing Member info.
-        // Single query keyed on the phones in this page of submissions.
+        // Build a duplicate-detection map for this page in a single query.
         $phones = $paginated->pluck('phone')->unique()->values();
         $existingMembers = Member::query()
             ->where('branch_id', $branchId)
@@ -58,32 +61,35 @@ class MemberSubmissionController extends Controller
             ->get(['id', 'first_name', 'last_name', 'phone'])
             ->keyBy('phone');
 
-        $data = $paginated->getCollection()->map(function ($sub) use ($existingMembers) {
-            $existing = $existingMembers->get($sub->phone);
+        $data = $paginated->getCollection()->map(
+            function (MemberSubmission $sub) use ($existingMembers): array {
+                $existing = $existingMembers->get($sub->phone);
 
-            return [
-                'id' => $sub->id,
-                'first_name' => $sub->first_name,
-                'last_name' => $sub->last_name,
-                'full_name' => $sub->full_name,
-                'phone' => $sub->phone,
-                'email' => $sub->email,
-                'gender' => $sub->gender,
-                'date_of_birth' => $sub->date_of_birth?->toDateString(),
-                'address' => $sub->address,
-                'occupation' => $sub->occupation,
-                'marital_status' => $sub->marital_status,
-                'cell_name_submitted' => $sub->cell_name,
-                'status' => $sub->status,
-                'submitted_at' => $sub->submitted_at,
-                'reviewed_at' => $sub->reviewed_at,
-                'duplicate_member' => $existing ? [
-                    'id' => $existing->id,
-                    'name' => trim("{$existing->first_name} {$existing->last_name}"),
-                    'phone' => $existing->phone,
-                ] : null,
-            ];
-        });
+                return [
+                    'id' => $sub->id,
+                    'first_name' => $sub->first_name,
+                    'last_name' => $sub->last_name,
+                    'full_name' => $sub->full_name,
+                    'phone' => $sub->phone,
+                    'email' => $sub->email,
+                    'gender' => $sub->gender,
+                    'date_of_birth' => $sub->date_of_birth?->toDateString(),
+                    'address' => $sub->address,
+                    'occupation' => $sub->occupation,
+                    'marital_status' => $sub->marital_status,
+                    'cell_name_submitted' => $sub->cell_name,
+                    'status' => $sub->status,
+                    'source' => $sub->source,
+                    'submitted_at' => $sub->submitted_at,
+                    'reviewed_at' => $sub->reviewed_at,
+                    'duplicate_member' => $existing ? [
+                        'id' => $existing->id,
+                        'name' => trim("{$existing->first_name} {$existing->last_name}"),
+                        'phone' => $existing->phone,
+                    ] : null,
+                ];
+            }
+        );
 
         return response()->json([
             'data' => $data,
@@ -95,7 +101,7 @@ class MemberSubmissionController extends Controller
                 'per_page' => $paginated->perPage(),
                 'pending_count' => MemberSubmission::query()
                     ->where('branch_id', $branchId)
-                    ->where('status', 'pending')
+                    ->where('status', MemberSubmission::STATUS_PENDING)
                     ->count(),
             ],
         ]);
@@ -103,8 +109,10 @@ class MemberSubmissionController extends Controller
 
     /**
      * GET /api/submissions/{id}
-     * Full detail of one submission including raw payload + cells
-     * available for assignment.
+     *
+     * Full detail for a single submission, including raw payload,
+     * duplicate-member hint, and the list of active cells available
+     * for assignment during approval.
      */
     public function show(Request $request, string $id): JsonResponse
     {
@@ -136,6 +144,7 @@ class MemberSubmissionController extends Controller
                 'marital_status' => $submission->marital_status,
                 'cell_name_submitted' => $submission->cell_name,
                 'status' => $submission->status,
+                'source' => $submission->source,
                 'submitted_at' => $submission->submitted_at,
                 'reviewed_at' => $submission->reviewed_at,
                 'reviewed_by' => $submission->reviewedBy
@@ -163,13 +172,24 @@ class MemberSubmissionController extends Controller
 
     /**
      * POST /api/submissions/{id}/approve
-     * Promote to a Member. Optionally assign a cell + add notes.
+     *
+     * Promotes a pending submission to a real Member record.
+     *
+     * Conflict guard: if an ACTIVE Member with the same phone already
+     * exists in the branch, this endpoint returns HTTP 409 with the
+     * conflicting record. The admin client must re-submit with
+     * `force_overwrite: true` to proceed. This prevents silent data
+     * overwrites on existing congregants.
+     *
+     * On success, two background jobs are dispatched:
+     *   - NotifyAdminOfApprovalJob: SMS alert to all branch admins.
      */
     public function approve(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'cell_id' => ['nullable', 'uuid', 'exists:cells,id'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'force_overwrite' => ['nullable', 'boolean'],
         ]);
 
         $submission = MemberSubmission::where('branch_id', $request->user()->branch_id)
@@ -178,19 +198,47 @@ class MemberSubmissionController extends Controller
 
         if ($submission->status !== MemberSubmission::STATUS_PENDING) {
             return response()->json([
-                'message' => "Submission already {$submission->status}.",
+                'message' => "Submission is already {$submission->status} and cannot be approved again.",
             ], 422);
         }
 
+        // ── Conflict guard ────────────────────────────────────────────────────
+        // Detect an active Member whose phone matches this submission. An admin
+        // must explicitly acknowledge the overwrite by sending force_overwrite=true.
+        // This surfaces data collisions rather than silently clobbering a real member.
+        $existingMember = $submission->existingMemberWithSamePhone();
+
+        if ($existingMember && $existingMember->status === 'active' && ! ($validated['force_overwrite'] ?? false)) {
+            return response()->json([
+                'message' => 'An active member with this phone number already exists. '
+                    .'Send force_overwrite: true to update their record with this submission\'s data.',
+                'existing_member' => [
+                    'id' => $existingMember->id,
+                    'name' => $existingMember->full_name,
+                    'phone' => $existingMember->phone,
+                    'status' => $existingMember->status,
+                ],
+                'requires_confirmation' => true,
+            ], 409);
+        }
+
+        // ── Promote (runs inside DB::transaction) ─────────────────────────────
         $member = $submission->promote(
             $request->user(),
             $validated['cell_id'] ?? null,
             $validated['notes'] ?? null,
         );
 
-        activity()->causedBy($request->user())
+        // ── Audit log ─────────────────────────────────────────────────────────
+        activity()
+            ->causedBy($request->user())
             ->performedOn($submission)
             ->log("Approved member submission for {$submission->full_name}");
+
+        // ── Async notifications ───────────────────────────────────────────────
+        // Both jobs are fire-and-forget. Failures are retried by the queue
+        // worker and do not affect the HTTP response to the admin.
+        NotifyAdminOfApprovalJob::dispatch($submission->id, $member->id);
 
         return response()->json([
             'message' => 'Submission approved and promoted to member.',
@@ -208,7 +256,8 @@ class MemberSubmissionController extends Controller
 
     /**
      * POST /api/submissions/{id}/reject
-     * Mark rejected with optional notes.
+     *
+     * Mark a pending submission as rejected with optional admin notes.
      */
     public function reject(Request $request, string $id): JsonResponse
     {
@@ -222,13 +271,14 @@ class MemberSubmissionController extends Controller
 
         if ($submission->status !== MemberSubmission::STATUS_PENDING) {
             return response()->json([
-                'message' => "Submission already {$submission->status}.",
+                'message' => "Submission is already {$submission->status} and cannot be rejected again.",
             ], 422);
         }
 
         $submission->reject($request->user(), $validated['notes'] ?? null);
 
-        activity()->causedBy($request->user())
+        activity()
+            ->causedBy($request->user())
             ->performedOn($submission)
             ->log("Rejected member submission for {$submission->full_name}");
 

@@ -205,33 +205,67 @@ class MemberSubmissionTest extends TestCase
         $this->assertSame('active', $member->status);
     }
 
-    public function test_approve_upserts_when_phone_matches_existing_member(): void
+    public function test_approve_rejects_with_409_when_phone_matches_existing_active_member(): void
     {
-        // Existing member with the same phone, OLD data
-        $existing = Member::create([
+        // Existing member with the same phone — conflict guard should fire.
+        Member::create([
             'branch_id' => $this->branch->id,
             'first_name' => 'Old', 'last_name' => 'Name', 'gender' => 'male',
             'phone' => '0241111111', 'status' => 'active',
         ]);
 
-        // Submission with NEW data, same phone
         $sub = MemberSubmission::create([
             'branch_id' => $this->branch->id,
             'first_name' => 'New', 'last_name' => 'Name', 'phone' => '0241111111',
             'gender' => 'male', 'status' => 'pending', 'submitted_at' => now(),
         ]);
 
+        // Without force_overwrite: 409 conflict response
         $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken())
             ->postJson("/api/submissions/{$sub->id}/approve");
 
+        $response->assertStatus(409);
+        $response->assertJsonPath('requires_confirmation', true);
+        $response->assertJsonStructure([
+            'message',
+            'existing_member' => ['id', 'name', 'phone', 'status'],
+            'requires_confirmation',
+        ]);
+
+        // Submission should still be pending (no silent promotion)
+        $sub->refresh();
+        $this->assertSame('pending', $sub->status);
+    }
+
+    public function test_approve_upserts_when_force_overwrite_is_true(): void
+    {
+        // Same setup: existing member with the same phone
+        $existing = Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'Old', 'last_name' => 'Name', 'gender' => 'male',
+            'phone' => '0241111111', 'status' => 'active',
+        ]);
+
+        $sub = MemberSubmission::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'New', 'last_name' => 'Name', 'phone' => '0241111111',
+            'gender' => 'male', 'status' => 'pending', 'submitted_at' => now(),
+        ]);
+
+        // With force_overwrite=true: should succeed and upsert
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken())
+            ->postJson("/api/submissions/{$sub->id}/approve", [
+                'force_overwrite' => true,
+            ]);
+
         $response->assertStatus(200);
 
-        // Approval should UPDATE the existing member, not create a new one
+        // Exactly one Member row with this phone (UPDATED, not duplicated)
         $this->assertSame(1, Member::where('phone', '0241111111')->count());
 
         $existing->refresh();
         $this->assertSame('New', $existing->first_name,
-            'Existing member should be UPDATED with submission data');
+            'Existing member should be UPDATED with submission data when force_overwrite is true');
 
         $sub->refresh();
         $this->assertSame($existing->id, $sub->approved_member_id);
@@ -255,7 +289,7 @@ class MemberSubmissionTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken())
             ->postJson("/api/submissions/{$sub->id}/approve");
         $response->assertStatus(422);
-        $response->assertJsonPath('message', 'Submission already approved.');
+        $response->assertJsonPath('message', 'Submission is already approved and cannot be approved again.');
     }
 
     // ──────────────────────────────────────────────────────

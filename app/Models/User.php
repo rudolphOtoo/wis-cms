@@ -18,7 +18,7 @@ class User extends Authenticatable
     public $incrementing = false;
 
     protected $fillable = [
-        'name', 'email', 'password', 'branch_id', 'member_id', 'is_active', 'must_change_password',
+        'name', 'email', 'phone', 'password', 'branch_id', 'member_id', 'is_active', 'must_change_password',
     ];
 
     protected $hidden = ['password', 'remember_token'];
