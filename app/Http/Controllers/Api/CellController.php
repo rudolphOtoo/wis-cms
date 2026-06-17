@@ -1,13 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cell\CellMessageRequest;
+use App\Http\Requests\Cell\StoreCellRequest;
+use App\Http\Requests\Cell\UpdateCellRequest;
 use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Cell;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +25,13 @@ class CellController extends Controller
      * cell leadership is a pointer (leader_user_id) for now, not a
      * scoped login role — so no per-leader filtering here yet.
      */
-    protected function scopedQuery(Request $request)
+    protected function scopedQuery(Request $request): Builder
     {
         $user = $request->user();
-        // Branch scoping handled by BelongsToBranch trait on Cell.
         $query = Cell::query();
+
         $seesAll = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+
         if (! $seesAll && $user->hasRole('cell_leader')) {
             $query->where('leader_user_id', $user->id);
         }
@@ -44,14 +51,9 @@ class CellController extends Controller
         return response()->json(['data' => $cells]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreCellRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'description' => ['nullable', 'string'],
-            'leader_user_id' => ['nullable', 'uuid', 'exists:users,id'],
-            'is_active' => ['boolean'],
-        ]);
+        $data = $request->validated();
 
         $cell = Cell::create([
             ...$data,
@@ -79,16 +81,10 @@ class CellController extends Controller
         return response()->json(['data' => $this->shape($cell, withMembers: true)]);
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateCellRequest $request, string $id): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
-
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'description' => ['nullable', 'string'],
-            'leader_user_id' => ['nullable', 'uuid', 'exists:users,id'],
-            'is_active' => ['boolean'],
-        ]);
+        $data = $request->validated();
 
         $cell->update($data);
 
@@ -122,8 +118,6 @@ class CellController extends Controller
     public function assignMember(Request $request, string $id, string $memberId): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
-
-        // Branch scoping handled by BelongsToBranch trait on Member.
         $member = Member::findOrFail($memberId);
 
         $member->update(['cell_id' => $cell->id]);
@@ -141,8 +135,6 @@ class CellController extends Controller
     public function unassignMember(Request $request, string $id, string $memberId): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
-
-        // Branch scoping handled by BelongsToBranch trait on Member.
         $member = Member::where('cell_id', $cell->id)->findOrFail($memberId);
 
         $member->update(['cell_id' => null]);
@@ -156,6 +148,9 @@ class CellController extends Controller
         ]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function shape(Cell $cell, bool $withMembers = false): array
     {
         $out = [
@@ -188,34 +183,27 @@ class CellController extends Controller
     /**
      * Send a broadcast message to all members of this cell.
      *
-     * Permission: cell_leader gets 'message own cell'; admins
-     * bypass via the route middleware. scopedQuery (which is
-     * ownership-aware after the Phase 2 fix) ensures a cell_leader
-     * can only target cells they actually lead - findOrFail returns
-     * 404 if they pass someone else's id.
+     * Permission: cell_leader gets 'message own cell'; admins bypass via
+     * the route middleware. scopedQuery ensures a cell_leader can only
+     * target cells they actually lead — findOrFail returns 404 otherwise.
      *
-     * Mirrors DepartmentController::message; the only differences
-     * are 'cell_id' instead of 'department_id' on the message row
-     * and 'recipient_group' = 'cell'.
+     * Mirrors DepartmentController::message; only differences are
+     * 'cell_id' vs 'department_id' and recipient_group = 'cell'.
      */
-    public function message(Request $request, string $id): JsonResponse
+    public function message(CellMessageRequest $request, string $id): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
-
-        $request->validate([
-            'subject' => ['nullable', 'string', 'max:200'],
-            'body' => ['required', 'string'],
-            'channel' => ['required', 'in:sms,email,both'],
-        ]);
+        $validated = $request->validated();
+        $channel = $validated['channel'];
 
         $recipients = $cell->members()
-            ->where(function ($q) use ($request) {
-                if ($request->channel === 'email') {
+            ->where(function ($q) use ($channel): void {
+                if ($channel === 'email') {
                     $q->whereNotNull('email')->where('email', '!=', '');
-                } elseif ($request->channel === 'sms') {
+                } elseif ($channel === 'sms') {
                     $q->whereNotNull('phone')->where('phone', '!=', '');
                 } else {
-                    $q->where(function ($inner) {
+                    $q->where(function ($inner): void {
                         $inner->whereNotNull('email')->where('email', '!=', '')
                             ->orWhereNotNull('phone')->where('phone', '!=', '');
                     });
@@ -229,13 +217,13 @@ class CellController extends Controller
             ], 422);
         }
 
-        $msg = DB::transaction(function () use ($request, $cell, $recipients) {
+        $msg = DB::transaction(function () use ($request, $validated, $cell, $recipients) {
             $message = Message::create([
                 'branch_id' => $request->user()->branch_id,
                 'sender_id' => $request->user()->id,
-                'subject' => $request->subject,
-                'body' => $request->body,
-                'channel' => $request->channel,
+                'subject' => $validated['subject'] ?? null,
+                'body' => $validated['body'],
+                'channel' => $validated['channel'],
                 'status' => 'sending',
                 'recipient_group' => 'cell',
                 'cell_id' => $cell->id,
