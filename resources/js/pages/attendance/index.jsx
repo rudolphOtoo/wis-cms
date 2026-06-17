@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { getAttendance, getAttendanceStats } from '../../api/attendance'
@@ -39,24 +39,36 @@ export default function AttendancePage() {
   const [page,     setPage]     = useState(1)
   const [meta,     setMeta]     = useState(null)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [aRes, sRes] = await Promise.all([
-        getAttendance({ page, per_page: 15 }),
-        getAttendanceStats(),
-      ])
-      setSessions(aRes.data.data)
-      setMeta(aRes.data.meta)
-      setStats(sRes.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    let mounted = true
+
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [aRes, sRes] = await Promise.all([
+          getAttendance({ page, per_page: 15 }, controller.signal),
+          getAttendanceStats(controller.signal),
+        ])
+        if (!mounted) return
+        setSessions(aRes.data.data)
+        setMeta(aRes.data.meta)
+        setStats(sRes.data.data)
+      } catch (err) {
+        if (!mounted || err?.code === 'ERR_CANCELED') return
+        console.error(err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      mounted = false
+      controller.abort()
     }
   }, [page])
-
-  useEffect(() => { fetchData() }, [fetchData])
 
   const wow = stats?.week_over_week_pct
   const insights = stats?.insights

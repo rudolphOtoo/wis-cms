@@ -107,33 +107,51 @@ export default function FinancePage() {
 
   const debouncedSearch = useDebounce(search, 400)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [tRes, sRes, cRes] = await Promise.all([
-        getTransactions({ search: debouncedSearch, type: typeFilter, category_id: catFilter, page, per_page: 15 }),
-        getFinanceStats(),
-        getFinanceCategories(),
-      ])
-      setTxns(tRes.data.data)
-      setMeta(tRes.data.meta)
-      setStats(sRes.data.data)
-      setCats(cRes.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, typeFilter, catFilter, page])
+  const [refreshKey, setRefreshKey] = useState(0)
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    const controller = new AbortController()
+    let mounted = true
+
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [tRes, sRes, cRes] = await Promise.all([
+          getTransactions(
+            { search: debouncedSearch, type: typeFilter, category_id: catFilter, page, per_page: 15 },
+            controller.signal,
+          ),
+          getFinanceStats(controller.signal),
+          getFinanceCategories(undefined, controller.signal),
+        ])
+        if (!mounted) return
+        setTxns(tRes.data.data)
+        setMeta(tRes.data.meta)
+        setStats(sRes.data.data)
+        setCats(cRes.data.data)
+      } catch (err) {
+        if (!mounted || err?.code === 'ERR_CANCELED') return
+        console.error(err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      mounted = false
+      controller.abort()
+    }
+  }, [debouncedSearch, typeFilter, catFilter, page, refreshKey])
 
   const handleDelete = async (txn) => {
     if (!confirm(`Delete this ${txn.type} of ${fmt(txn.amount)}?`)) return
     setDel(txn.id)
     try {
       await deleteTransaction(txn.id)
-      fetchData()
+      triggerRefresh()
     } catch {
       alert('Failed to delete transaction.')
     } finally {
