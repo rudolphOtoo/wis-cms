@@ -199,7 +199,7 @@ class DepartmentController extends Controller
 
         $request->validate([
             'subject' => ['nullable', 'string', 'max:200'],
-            'body' => ['required', 'string'],
+            'body' => ['required', 'string', 'max:1600'],
             'channel' => ['required', 'in:sms,email,both'],
         ]);
 
