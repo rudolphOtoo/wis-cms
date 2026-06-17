@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDepartment, getDeptMembers, addDeptMember, removeDeptMember } from '../../api/departments'
 import { getMembers } from '../../api/members'
+import MemberSearchPicker from '../../components/MemberSearchPicker'
 
 export default function DepartmentDetail() {
   const navigate    = useNavigate()
@@ -132,27 +133,27 @@ export default function DepartmentDetail() {
 
         {/* Add member panel */}
         {showAdd && (
-          <div className="px-6 py-4 flex items-center gap-3"
+          <div className="px-6 py-4"
                style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
-            <select className="input-field flex-1" value={selectedMember}
-                    onChange={e => setSelected(e.target.value)}>
-              <option value="">Select a member to add...</option>
-              {availableMembers.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.full_name} ({m.member_number})
-                </option>
-              ))}
-            </select>
-            <button onClick={handleAdd} disabled={!selectedMember || adding}
-                    className="btn-primary px-4 py-2.5 text-sm">
-              {adding ? 'Adding...' : 'Add'}
-            </button>
-            <button onClick={() => { setShowAdd(false); setSelected('') }}
-                    className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-                    style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',
-                            color:'#374151'}}>
-              Cancel
-            </button>
+            <div className="flex items-center gap-3">
+              <MemberSearchPicker
+                members={availableMembers}
+                value={selectedMember}
+                onChange={setSelected}
+                placeholder="Search members by name or number..."
+                disabled={adding}
+              />
+              <button onClick={handleAdd} disabled={!selectedMember || adding}
+                      className="btn-primary px-4 py-2.5 text-sm">
+                {adding ? 'Adding...' : 'Add'}
+              </button>
+              <button onClick={() => { setShowAdd(false); setSelected('') }}
+                      className="px-4 py-2.5 rounded-lg text-sm font-semibold"
+                      style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',
+                              color:'#374151'}}>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
