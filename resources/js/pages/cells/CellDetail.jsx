@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCell, assignToCell, unassignFromCell } from '../../api/cells'
 import { getMembers } from '../../api/members'
+import MemberSearchPicker from '../../components/MemberSearchPicker'
 
 export default function CellDetail() {
   const navigate = useNavigate()
@@ -136,14 +137,13 @@ export default function CellDetail() {
           <div className="px-6 py-4"
                style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
             <div className="flex items-center gap-3">
-              <select className="input-field flex-1" value={selected} onChange={e => setSelected(e.target.value)}>
-                <option value="">Select a member to assign...</option>
-                {availableMembers.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.member_number})
-                  </option>
-                ))}
-              </select>
+              <MemberSearchPicker
+                members={availableMembers}
+                value={selected}
+                onChange={setSelected}
+                placeholder="Search members by name or number..."
+                disabled={assigning}
+              />
               <button onClick={handleAssign} disabled={!selected || assigning} className="btn-primary px-4 py-2.5 text-sm">
                 {assigning ? 'Assigning...' : 'Assign'}
               </button>
