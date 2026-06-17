@@ -24,19 +24,27 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
-    Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:auth-password-reset');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:auth-password-reset');
 });
 
 // ─────────────────────────────────────────────────────────────────
 // PUBLIC WEBHOOKS (no Sanctum auth — uses shared secret instead)
 //
-// Throttled per-IP to deter abuse: 60 submissions/minute is generous
-// for legitimate form use, restrictive for spam.
+// Rate-limited by the named 'intake-webhook' limiter defined in
+// AppServiceProvider::configureRateLimiters():
+//   • 5 requests per IP per 10 minutes
+//   • 3 requests per phone number per day
+//
+// A human filling a form once needs exactly 1 hit. The limiter
+// is intentionally strict — a 429 here is far less costly than
+// a flooded submissions queue.
 // ─────────────────────────────────────────────────────────────────
 Route::post('/webhooks/member-submission',
     [MemberSubmissionWebhookController::class, 'store']
-)->middleware('throttle:60,1');
+)->middleware('throttle:intake-webhook');
 
 Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(function () {
 
