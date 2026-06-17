@@ -68,34 +68,53 @@ export default function MembersPage() {
     }
   }
 
-  const fetchMembers = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [membersRes, statsRes] = await Promise.all([
-        getMembers({ search: debouncedSearch, status: statusFilter, gender: genderFilter, page, per_page: 15 }),
-        getMemberStats(),
-      ])
-      setMembers(membersRes.data.data)
-      setMeta(membersRes.data.meta)
-      setStats(statsRes.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, statusFilter, genderFilter, page])
+  const [refreshKey, setRefreshKey] = useState(0)
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
-  // Single effect: fires when debouncedSearch settles (after 400 ms of silence)
-  // or when any other filter / page changes (immediately, because those are not
-  // debounced). This replaces the broken dual-effect pattern.
-  useEffect(() => { fetchMembers() }, [fetchMembers])
+  // AbortController cleanup: if the user navigates away while a request is
+  // in flight the signal fires, Axios throws CanceledError (code ERR_CANCELED),
+  // the catch guard swallows it silently, and the mounted flag prevents any
+  // state update from reaching an unmounted component.
+  useEffect(() => {
+    const controller = new AbortController()
+    let mounted = true
+
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [membersRes, statsRes] = await Promise.all([
+          getMembers(
+            { search: debouncedSearch, status: statusFilter, gender: genderFilter, page, per_page: 15 },
+            controller.signal,
+          ),
+          getMemberStats(controller.signal),
+        ])
+        if (!mounted) return
+        setMembers(membersRes.data.data)
+        setMeta(membersRes.data.meta)
+        setStats(statsRes.data.data)
+      } catch (err) {
+        if (!mounted || err?.code === 'ERR_CANCELED') return
+        console.error(err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      mounted = false
+      controller.abort()
+    }
+  }, [debouncedSearch, statusFilter, genderFilter, page, refreshKey])
 
   const handleDelete = async (member) => {
     if (!confirm(`Delete ${member.full_name}? This cannot be undone.`)) return
     setDeleting(member.id)
     try {
       await deleteMember(member.id)
-      fetchMembers()
+      triggerRefresh()
     } catch (err) {
       alert('Failed to delete member.')
     } finally {
