@@ -26,7 +26,16 @@ body {
 
 h1, h2, h3 { font-family: var(--font-display); }
 
-/* ===== Components — plain CSS for reliability ===== */
+/* ===== Fix #1 — Global keyboard focus ring (WCAG 2.4.7) ===== */
+
+*:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-surface-card),
+              0 0 0 4px var(--color-navy);
+}
+
+/* ===== Components ===== */
 
 .btn-primary {
   background-color: var(--color-navy);
@@ -35,16 +44,41 @@ h1, h2, h3 { font-family: var(--font-display); }
   border-radius: 0.5rem;
   font-weight: 600;
   font-size: 0.875rem;
-  transition: all 150ms;
+  transition: background-color 150ms, box-shadow 150ms;
   cursor: pointer;
   border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
 }
 .btn-primary:hover    { background-color: var(--color-navy-light); }
 .btn-primary:active   { background-color: var(--color-navy-dark); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-navy-dark),
+              0 0 0 4px var(--color-gold);
+}
+
+/* Fix #5 — reusable surface card replaces scattered inline cardBase objects */
+.btn-secondary {
+  background-color: white;
+  color: var(--color-navy);
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: background-color 150ms, box-shadow 150ms;
+  cursor: pointer;
+  border: 1px solid var(--color-surface-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.btn-secondary:hover    { background-color: #f8f9fc; }
+.btn-secondary:active   { background-color: #f2f3f6; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .input-field {
   width: 100%;
@@ -53,13 +87,21 @@ h1, h2, h3 { font-family: var(--font-display); }
   border: 1px solid var(--color-surface-border);
   background-color: white;
   font-size: 0.875rem;
-  transition: all 150ms;
+  transition: border-color 150ms, box-shadow 150ms;
   outline: none;
 }
 .input-field::placeholder { color: #9ca3af; }
 .input-field:focus {
   border-color: var(--color-navy);
-  box-shadow: 0 0 0 3px rgba(27,58,107,.1);
+  box-shadow: 0 0 0 3px rgba(27,58,107,.12);
+}
+
+.surface-card {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-surface-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(13,31,60,0.04),
+              0 4px 12px 0 rgba(13,31,60,0.04);
 }
 
 .card {
