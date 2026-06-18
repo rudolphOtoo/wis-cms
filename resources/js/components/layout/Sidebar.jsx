@@ -1,115 +1,362 @@
-
-import { NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
+import {
+  LayoutDashboard, Users, GraduationCap, ClipboardCheck,
+  Building2, Home, UserPlus, MessageSquare, Gift, Bell, FileText,
+  UserCog, ScrollText, MessageCircle,
+  Wallet, TrendingUp, TrendingDown, BarChart2, LineChart,
+  ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
+} from 'lucide-react'
 
-const nav = [
-  { to: '/dashboard',     label: 'Dashboard',   permission: null,                d: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { to: '/members',       label: 'Members',     permission: 'view members',      d: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-  { to: '/children',      label: 'Children',    permission: 'view children',     d: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z' },
-  { to: '/attendance',    label: 'Attendance',  permission: 'view attendance',   d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-  { to: '/finance',       label: 'Finance',     permission: 'view finance',      d: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { to: '/departments',   label: 'Departments', permission: 'view departments',  d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-  { to: '/cells',         label: 'Cells',       permission: 'view cells',        d: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
-  { to: '/visitors',      label: 'Visitors',    permission: 'view visitors',     d: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
-  { to: '/communication', label: 'Messages',    permission: 'view messages',     d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-  { to: '/birthdays',     label: 'Birthdays',   permission: 'view birthday messages', d: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
-  { to: '/reminders',     label: 'Reminders',   permission: 'view service reminders', d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-  { to: '/admin/submissions', label: 'Submissions', permission: 'view member submissions', d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+// ── Nav configuration ─────────────────────────────────────────────────────────
+
+const MAIN_NAV = [
+  { to: '/dashboard',         label: 'Dashboard',   icon: LayoutDashboard, permission: null },
+  { to: '/members',           label: 'Members',     icon: Users,           permission: 'view members' },
+  { to: '/children',          label: 'Children',    icon: GraduationCap,   permission: 'view children' },
+  { to: '/attendance',        label: 'Attendance',  icon: ClipboardCheck,  permission: 'view attendance' },
+  { to: '/departments',       label: 'Departments', icon: Building2,       permission: 'view departments' },
+  { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells' },
+  { to: '/visitors',          label: 'Visitors',    icon: UserPlus,        permission: 'view visitors' },
+  { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
+  { to: '/birthdays',         label: 'Birthdays',   icon: Gift,            permission: 'view birthday messages' },
+  { to: '/reminders',         label: 'Reminders',   icon: Bell,            permission: 'view service reminders' },
+  { to: '/admin/submissions', label: 'Submissions', icon: FileText,        permission: 'view member submissions' },
 ]
 
-const adminNav = [
-  { to: '/admin/users', label: 'Users',     permission: 'manage users',   d: 'M9 7a3 3 0 11-6 0 3 3 0 016 0zM6 21v-1a4 4 0 014-4h2m6-5v6m-3-3h6' },
-  { to: '/admin/audit', label: 'Audit Log', permission: 'view audit log', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-  { to: '/admin/settings/follow-up', label: 'Follow-up SMS', permission: 'manage users', d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-  { to: '/reports/finance/income-by-category', label: 'Income Report', permission: 'view finance', d: 'M9 17v-2a4 4 0 00-4-4H3m18 6v-2a4 4 0 00-4-4h-2m-4-6a4 4 0 11-8 0 4 4 0 018 0zM12 21v-4m0 0a4 4 0 014-4h2a4 4 0 014 4v4M5 17h.01M5 11h.01' },
-  { to: '/reports/finance/expense-by-category', label: 'Expense Report', permission: 'view finance', d: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
-  { to: '/reports/cells/comparison', label: 'Cell Comparison', permission: 'view finance', d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-  { to: '/reports/attendance/trends', label: 'Attendance Trends', permission: 'view finance', d: 'M3 3v18h18M7 12l4-4 4 4 6-6' },
+const FINANCE_NAV = [
+  { to: '/finance',                             label: 'Overview',        icon: Wallet,       permission: 'view finance' },
+  { to: '/reports/finance/income-by-category',  label: 'Income',          icon: TrendingUp,   permission: 'view finance' },
+  { to: '/reports/finance/expense-by-category', label: 'Expenses',        icon: TrendingDown, permission: 'view finance' },
+  { to: '/reports/cells/comparison',            label: 'Cell Comparison', icon: BarChart2,    permission: 'view finance' },
+  { to: '/reports/attendance/trends',           label: 'Att. Trends',     icon: LineChart,    permission: 'view finance' },
 ]
+
+const ADMIN_NAV = [
+  { to: '/admin/users',              label: 'Users',         icon: UserCog,       permission: 'manage users' },
+  { to: '/admin/audit',              label: 'Audit Log',     icon: ScrollText,    permission: 'view audit log' },
+  { to: '/admin/settings/follow-up', label: 'Follow-up SMS', icon: MessageCircle, permission: 'manage users' },
+]
+
+// ── Shared nav link atom ──────────────────────────────────────────────────────
+
+function NavItem({ to, icon: Icon, label, collapsed }) {
+  return (
+    <NavLink to={to} title={collapsed ? label : undefined} className="block no-underline">
+      {({ isActive }) => (
+        <div className={[
+          'relative flex items-center rounded-xl text-sm font-medium select-none cursor-pointer',
+          'transition-all duration-200',
+          collapsed ? 'justify-center py-[10px] px-1' : 'gap-3 px-3 py-[10px]',
+          isActive
+            ? 'bg-white/[0.12] text-white'
+            : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
+        ].join(' ')}>
+          {isActive && !collapsed && (
+            <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#C9A84C] rounded-r-full pointer-events-none" />
+          )}
+          <Icon
+            size={18}
+            strokeWidth={1.75}
+            className={`flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-[#C9A84C]' : ''}`}
+          />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </div>
+      )}
+    </NavLink>
+  )
+}
+
+// ── Finance accordion ─────────────────────────────────────────────────────────
+
+function FinanceAccordion({ items, collapsed, isGroupActive }) {
+  const [open, setOpen] = useState(isGroupActive)
+
+  useEffect(() => {
+    if (isGroupActive) setOpen(true)
+  }, [isGroupActive])
+
+  const showChildren = open && !collapsed
+
+  if (collapsed) {
+    return (
+      <NavLink to="/finance" end title="Finance" className="block no-underline">
+        {() => (
+          <div className={[
+            'relative flex justify-center items-center rounded-xl py-[10px] px-1',
+            'transition-all duration-200 cursor-pointer select-none',
+            isGroupActive
+              ? 'bg-white/[0.12] text-white'
+              : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
+          ].join(' ')}>
+            <Wallet
+              size={18}
+              strokeWidth={1.75}
+              className={`flex-shrink-0 ${isGroupActive ? 'text-[#C9A84C]' : ''}`}
+            />
+          </div>
+        )}
+      </NavLink>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-controls="finance-subnav"
+        className={[
+          'relative w-full flex items-center gap-3 px-3 py-[10px] rounded-xl',
+          'text-sm font-medium transition-all duration-200 cursor-pointer select-none',
+          isGroupActive
+            ? 'bg-white/[0.12] text-white'
+            : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
+        ].join(' ')}
+      >
+        {isGroupActive && (
+          <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#C9A84C] rounded-r-full pointer-events-none" />
+        )}
+        <Wallet
+          size={18}
+          strokeWidth={1.75}
+          className={`flex-shrink-0 ${isGroupActive ? 'text-[#C9A84C]' : ''}`}
+        />
+        <span className="flex-1 text-left truncate">Finance</span>
+        <ChevronDown
+          size={14}
+          strokeWidth={2}
+          className={`flex-shrink-0 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      <div
+        id="finance-subnav"
+        className={[
+          'overflow-hidden transition-all duration-300 ease-in-out',
+          showChildren ? 'max-h-[360px] opacity-100' : 'max-h-0 opacity-0',
+        ].join(' ')}
+      >
+        <div
+          className="ml-[18px] mt-1 pl-3 pb-1 space-y-0.5"
+          style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          {items.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} end className="block no-underline">
+              {({ isActive }) => (
+                <div className={[
+                  'flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-xs font-medium',
+                  'transition-all duration-150 cursor-pointer select-none',
+                  isActive
+                    ? 'text-[#C9A84C] bg-white/[0.08]'
+                    : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]',
+                ].join(' ')}>
+                  <Icon size={13} strokeWidth={2} className={`flex-shrink-0 ${isActive ? 'text-[#C9A84C]' : ''}`} />
+                  <span className="truncate">{label}</span>
+                </div>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const { user, logout } = useAuth()
   const { can }          = usePermission()
+  const { pathname }     = useLocation()
+  const [collapsed, setCollapsed] = useState(false)
 
-  const visibleNav      = nav.filter(item => !item.permission || can(item.permission))
-  const visibleAdminNav = adminNav.filter(item => can(item.permission))
+  const visibleMain    = MAIN_NAV.filter(i => !i.permission || can(i.permission))
+  const visibleFinance = FINANCE_NAV.filter(i => can(i.permission))
+  const visibleAdmin   = ADMIN_NAV.filter(i => can(i.permission))
+  const showFinance    = visibleFinance.length > 0
+  const showAdmin      = visibleAdmin.length > 0
+
+  const isFinanceActive = FINANCE_NAV.some(({ to }) =>
+    pathname === to || pathname.startsWith(to + '/')
+  )
+
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? 'U'
+  const userRole    = user?.roles?.[0]?.replace(/_/g, ' ') ?? ''
 
   return (
-    <div className={`w-64 flex flex-col flex-shrink-0 z-40 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{backgroundColor:'var(--color-navy-deeper)', height:'100dvh'}}>
-      <div className="px-6 py-5 flex items-center justify-between" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-        <div className="flex items-center gap-3">
-          <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-9 h-9 object-contain flex-shrink-0" />
-          <div>
-            <div className="text-white text-sm font-bold" style={{fontFamily:'var(--font-display)'}}>WIS-CMS</div>
-            <div className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Methodist Church Ghana</div>
-          </div>
+    <aside
+      className={[
+        'flex flex-col flex-shrink-0 z-40',
+        'transition-[width,transform] duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full',
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        collapsed ? 'w-64 md:w-[72px]' : 'w-64',
+      ].join(' ')}
+      style={{ backgroundColor: 'var(--color-navy-deeper)', height: '100dvh' }}
+    >
+
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center h-16 px-3 flex-shrink-0 gap-2"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div className={`flex items-center gap-3 min-w-0 ${collapsed ? 'flex-1 justify-center' : 'flex-1'}`}>
+          <img
+            src="/images/wis-logo.png"
+            alt="WIS Logo"
+            className={`object-contain flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
+          />
+          {!collapsed && (
+            <div className="min-w-0">
+              <div
+                className="text-white text-sm font-bold leading-tight truncate"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                WIS-CMS
+              </div>
+              <div className="text-[10px] leading-tight truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Methodist Church Ghana
+              </div>
+            </div>
+          )}
         </div>
-        <button onClick={onMobileClose}
-                className="mobile-close-btn md:hidden text-white p-1"
-                aria-label="Close menu">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+
+        {/* Desktop: collapse / expand */}
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          className="hidden md:flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0"
+          style={{ color: 'rgba(255,255,255,0.35)' }}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed
+            ? <ChevronRight size={15} strokeWidth={2} />
+            : <ChevronLeft  size={15} strokeWidth={2} />
+          }
+        </button>
+
+        {/* Mobile: close drawer */}
+        <button
+          onClick={onMobileClose}
+          className="md:hidden flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0"
+          style={{ color: 'rgba(255,255,255,0.35)' }}
+          aria-label="Close menu"
+        >
+          <X size={16} strokeWidth={2} />
         </button>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {visibleNav.map((item) => (
-          <NavLink key={item.to} to={item.to}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={item.d}/>
-            </svg>
-            {item.label}
-          </NavLink>
+      {/* ── Navigation ─────────────────────────────────────────────── */}
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto sidebar-scroll">
+
+        {visibleMain.map(item => (
+          <NavItem
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            label={item.label}
+            collapsed={collapsed}
+          />
         ))}
 
-        {visibleAdminNav.length > 0 && (
-          <>
-            <div className="px-4 py-3 mt-2">
-              <div className="text-xs font-bold uppercase tracking-wider"
-                   style={{color:'rgba(255,255,255,0.4)'}}>
-                Administration
-              </div>
+        {showFinance && (
+          <FinanceAccordion
+            items={visibleFinance}
+            collapsed={collapsed}
+            isGroupActive={isFinanceActive}
+          />
+        )}
+
+        {showAdmin && (
+          <div className="pt-3 mt-1">
+            {collapsed
+              ? <div className="mx-1 mb-2 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              : (
+                <div className="flex items-center gap-2 px-3 pb-2">
+                  <div className="h-px flex-1" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }} />
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: 'rgba(255,255,255,0.25)' }}
+                  >
+                    Admin
+                  </span>
+                  <div className="h-px flex-1" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }} />
+                </div>
+              )
+            }
+            <div className="space-y-0.5">
+              {visibleAdmin.map(item => (
+                <NavItem
+                  key={item.to}
+                  to={item.to}
+                  icon={item.icon}
+                  label={item.label}
+                  collapsed={collapsed}
+                />
+              ))}
             </div>
-            {visibleAdminNav.map(item => (
-              <NavLink key={item.to} to={item.to}
-                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={item.d}/>
-                </svg>
-                {item.label}
-              </NavLink>
-            ))}
-          </>
+          </div>
         )}
       </nav>
 
-      <div className="px-3 py-4" style={{borderTop:'1px solid rgba(255,255,255,0.1)'}}>
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-               style={{backgroundColor:'rgba(201,168,76,0.2)'}}>
-            <span className="text-xs font-bold" style={{color:'var(--color-gold)'}}>
-              {user?.name?.charAt(0) ?? 'U'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-semibold truncate">{user?.name}</div>
-            <div className="text-xs capitalize truncate" style={{color:'rgba(255,255,255,0.4)'}}>
-              {user?.roles?.[0]?.replace('_', ' ')}
+      {/* ── User footer ────────────────────────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-2 py-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+              style={{ backgroundColor: 'rgba(201,168,76,0.2)', color: 'var(--color-gold)' }}
+              title={user?.name}
+            >
+              {userInitial}
             </div>
+            <button
+              type="button"
+              onClick={logout}
+              title="Sign out"
+              className="flex items-center justify-center w-8 h-7 rounded-lg transition-colors hover:bg-white/10"
+              style={{ color: 'rgba(255,255,255,0.35)' }}
+            >
+              <LogOut size={14} strokeWidth={2} />
+            </button>
           </div>
-          <button onClick={logout} title="Sign out"
-                  style={{color:'rgba(255,255,255,0.3)'}}
-                  className="hover:text-white transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-            </svg>
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-white/[0.04] transition-colors group">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+              style={{ backgroundColor: 'rgba(201,168,76,0.2)', color: 'var(--color-gold)' }}
+            >
+              {userInitial}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-white text-xs font-semibold truncate leading-tight">{user?.name}</div>
+              <div
+                className="text-[10px] capitalize truncate leading-tight"
+                style={{ color: 'rgba(255,255,255,0.4)' }}
+              >
+                {userRole}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              title="Sign out"
+              className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0 opacity-0 group-hover:opacity-100"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              <LogOut size={14} strokeWidth={2} />
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+
+    </aside>
   )
 }
