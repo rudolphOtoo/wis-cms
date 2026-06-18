@@ -90,7 +90,7 @@ export default function Login() {
         <div className="relative z-10 flex-grow flex flex-col items-center justify-center text-center login-fade">
           {/* Logo tile */}
           <div className="mb-2 flex items-center justify-center">
-            <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-24 h-24 object-contain" />
+            <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-24 h-24 object-contain" />
           </div>
 
           <h1 className="font-bold mb-1"

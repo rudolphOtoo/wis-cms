@@ -39,7 +39,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
     <div className={`w-64 flex flex-col flex-shrink-0 z-40 transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`} style={{backgroundColor:'var(--color-navy-deeper)', height:'100dvh'}}>
       <div className="px-6 py-5 flex items-center justify-between" style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
         <div className="flex items-center gap-3">
-          <img src="/images/logo.png" alt="Methodist Church Ghana Logo" className="w-9 h-9 object-contain flex-shrink-0" />
+          <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
             <div className="text-white text-sm font-bold" style={{fontFamily:'var(--font-display)'}}>WIS-CMS</div>
             <div className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Methodist Church Ghana</div>
