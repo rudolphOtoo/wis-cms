@@ -10,6 +10,27 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
 } from 'lucide-react'
 
+// ── Breakpoint hook — mirrors Tailwind's md: threshold (768 px) ───────────────
+//
+// useIsDesktop() tracks window.matchMedia so that isCollapsed is always false
+// on mobile viewports, regardless of the stored collapsed toggle state.
+// Without this, a desktop-collapsed sidebar bleeds its icon-only layout into
+// the mobile slide-over drawer.
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    setIsDesktop(mq.matches)
+    const handler = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isDesktop
+}
+
 // ── Nav configuration ─────────────────────────────────────────────────────────
 
 const MAIN_NAV = [
@@ -40,21 +61,21 @@ const ADMIN_NAV = [
   { to: '/admin/settings/follow-up', label: 'Follow-up SMS', icon: MessageCircle, permission: 'manage users' },
 ]
 
-// ── Shared nav link atom ──────────────────────────────────────────────────────
+// ── NavItem ───────────────────────────────────────────────────────────────────
 
-function NavItem({ to, icon: Icon, label, collapsed }) {
+function NavItem({ to, icon: Icon, label, isCollapsed }) {
   return (
-    <NavLink to={to} title={collapsed ? label : undefined} className="block no-underline">
+    <NavLink to={to} title={isCollapsed ? label : undefined} className="block no-underline">
       {({ isActive }) => (
         <div className={[
           'relative flex items-center rounded-xl text-sm font-medium select-none cursor-pointer',
           'transition-all duration-200',
-          collapsed ? 'justify-center py-[10px] px-1' : 'gap-3 px-3 py-[10px]',
+          isCollapsed ? 'justify-center py-[10px] px-1' : 'gap-3 px-3 py-[10px]',
           isActive
             ? 'bg-white/[0.12] text-white'
             : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
         ].join(' ')}>
-          {isActive && !collapsed && (
+          {isActive && !isCollapsed && (
             <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#C9A84C] rounded-r-full pointer-events-none" />
           )}
           <Icon
@@ -62,7 +83,7 @@ function NavItem({ to, icon: Icon, label, collapsed }) {
             strokeWidth={1.75}
             className={`flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-[#C9A84C]' : ''}`}
           />
-          {!collapsed && <span className="truncate">{label}</span>}
+          {!isCollapsed && <span className="truncate">{label}</span>}
         </div>
       )}
     </NavLink>
@@ -71,16 +92,17 @@ function NavItem({ to, icon: Icon, label, collapsed }) {
 
 // ── Finance accordion ─────────────────────────────────────────────────────────
 
-function FinanceAccordion({ items, collapsed, isGroupActive }) {
+function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
   const [open, setOpen] = useState(isGroupActive)
 
   useEffect(() => {
     if (isGroupActive) setOpen(true)
   }, [isGroupActive])
 
-  const showChildren = open && !collapsed
+  const showChildren = open && !isCollapsed
 
-  if (collapsed) {
+  // Icon-only mode (desktop collapsed): navigate directly to overview
+  if (isCollapsed) {
     return (
       <NavLink to="/finance" end title="Finance" className="block no-underline">
         {() => (
@@ -102,6 +124,7 @@ function FinanceAccordion({ items, collapsed, isGroupActive }) {
     )
   }
 
+  // Expanded mode (desktop full or any mobile state): accordion
   return (
     <div>
       <button
@@ -172,7 +195,13 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const { user, logout } = useAuth()
   const { can }          = usePermission()
   const { pathname }     = useLocation()
+  const isDesktop        = useIsDesktop()
   const [collapsed, setCollapsed] = useState(false)
+
+  // isCollapsed is ONLY true on desktop viewports — mobile always renders fully.
+  // raw `collapsed` is still used for the CSS width class because that already
+  // uses the md: prefix to scope the narrow width to desktop.
+  const isCollapsed = collapsed && isDesktop
 
   const visibleMain    = MAIN_NAV.filter(i => !i.permission || can(i.permission))
   const visibleFinance = FINANCE_NAV.filter(i => can(i.permission))
@@ -194,6 +223,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
         'transition-[width,transform] duration-300 ease-in-out',
         'fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full',
         isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        // Width: mobile always w-64; desktop narrows to 72px when collapsed
         collapsed ? 'w-64 md:w-[72px]' : 'w-64',
       ].join(' ')}
       style={{ backgroundColor: 'var(--color-navy-deeper)', height: '100dvh' }}
@@ -204,13 +234,13 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
         className="flex items-center h-16 px-3 flex-shrink-0 gap-2"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
       >
-        <div className={`flex items-center gap-3 min-w-0 ${collapsed ? 'flex-1 justify-center' : 'flex-1'}`}>
+        <div className={`flex items-center gap-3 min-w-0 flex-1 ${isCollapsed ? 'justify-center' : ''}`}>
           <img
             src="/images/wis-logo.png"
             alt="WIS Logo"
-            className={`object-contain flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
+            className={`object-contain flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
           />
-          {!collapsed && (
+          {!isCollapsed && (
             <div className="min-w-0">
               <div
                 className="text-white text-sm font-bold leading-tight truncate"
@@ -225,28 +255,29 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
           )}
         </div>
 
-        {/* Desktop: collapse / expand */}
+        {/* Desktop only: collapse / expand toggle */}
         <button
           type="button"
           onClick={() => setCollapsed(c => !c)}
           className="hidden md:flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0"
           style={{ color: 'rgba(255,255,255,0.35)' }}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed
+          {isCollapsed
             ? <ChevronRight size={15} strokeWidth={2} />
             : <ChevronLeft  size={15} strokeWidth={2} />
           }
         </button>
 
-        {/* Mobile: close drawer */}
+        {/* Mobile only: close drawer — 44×44 px touch target */}
         <button
+          type="button"
           onClick={onMobileClose}
-          className="md:hidden flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
+          className="md:hidden flex items-center justify-center w-11 h-11 rounded-xl transition-colors hover:bg-white/10 flex-shrink-0 -mr-1"
+          style={{ color: 'rgba(255,255,255,0.75)' }}
           aria-label="Close menu"
         >
-          <X size={16} strokeWidth={2} />
+          <X size={20} strokeWidth={2} />
         </button>
       </div>
 
@@ -259,21 +290,21 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
             to={item.to}
             icon={item.icon}
             label={item.label}
-            collapsed={collapsed}
+            isCollapsed={isCollapsed}
           />
         ))}
 
         {showFinance && (
           <FinanceAccordion
             items={visibleFinance}
-            collapsed={collapsed}
+            isCollapsed={isCollapsed}
             isGroupActive={isFinanceActive}
           />
         )}
 
         {showAdmin && (
           <div className="pt-3 mt-1">
-            {collapsed
+            {isCollapsed
               ? <div className="mx-1 mb-2 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }} />
               : (
                 <div className="flex items-center gap-2 px-3 pb-2">
@@ -295,7 +326,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
                   to={item.to}
                   icon={item.icon}
                   label={item.label}
-                  collapsed={collapsed}
+                  isCollapsed={isCollapsed}
                 />
               ))}
             </div>
@@ -308,7 +339,9 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
         className="flex-shrink-0 px-2 py-3"
         style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
       >
-        {collapsed ? (
+        {isCollapsed ? (
+
+          // Desktop icon-only footer
           <div className="flex flex-col items-center gap-2">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
@@ -321,39 +354,46 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
               type="button"
               onClick={logout}
               title="Sign out"
-              className="flex items-center justify-center w-8 h-7 rounded-lg transition-colors hover:bg-white/10"
+              className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/10"
               style={{ color: 'rgba(255,255,255,0.35)' }}
             >
               <LogOut size={14} strokeWidth={2} />
             </button>
           </div>
+
         ) : (
+
+          // Mobile + desktop expanded footer — always shows full name, role, and logout
           <div className="flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-white/[0.04] transition-colors group">
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
               style={{ backgroundColor: 'rgba(201,168,76,0.2)', color: 'var(--color-gold)' }}
             >
               {userInitial}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white text-xs font-semibold truncate leading-tight">{user?.name}</div>
+              <div className="text-white text-xs font-semibold truncate leading-tight">
+                {user?.name}
+              </div>
               <div
                 className="text-[10px] capitalize truncate leading-tight"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
+                style={{ color: 'rgba(255,255,255,0.45)' }}
               >
-                {userRole}
+                {userInitial} · {userRole}
               </div>
             </div>
+            {/* Logout: always visible on mobile (no hover); fades in on desktop hover */}
             <button
               type="button"
               onClick={logout}
               title="Sign out"
-              className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10 flex-shrink-0 opacity-0 group-hover:opacity-100"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl transition-all hover:bg-white/10 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'rgba(255,255,255,0.5)' }}
             >
-              <LogOut size={14} strokeWidth={2} />
+              <LogOut size={15} strokeWidth={2} />
             </button>
           </div>
+
         )}
       </div>
 

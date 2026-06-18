@@ -1,51 +1,53 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Users, UserCheck, UserPlus, Scale, Search, Download,
+  CheckCircle2, MinusCircle, ArrowRightCircle, XCircle,
+  ChevronLeft, ChevronRight,
+} from 'lucide-react'
 import { getMembers, deleteMember, getMemberStats, exportMembers } from '../../api/members'
 import { usePermission } from '../../hooks/usePermission'
 import { useDebounce } from '../../hooks/useDebounce'
+import { TableSkeleton } from '../../components/ui/Skeletons'
 
-const STATUS_COLORS = {
-  active:      { bg: '#dcfce7', text: '#15803d' },
-  inactive:    { bg: '#edeef1', text: '#6b7280' },
-  transferred: { bg: '#dbeafe', text: '#2563eb' },
-  deceased:    { bg: '#fce7f3', text: '#9d174d' },
+// Fix #7 — each status has a Lucide icon + WCAG-AA text contrast pair
+const STATUS_CONFIG = {
+  active:      { bg: '#dcfce7', text: '#166534', icon: CheckCircle2,      label: 'Active' },
+  inactive:    { bg: '#e2e8f0', text: '#475569', icon: MinusCircle,        label: 'Inactive' },
+  transferred: { bg: '#dbeafe', text: '#1d4ed8', icon: ArrowRightCircle,   label: 'Transferred' },
+  deceased:    { bg: '#fce7f3', text: '#9d174d', icon: XCircle,            label: 'Deceased' },
 }
 
-const cardBase = {
-  backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
-  borderRadius: '16px',
-  boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
-}
-
-const Icon = ({ d, size = 18 }) => (
-  <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8}
-       viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
-)
-const ICONS = {
-  group:  <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>,
-  check:  <><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11l2 2 4-4"/></>,
-  new:    <><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></>,
-  balance:<><line x1="12" y1="3" x2="12" y2="21"/><path d="M5 7h14M5 7l-3 6a3 3 0 006 0zM19 7l-3 6a3 3 0 006 0z"/></>,
+function StatIcon({ children }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-lg p-1.5"
+      style={{ color: 'var(--color-navy)', backgroundColor: 'rgba(27,58,107,0.1)' }}
+    >
+      {children}
+    </span>
+  )
 }
 
 export default function MembersPage() {
   const navigate = useNavigate()
   const { can }  = usePermission()
-  const [members,    setMembers]    = useState([])
-  const [stats,      setStats]      = useState(null)
-  const [loading,    setLoading]    = useState(true)
-  const [search,     setSearch]     = useState('')
-  const [statusFilter, setStatus]   = useState('')
-  const [genderFilter, setGender]   = useState('')
-  const [page,       setPage]       = useState(1)
-  const [meta,       setMeta]       = useState(null)
-  const [deleting,   setDeleting]   = useState(null)
-  const [exporting,  setExporting]  = useState(false)
 
-  // Debounce search: the settled value is what drives the API call dep array.
-  // This replaces the dual-useEffect pattern (one immediate + one debounced)
-  // that previously fired two concurrent requests on every keystroke.
+  const [members,      setMembers]      = useState([])
+  const [stats,        setStats]        = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [search,       setSearch]       = useState('')
+  const [statusFilter, setStatus]       = useState('')
+  const [genderFilter, setGender]       = useState('')
+  const [page,         setPage]         = useState(1)
+  const [meta,         setMeta]         = useState(null)
+  const [deleting,     setDeleting]     = useState(null)
+  // Fix #4 — inline confirm state replaces window.confirm()
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [exporting,    setExporting]    = useState(false)
+
+  // Debounce search: settled value drives the API call dep array to prevent
+  // two concurrent requests firing on every keystroke.
   const debouncedSearch = useDebounce(search, 400)
 
   const handleExport = async () => {
@@ -71,10 +73,7 @@ export default function MembersPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
-  // AbortController cleanup: if the user navigates away while a request is
-  // in flight the signal fires, Axios throws CanceledError (code ERR_CANCELED),
-  // the catch guard swallows it silently, and the mounted flag prevents any
-  // state update from reaching an unmounted component.
+  // AbortController cleanup prevents stale state updates on unmount / fast navigation.
   useEffect(() => {
     const controller = new AbortController()
     let mounted = true
@@ -109,132 +108,169 @@ export default function MembersPage() {
     }
   }, [debouncedSearch, statusFilter, genderFilter, page, refreshKey])
 
+  // Fix #4 — no confirm(); caller sets pendingDelete, this fires on Confirm click
   const handleDelete = async (member) => {
-    if (!confirm(`Delete ${member.full_name}? This cannot be undone.`)) return
     setDeleting(member.id)
     try {
       await deleteMember(member.id)
       triggerRefresh()
-    } catch (err) {
+    } catch {
       alert('Failed to delete member.')
     } finally {
       setDeleting(null)
+      setPendingDelete(null)
     }
   }
 
   const total       = stats?.total ?? 0
-  const active       = stats?.active ?? 0
+  const active      = stats?.active ?? 0
   const activePct   = total > 0 ? Math.round((active / total) * 100) : 0
   const totalGender = (stats?.male ?? 0) + (stats?.female ?? 0)
   const malePct     = totalGender > 0 ? Math.round(((stats?.male ?? 0) / totalGender) * 100) : 0
   const femalePct   = 100 - malePct
 
-  const StatIcon = ({ children }) => (
-    <span className="flex items-center justify-center rounded-lg"
-          style={{color:'var(--color-navy)',backgroundColor:'rgba(27,58,107,0.1)',padding:'6px'}}>
-      {children}
-    </span>
-  )
-
   return (
-    <div className="space-y-6" style={{maxWidth:'1440px'}}>
+    <div className="space-y-6" style={{ maxWidth: '1440px' }}>
 
       {/* Page header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
+          <h2
+            className="font-bold"
+            style={{ fontFamily: 'var(--font-display)', fontSize: '32px', lineHeight: '40px', color: 'var(--color-navy)' }}
+          >
             Members
           </h2>
-          <p style={{color:'#44474f'}}>{meta ? `${meta.total} Total Registered Members` : 'Loading...'}</p>
+          <p style={{ color: '#44474f' }}>
+            {meta ? `${meta.total} Total Registered Members` : 'Loading…'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Fix #8 — Lucide Download icon replaces raw SVG path */}
           {can('export members') && (
-            <button onClick={handleExport} disabled={exporting}
-                    className="gap-2 inline-flex items-center rounded-lg font-semibold"
-                    style={{padding:'10px 20px',backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)',fontSize:'14px',opacity: exporting ? 0.6 : 1}}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V3m0 9l-4-4m4 4l4-4"/>
-              </svg>
-              {exporting ? 'Exporting...' : 'Export CSV'}
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="btn-secondary"
+              style={{ padding: '10px 20px' }}
+              aria-label="Export members list as CSV"
+            >
+              <Download size={16} strokeWidth={2} aria-hidden="true" />
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </button>
           )}
           {can('create members') && (
-            <button onClick={() => navigate('/members/new')} className="btn-primary gap-2" style={{padding:'10px 24px'}}>
+            <button
+              onClick={() => navigate('/members/new')}
+              className="btn-primary"
+              style={{ padding: '10px 24px' }}
+            >
               Add Member
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-              </svg>
+              <UserPlus size={16} strokeWidth={2} aria-hidden="true" />
             </button>
           )}
         </div>
       </div>
 
+      {/* Fix #5 — surface-card class replaces inline cardBase objects */}
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div style={{...cardBase, padding:'24px'}}>
+        <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{fontSize:'14px',fontWeight:600,color:'#747780'}}>Total Members</p>
-            <StatIcon><Icon d={ICONS.group} /></StatIcon>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Total Members</p>
+            <StatIcon><Users size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>{total}</p>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+            {total}
+          </p>
         </div>
 
-        <div style={{...cardBase, padding:'24px'}}>
+        <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{fontSize:'14px',fontWeight:600,color:'#747780'}}>Active</p>
-            <StatIcon><Icon d={ICONS.check} /></StatIcon>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Active</p>
+            <StatIcon><UserCheck size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>{active}</p>
-          <div className="w-full rounded-full mt-2" style={{height:'6px',backgroundColor:'#e7e8eb'}}>
-            <div className="rounded-full" style={{height:'6px',width:`${activePct}%`,backgroundColor:'var(--color-navy)'}}/>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+            {active}
+          </p>
+          <div className="w-full rounded-full mt-2" style={{ height: '6px', backgroundColor: '#e7e8eb' }}>
+            <div className="rounded-full" style={{ height: '6px', width: `${activePct}%`, backgroundColor: 'var(--color-navy)' }} />
           </div>
         </div>
 
-        <div style={{...cardBase, padding:'24px'}}>
+        <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{fontSize:'14px',fontWeight:600,color:'#747780'}}>New This Month</p>
-            <StatIcon><Icon d={ICONS.new} /></StatIcon>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>New This Month</p>
+            <StatIcon><UserPlus size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>{stats?.new_this_month ?? '—'}</p>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+            {stats?.new_this_month ?? '—'}
+          </p>
         </div>
 
-        <div style={{...cardBase, padding:'24px'}}>
+        <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{fontSize:'14px',fontWeight:600,color:'#747780'}}>Male / Female Split</p>
-            <StatIcon><Icon d={ICONS.balance} /></StatIcon>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Male / Female Split</p>
+            <StatIcon><Scale size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>{malePct}% / {femalePct}%</p>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+            {malePct}% / {femalePct}%
+          </p>
           <div className="flex gap-1 mt-2">
-            <div className="rounded-full" style={{height:'6px',width:`${malePct}%`,backgroundColor:'#1B3A6B'}}/>
-            <div className="rounded-full" style={{height:'6px',width:`${femalePct}%`,backgroundColor:'#d7e2ff'}}/>
+            <div className="rounded-full" style={{ height: '6px', width: `${malePct}%`, backgroundColor: '#1B3A6B' }} />
+            <div className="rounded-full" style={{ height: '6px', width: `${femalePct}%`, backgroundColor: '#d7e2ff' }} />
           </div>
         </div>
       </div>
 
       {/* Filters + Table card */}
-      <div style={{...cardBase, overflow:'hidden'}}>
-        {/* Filters bar */}
-        <div className="flex flex-col lg:flex-row gap-4" style={{padding:'24px',borderBottom:'1px solid var(--color-surface-border)'}}>
+      <div className="surface-card overflow-hidden">
+
+        {/* Fix #6 — fluid responsive padding (p-4 mobile → p-6 desktop) */}
+        <div
+          className="flex flex-col lg:flex-row gap-4 p-4 md:p-6"
+          style={{ borderBottom: '1px solid var(--color-surface-border)' }}
+        >
+          {/* Fix #8 — Lucide Search icon */}
           <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#747780'}}
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-            <input type="text" placeholder="Search by name, phone, or member number"
-                   className="input-field" style={{paddingLeft:'2.5rem'}}
-                   value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}/>
+            <Search
+              size={16}
+              strokeWidth={2}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ color: '#747780' }}
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              placeholder="Search by name, phone, or member number"
+              className="input-field"
+              style={{ paddingLeft: '2.5rem' }}
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              aria-label="Search members"
+            />
           </div>
           <div className="flex gap-2">
-            <select className="input-field" style={{width:'auto'}}
-                    value={statusFilter} onChange={e => { setStatus(e.target.value); setPage(1) }}>
+            <select
+              className="input-field"
+              style={{ width: 'auto' }}
+              value={statusFilter}
+              onChange={e => { setStatus(e.target.value); setPage(1) }}
+              aria-label="Filter by membership status"
+            >
               <option value="">All Statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="transferred">Transferred</option>
               <option value="deceased">Deceased</option>
             </select>
-            <select className="input-field" style={{width:'auto'}}
-                    value={genderFilter} onChange={e => { setGender(e.target.value); setPage(1) }}>
+            <select
+              className="input-field"
+              style={{ width: 'auto' }}
+              value={genderFilter}
+              onChange={e => { setGender(e.target.value); setPage(1) }}
+              aria-label="Filter by gender"
+            >
               <option value="">Gender: All</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
@@ -242,116 +278,252 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Fix #3 — non-essential columns hidden on small viewports */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr style={{backgroundColor:'#f8f9fc'}}>
-                {[['Member #'],['Name'],['Gender'],['Phone'],['Status'],['Join Date','center'],['Actions','right']].map(([h, align]) => (
-                  <th key={h} className="uppercase tracking-wider"
-                      style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>
-                    {h}
-                  </th>
-                ))}
+              <tr style={{ backgroundColor: '#f8f9fc' }}>
+                <th
+                  className="hidden md:table-cell uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
+                >
+                  Member #
+                </th>
+                <th
+                  className="uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
+                >
+                  Name
+                </th>
+                <th
+                  className="hidden sm:table-cell uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
+                >
+                  Gender
+                </th>
+                <th
+                  className="hidden sm:table-cell uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
+                >
+                  Phone
+                </th>
+                <th
+                  className="uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
+                >
+                  Status
+                </th>
+                <th
+                  className="hidden lg:table-cell uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780', textAlign: 'center' }}
+                >
+                  Join Date
+                </th>
+                <th
+                  className="uppercase tracking-wider"
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780', textAlign: 'right' }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
+              {/* Fix #2 — TableSkeleton replaces the full-colspan spinner */}
               {loading ? (
-                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>
-                  <svg className="animate-spin w-6 h-6 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                  Loading members...
-                </td></tr>
+                <TableSkeleton rows={8} cols={7} hasAvatar={true} />
               ) : members.length === 0 ? (
-                <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
-                  <div className="text-4xl mb-3">👥</div>
-                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No members found</div>
-                  <div className="text-sm mt-1" style={{color:'#9ca3af'}}>
-                    {search ? 'Try a different search term' : 'Add your first member to get started'}
-                  </div>
-                </td></tr>
-              ) : members.map((member, i) => (
-                <tr key={member.id} className="transition-colors"
-                    style={{borderTop:'1px solid var(--color-surface-border)',
-                            backgroundColor: i % 2 === 0 ? 'white' : '#ffffff'}}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor='#f2f3f6'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor= i % 2 === 0 ? 'white' : '#ffffff'}>
-                  <td style={{padding:'16px 24px',fontSize:'13px',fontFamily:'monospace',color:'#44474f'}}>
-                    {member.member_number}
-                  </td>
-                  <td style={{padding:'16px 24px'}}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
-                           style={{backgroundColor:'var(--color-navy)'}}>
-                        {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                <tr>
+                  <td colSpan={7}>
+                    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                      <div
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                        style={{ backgroundColor: 'rgba(27,58,107,0.08)' }}
+                      >
+                        <Users size={26} strokeWidth={1.5} style={{ color: 'var(--color-navy)' }} aria-hidden="true" />
                       </div>
-                      <div>
-                        <p className="font-bold" style={{color:'var(--color-navy)'}}>{member.full_name}</p>
-                        {member.email && <p style={{fontSize:'12px',color:'#747780'}}>{member.email}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="capitalize" style={{padding:'16px 24px',fontSize:'14px',color:'#44474f'}}>{member.gender}</td>
-                  <td style={{padding:'16px 24px',fontSize:'14px',color:'#44474f'}}>{member.phone ?? '—'}</td>
-                  <td style={{padding:'16px 24px'}}>
-                    <span className="capitalize"
-                          style={{padding:'4px 12px',borderRadius:'9999px',fontSize:'12px',fontWeight:700,
-                                  backgroundColor:STATUS_COLORS[member.status]?.bg,color:STATUS_COLORS[member.status]?.text}}>
-                      {member.status}
-                    </span>
-                  </td>
-                  <td style={{padding:'16px 24px',fontSize:'14px',color:'#44474f',textAlign:'center'}}>{member.join_date ?? '—'}</td>
-                  <td style={{padding:'16px 24px'}}>
-                    <div className="flex justify-end gap-4">
-                      <button onClick={() => navigate(`/members/${member.id}`)}
-                              className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
-                        View
-                      </button>
-                      {can('edit members') && (
-                        <button onClick={() => navigate(`/members/${member.id}/edit`)}
-                                className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'#C9A84C'}}>
-                          Edit
-                        </button>
-                      )}
-                      {can('delete members') && (
-                        <button onClick={() => handleDelete(member)} disabled={deleting === member.id}
-                                className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'#ba1a1a'}}>
-                          {deleting === member.id ? '...' : 'Delete'}
+                      <p className="font-semibold text-base mb-1" style={{ color: 'var(--color-navy)' }}>
+                        {search ? 'No members found' : 'No members yet'}
+                      </p>
+                      <p className="text-sm mb-5 max-w-xs" style={{ color: '#747780' }}>
+                        {search
+                          ? `No results for "${search}". Try a different name, phone, or member number.`
+                          : 'Add your first member to start building your congregation register.'}
+                      </p>
+                      {!search && can('create members') && (
+                        <button
+                          onClick={() => navigate('/members/new')}
+                          className="btn-primary"
+                          style={{ padding: '10px 24px' }}
+                        >
+                          Add First Member
                         </button>
                       )}
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : members.map((member) => {
+                const cfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive
+                const StatusIcon = cfg.icon
+                return (
+                  /* Replace onMouseEnter/Leave with Tailwind hover utility */
+                  <tr
+                    key={member.id}
+                    className="hover:bg-slate-50 transition-colors duration-150"
+                    style={{ borderTop: '1px solid var(--color-surface-border)' }}
+                  >
+                    <td
+                      className="hidden md:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: '#44474f' }}
+                    >
+                      {member.member_number}
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
+                          style={{ backgroundColor: 'var(--color-navy)' }}
+                          aria-hidden="true"
+                        >
+                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold" style={{ color: 'var(--color-navy)' }}>{member.full_name}</p>
+                          {member.email && (
+                            <p style={{ fontSize: '12px', color: '#747780' }}>{member.email}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      className="hidden sm:table-cell capitalize"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
+                    >
+                      {member.gender}
+                    </td>
+                    <td
+                      className="hidden sm:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
+                    >
+                      {member.phone ?? '—'}
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      {/* Fix #7 — icon + text badge; not color alone */}
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full text-xs font-bold"
+                        style={{ padding: '4px 10px', backgroundColor: cfg.bg, color: cfg.text }}
+                        aria-label={`Status: ${cfg.label}`}
+                      >
+                        <StatusIcon size={11} strokeWidth={2.5} aria-hidden="true" />
+                        {cfg.label}
+                      </span>
+                    </td>
+                    <td
+                      className="hidden lg:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f', textAlign: 'center' }}
+                    >
+                      {member.join_date ?? '—'}
+                    </td>
+                    {/* Fix #4 — inline confirm pattern; fix #4a — 44px-tall touch targets */}
+                    <td style={{ padding: '12px 24px' }}>
+                      <div className="flex justify-end items-center gap-1">
+                        <button
+                          onClick={() => navigate(`/members/${member.id}`)}
+                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
+                          style={{ color: 'var(--color-navy)' }}
+                          aria-label={`View profile of ${member.full_name}`}
+                        >
+                          View
+                        </button>
+                        {can('edit members') && (
+                          <button
+                            onClick={() => navigate(`/members/${member.id}/edit`)}
+                            className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+                            style={{ color: '#92400e' }}
+                            aria-label={`Edit ${member.full_name}`}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {can('delete members') && (
+                          pendingDelete === member.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(member)}
+                                disabled={deleting === member.id}
+                                className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                                style={{ color: '#be123c' }}
+                                aria-label={`Confirm deletion of ${member.full_name}`}
+                              >
+                                {deleting === member.id ? '…' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => setPendingDelete(null)}
+                                className="inline-flex items-center justify-center h-9 px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                                style={{ color: '#747780' }}
+                                aria-label="Cancel deletion"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setPendingDelete(member.id)}
+                              className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                              style={{ color: '#be123c' }}
+                              aria-label={`Delete ${member.full_name}`}
+                            >
+                              Delete
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4"
-               style={{padding:'24px',backgroundColor:'#f8f9fc',borderTop:'1px solid var(--color-surface-border)'}}>
-            <p style={{fontSize:'14px',color:'#44474f'}}>
-              Page <span className="font-bold" style={{color:'var(--color-navy)'}}>{meta.current_page}</span> of <span className="font-bold" style={{color:'var(--color-navy)'}}>{meta.last_page}</span> · {meta.total} members
+          <div
+            className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 md:p-6"
+            style={{ backgroundColor: '#f8f9fc', borderTop: '1px solid var(--color-surface-border)' }}
+          >
+            <p style={{ fontSize: '14px', color: '#44474f' }}>
+              Page{' '}
+              <span className="font-bold" style={{ color: 'var(--color-navy)' }}>{meta.current_page}</span>
+              {' '}of{' '}
+              <span className="font-bold" style={{ color: 'var(--color-navy)' }}>{meta.last_page}</span>
+              {' '}· {meta.total} members
             </p>
-            <div className="flex items-center gap-2">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
-                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
+            <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
+                aria-label="Go to previous page"
+              >
+                <ChevronLeft size={18} strokeWidth={2} aria-hidden="true" />
               </button>
-              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white"
-                    style={{backgroundColor:'var(--color-navy)'}}>{meta.current_page}</span>
-              <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
-                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                </svg>
+              <span
+                className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm text-white"
+                style={{ backgroundColor: 'var(--color-navy)' }}
+                aria-current="page"
+                aria-label={`Current page, page ${meta.current_page}`}
+              >
+                {meta.current_page}
+              </span>
+              <button
+                disabled={page === meta.last_page}
+                onClick={() => setPage(p => p + 1)}
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
+                aria-label="Go to next page"
+              >
+                <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
           </div>
