@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Resources\UserResource;
 use App\Models\Member;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +37,7 @@ class UserController extends Controller
         $users = $query->orderBy('name')->paginate($request->integer('per_page', 15));
 
         return response()->json([
-            'data' => collect($users->items())->map(fn ($u) => $this->transform($u)),
+            'data' => UserResource::collection($users->items()),
             'meta' => [
                 'total' => $users->total(),
                 'per_page' => $users->perPage(),
@@ -87,7 +88,7 @@ class UserController extends Controller
         // never stored anywhere reversible, never logged.
         return response()->json([
             'message' => 'User created successfully.',
-            'data' => $this->transform($user->load('roles')),
+            'data' => new UserResource($user->load('roles')),
             'temp_password' => $tempPassword,
         ], 201);
     }
@@ -98,7 +99,7 @@ class UserController extends Controller
             ->with(['roles', 'member'])
             ->findOrFail($id);
 
-        return response()->json(['data' => $this->transform($user)]);
+        return response()->json(['data' => new UserResource($user)]);
     }
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
@@ -130,7 +131,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User updated successfully.',
-            'data' => $this->transform($user->fresh('roles')),
+            'data' => new UserResource($user->fresh('roles')),
         ]);
     }
 
@@ -189,7 +190,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Member linked successfully.',
-            'data' => $this->transform($user->fresh()->load('member')),
+            'data' => new UserResource($user->fresh()->load('member')),
         ]);
     }
 
@@ -236,7 +237,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Member created and linked successfully.',
-            'data' => $this->transform($user->fresh()->load('member')),
+            'data' => new UserResource($user->fresh()->load('member')),
         ], 201);
     }
 
@@ -263,29 +264,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Member unlinked successfully.',
-            'data' => $this->transform($user->fresh()),
+            'data' => new UserResource($user->fresh()),
         ]);
-    }
-
-    protected function transform(User $user): array
-    {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'is_active' => $user->is_active,
-            'last_login_at' => $user->last_login_at?->diffForHumans(),
-            'role' => $user->roles->first()?->name,
-            'role_label' => $user->roles->first() ? ucwords(str_replace('_', ' ', $user->roles->first()->name)) : null,
-            'created_at' => $user->created_at->format('Y-m-d'),
-            'member_id' => $user->member_id,
-            'member' => $user->relationLoaded('member') && $user->member ? [
-                'id' => $user->member->id,
-                'first_name' => $user->member->first_name,
-                'last_name' => $user->member->last_name,
-                'member_number' => $user->member->member_number,
-                'phone' => $user->member->phone,
-            ] : null,
-        ];
     }
 }

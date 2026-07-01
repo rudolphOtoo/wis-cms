@@ -39,6 +39,10 @@ class Department extends Model
 
     public function getMembersCountAttribute(): int
     {
+        if (array_key_exists('members_count', $this->attributes)) {
+            return (int) $this->attributes['members_count'];
+        }
+
         return $this->members()->count();
     }
 }

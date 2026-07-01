@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { changePassword, getMe } from '../../api/auth'
 import { useAuth } from '../../context/AuthContext'
@@ -35,7 +36,7 @@ export default function ChangePassword() {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
       } else {
-        alert('Could not change password. Please try again.')
+        toast.error('Could not change password. Please try again.')
       }
     } finally {
       setLoading(false)

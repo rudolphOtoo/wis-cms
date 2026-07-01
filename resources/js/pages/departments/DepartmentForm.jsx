@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createDepartment, updateDepartment, getDepartment } from '../../api/departments'
 import { getUsers } from '../../api/users'
@@ -73,7 +74,7 @@ export default function DepartmentForm() {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
       } else {
-        alert('Something went wrong. Please try again.')
+        toast.error('Something went wrong. Please try again.')
       }
     } finally {
       setLoading(false)

@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCell, assignToCell, unassignFromCell } from '../../api/cells'
-import { getMembers } from '../../api/members'
+import { createMember, getMembers } from '../../api/members'
 import MemberSearchPicker from '../../components/MemberSearchPicker'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function CellDetail() {
   const navigate = useNavigate()
   const { id }   = useParams()
+  const { confirm, dialog } = useConfirm()
   const [cell,       setCell]       = useState(null)
   const [members,    setMembers]    = useState([])
   const [allMembers, setAllMembers] = useState([])
@@ -15,6 +18,9 @@ export default function CellDetail() {
   const [selected,   setSelected]   = useState('')
   const [removing,   setRemoving]   = useState(null)
   const [showAdd,    setShowAdd]    = useState(false)
+  const [addTab,     setAddTab]     = useState('new')
+  const [newMember,  setNewMember]  = useState({ first_name: '', last_name: '', phone: '', gender: '' })
+  const [creating,   setCreating]   = useState(false)
   const [notice,     setNotice]     = useState(null)
 
   const fetchData = useCallback(async () => {
@@ -22,7 +28,7 @@ export default function CellDetail() {
     try {
       const [cRes, amRes] = await Promise.all([
         getCell(id),
-        getMembers({ per_page: 200 }),
+        getMembers({ per_page: 200, unscoped: 1 }),
       ])
       setCell(cRes.data.data)
       setMembers(cRes.data.data.members ?? [])
@@ -53,24 +59,42 @@ export default function CellDetail() {
     }
   }
 
+  const handleCreateAndAssign = async () => {
+    if (!newMember.first_name || !newMember.last_name || !newMember.gender) {
+      toast.error('First name, last name, and gender are required.')
+      return
+    }
+    setCreating(true)
+    setNotice(null)
+    try {
+      const res = await createMember({ ...newMember, status: 'active' })
+      const mId = res.data.data.id
+      await assignToCell(id, mId)
+      setNotice({ ok: true, text: `${newMember.first_name} ${newMember.last_name} has been added to the cell.` })
+      setNewMember({ first_name: '', last_name: '', phone: '', gender: '' })
+      setShowAdd(false)
+      fetchData()
+    } catch (err) {
+      setNotice({ ok: false, text: err.response?.data?.message ?? 'Failed to create member.' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const handleRemove = async (memberId) => {
-    if (!confirm('Remove this member from the cell? They will have no cell until reassigned.')) return
+    if (!(await confirm('Remove this member from the cell? They will have no cell until reassigned.'))) return
     setRemoving(memberId)
     try {
       await unassignFromCell(id, memberId)
       fetchData()
     } catch {
-      alert('Failed to remove member.')
+      toast.error('Failed to remove member.')
     } finally {
       setRemoving(null)
     }
   }
 
-  // Members not already in THIS cell (includes those in other cells —
-  // assigning them will MOVE them here, which the backend handles).
-  const availableMembers = allMembers.filter(
-    m => !members.some(cm => cm.id === m.id)
-  )
+  const unassignedMembers = allMembers.filter(m => m.cell_id === null)
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -129,33 +153,100 @@ export default function CellDetail() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
             </svg>
-            Assign Member
+            Add Member
           </button>
         </div>
 
         {showAdd && (
-          <div className="px-6 py-4"
-               style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
-            <div className="flex items-center gap-3">
-              <MemberSearchPicker
-                members={availableMembers}
-                value={selected}
-                onChange={setSelected}
-                placeholder="Search members by name or number..."
-                disabled={assigning}
-              />
-              <button onClick={handleAssign} disabled={!selected || assigning} className="btn-primary px-4 py-2.5 text-sm">
-                {assigning ? 'Assigning...' : 'Assign'}
+          <div>
+            <div className="flex border-b" style={{borderColor:'var(--color-surface-border)'}}>
+              <button onClick={() => setAddTab('new')}
+                      className="px-4 py-2.5 text-sm font-semibold transition-colors"
+                      style={{
+                        color: addTab === 'new' ? 'var(--color-navy)' : '#6b7280',
+                        borderBottom: addTab === 'new' ? '2px solid var(--color-navy)' : '2px solid transparent',
+                      }}>
+                New Member
               </button>
-              <button onClick={() => { setShowAdd(false); setSelected('') }}
-                      className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-                      style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
-                Cancel
+              <button onClick={() => setAddTab('existing')}
+                      className="px-4 py-2.5 text-sm font-semibold transition-colors"
+                      style={{
+                        color: addTab === 'existing' ? 'var(--color-navy)' : '#6b7280',
+                        borderBottom: addTab === 'existing' ? '2px solid var(--color-navy)' : '2px solid transparent',
+                      }}>
+                From Church
               </button>
             </div>
-            <p className="text-xs mt-2" style={{color:'#9ca3af'}}>
-              Each member belongs to one cell. Assigning a member already in another cell will move them here.
-            </p>
+
+            <div className="px-6 py-4"
+                 style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
+              {addTab === 'new' ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{color:'#374151'}}>First Name *</label>
+                      <input type="text" className="input-field" value={newMember.first_name}
+                             onChange={e => setNewMember(f => ({...f, first_name: e.target.value}))}
+                             placeholder="e.g. Kwame"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{color:'#374151'}}>Last Name *</label>
+                      <input type="text" className="input-field" value={newMember.last_name}
+                             onChange={e => setNewMember(f => ({...f, last_name: e.target.value}))}
+                             placeholder="e.g. Asante"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{color:'#374151'}}>Phone</label>
+                      <input type="text" className="input-field" value={newMember.phone}
+                             onChange={e => setNewMember(f => ({...f, phone: e.target.value}))}
+                             placeholder="e.g. 054 123 4567"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{color:'#374151'}}>Gender *</label>
+                      <select className="input-field" value={newMember.gender}
+                              onChange={e => setNewMember(f => ({...f, gender: e.target.value}))}>
+                        <option value="">Select</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button onClick={handleCreateAndAssign} disabled={creating} className="btn-primary px-4 py-2 text-sm">
+                      {creating ? 'Creating...' : 'Create & Assign'}
+                    </button>
+                    <button onClick={() => { setShowAdd(false); setNewMember({ first_name: '', last_name: '', phone: '', gender: '' }) }}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold"
+                            style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-3">
+                    <MemberSearchPicker
+                      members={unassignedMembers}
+                      value={selected}
+                      onChange={setSelected}
+                      placeholder="Search unassigned members..."
+                      disabled={assigning}
+                    />
+                    <button onClick={handleAssign} disabled={!selected || assigning} className="btn-primary px-4 py-2.5 text-sm">
+                      {assigning ? 'Assigning...' : 'Assign'}
+                    </button>
+                    <button onClick={() => { setShowAdd(false); setSelected('') }}
+                            className="px-4 py-2.5 rounded-lg text-sm font-semibold"
+                            style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-xs mt-2" style={{color:'#9ca3af'}}>
+                    Only members not currently assigned to any cell are shown.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -163,7 +254,7 @@ export default function CellDetail() {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">👥</div>
             <p className="font-semibold" style={{color:'var(--color-navy)'}}>No members yet</p>
-            <p className="text-sm mt-1" style={{color:'#9ca3af'}}>Click "Assign Member" to add members to this cell</p>
+            <p className="text-sm mt-1" style={{color:'#9ca3af'}}>Click "Add Member" to add members to this cell</p>
           </div>
         ) : (
           <table className="w-full">
@@ -204,6 +295,7 @@ export default function CellDetail() {
           </table>
         )}
       </div>
+      {dialog}
     </div>
   )
 }

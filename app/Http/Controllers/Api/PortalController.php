@@ -112,11 +112,16 @@ class PortalController extends Controller
         $records = AttendanceRecord::query()
             ->where('member_id', $member->id)
             ->where('is_present', true)
+            ->whereHas('session')
             ->with('session.serviceType')
-            ->get()
-            ->sortByDesc(fn ($r) => $r->session?->service_date)
-            ->take(50)
-            ->values();
+            ->orderByDesc(
+                AttendanceRecord::select('service_date')
+                    ->from('attendance_sessions')
+                    ->whereColumn('attendance_sessions.id', 'attendance_records.session_id')
+                    ->limit(1)
+            )
+            ->limit(50)
+            ->get();
 
         $totalPresent = AttendanceRecord::where('member_id', $member->id)
             ->where('is_present', true)

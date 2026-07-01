@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { sendMessage, previewRecipients } from '../../api/messages'
 import { getDepartments } from '../../api/departments'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -29,6 +31,7 @@ const CHANNEL_OPTS = [
 
 export default function Compose() {
   const navigate = useNavigate()
+  const { confirm, dialog } = useConfirm()
   const [form, setForm] = useState({
     channel:'email', subject:'', body:'',
     recipient_group:'all', department_id:'', gender:'', status:'active',
@@ -60,19 +63,19 @@ export default function Compose() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!confirm(`Send this message to ${count} recipient(s)?`)) return
+    if (!(await confirm(`Send this message to ${count} recipient(s)?`))) return
     setLoading(true)
     setErrors({})
     try {
       const res = await sendMessage(form)
-      alert(res.data.message)
+      toast.success(res.data.message)
       navigate(`/communication/${res.data.data.id}`)
     } catch (err) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
-        if (err.response.data.message && !err.response.data.errors) alert(err.response.data.message)
+        if (err.response.data.message && !err.response.data.errors) toast.error(err.response.data.message)
       } else {
-        alert('Failed to send. Please try again.')
+        toast.error('Failed to send. Please try again.')
       }
     } finally {
       setLoading(false)
@@ -243,6 +246,7 @@ export default function Compose() {
           </div>
         </div>
       </form>
+      {dialog}
     </div>
   )
 }

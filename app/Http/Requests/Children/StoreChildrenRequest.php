@@ -8,7 +8,7 @@ class StoreChildrenRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create children') ?? false;
     }
 
     public function rules(): array

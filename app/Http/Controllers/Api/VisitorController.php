@@ -107,19 +107,20 @@ class VisitorController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
+        $stats = Visitor::query()
+            ->selectRaw("
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE follow_up_status = 'pending') AS pending,
+                COUNT(*) FILTER (WHERE follow_up_status = 'contacted') AS contacted,
+                COUNT(*) FILTER (WHERE follow_up_status = 'joined') AS joined,
+                COUNT(*) FILTER (
+                    WHERE EXTRACT(MONTH FROM visit_date) = ?
+                      AND EXTRACT(YEAR FROM visit_date) = ?
+                ) AS this_month
+            ", [now()->month, now()->year])
+            ->first();
 
-        return response()->json([
-            'data' => [
-                'total' => Visitor::query()->count(),
-                'pending' => Visitor::query()->where('follow_up_status', 'pending')->count(),
-                'contacted' => Visitor::query()->where('follow_up_status', 'contacted')->count(),
-                'joined' => Visitor::query()->where('follow_up_status', 'joined')->count(),
-                'this_month' => Visitor::query()
-                    ->whereMonth('visit_date', now()->month)
-                    ->whereYear('visit_date', now()->year)
-                    ->count(),
-            ],
-        ]);
+        return response()->json(['data' => $stats]);
     }
 
     /**
