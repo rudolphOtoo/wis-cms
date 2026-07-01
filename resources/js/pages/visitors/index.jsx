@@ -236,13 +236,13 @@ export default function VisitorsPage() {
             <span style={{fontSize:'14px',color:'#747780'}}>Page {meta.current_page} of {meta.last_page} · {meta.total} entries</span>
             <div className="flex items-center gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-40"
+                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-40"
                       style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
               </button>
               <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-40"
+                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-40"
                       style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
               </button>
