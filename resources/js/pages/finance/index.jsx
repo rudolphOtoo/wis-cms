@@ -32,7 +32,6 @@ export default function FinancePage() {
   const [page,         setPage]      = useState(1)
   const [meta,         setMeta]      = useState(null)
   const [deleting,     setDel]       = useState(null)
-  // Fix #4 — inline confirm state replaces window.confirm()
   const [pendingDelete, setPendingDelete] = useState(null)
   const [exporting,    setExporting] = useState(false)
   const [generating,   setGenerating] = useState(false)
@@ -136,7 +135,6 @@ export default function FinancePage() {
     }
   }, [debouncedSearch, typeFilter, catFilter, page, refreshKey])
 
-  // Fix #4 — no window.confirm(); caller sets pendingDelete, this fires on Confirm click
   const handleDelete = async (txn) => {
     setDel(txn.id)
     try {
@@ -152,7 +150,6 @@ export default function FinancePage() {
 
   const chart = stats?.chart ?? []
 
-  // Fix #8 — Lucide icons replace the custom inline Icon/ICONS system
   const summaryCards = [
     {
       label: 'This Month — Income',
@@ -191,7 +188,7 @@ export default function FinancePage() {
               className="relative overflow-hidden flex flex-col justify-between text-white"
               style={{ borderRadius: '16px', padding: '24px', minHeight: '160px', background: c.gradient, boxShadow: '0 4px 12px rgba(13,31,60,0.05)' }}
             >
-              {/* Ghost icon decoration — Fix #8 Lucide at large size */}
+              {/* Ghost icon decoration */}
               <div className="absolute pointer-events-none" style={{ right: '-16px', bottom: '-16px', opacity: 0.1 }}>
                 <CardIcon size={120} strokeWidth={0.8} aria-hidden="true" />
               </div>
@@ -214,7 +211,7 @@ export default function FinancePage() {
         })}
       </div>
 
-      {/* Financial Report card — Fix #5 surface-card replaces inline cardBase */}
+      {/* Financial Report card */}
       {can('export finance') && (
         <div className="surface-card p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
@@ -297,10 +294,10 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* Transactions card — Fix #5 surface-card */}
+      {/* Transactions card */}
       <div className="surface-card overflow-hidden">
 
-        {/* Header — Fix #6 fluid responsive padding */}
+        {/* Header */}
         <div
           className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6"
           style={{ borderBottom: '1px solid var(--color-surface-border)' }}
@@ -339,7 +336,7 @@ export default function FinancePage() {
           </div>
         </div>
 
-        {/* Filter bar — Fix #6 fluid padding */}
+        {/* Filter bar */}
         <div
           className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 md:p-6"
           style={{ borderBottom: '1px solid var(--color-surface-border)', backgroundColor: '#fafbfc' }}
@@ -377,7 +374,7 @@ export default function FinancePage() {
           </select>
         </div>
 
-        {/* Fix #3 — non-essential columns hidden on mobile */}
+        {/* Non-essential columns hidden on mobile */}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -391,7 +388,7 @@ export default function FinancePage() {
               </tr>
             </thead>
             <tbody>
-              {/* Fix #2 — TableSkeleton replaces the plain "Loading…" text cell */}
+              {/* TableSkeleton for loading state */}
               {loading ? (
                 <TableSkeleton rows={8} cols={6} />
               ) : transactions.length === 0 ? (
@@ -433,7 +430,7 @@ export default function FinancePage() {
                     {txn.transaction_date}
                   </td>
                   <td style={{ padding: '16px 24px', whiteSpace: 'nowrap' }}>
-                    {/* Fix #7 — icon + text pill; not color-dot alone */}
+                    {/* Icon + text pill */}
                     <div className="flex items-center gap-2.5">
                       <span
                         className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide rounded-md"
@@ -464,13 +461,13 @@ export default function FinancePage() {
                   <td className="hidden md:table-cell" style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: '#747780', whiteSpace: 'nowrap' }}>
                     {txn.reference ?? '—'}
                   </td>
-                  {/* Fix #4 — inline confirm; Fix #4a — h-9 touch targets */}
+                  {/* Inline confirm with 44px touch targets */}
                   <td style={{ padding: '12px 24px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div className="flex justify-end items-center gap-1">
                       {can('edit transactions') && (
                         <button
                           onClick={() => navigate(`/finance/${txn.id}/edit`)}
-                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
                           style={{ color: '#92400e' }}
                           aria-label={`Edit transaction ${txn.reference ?? txn.id}`}
                         >
@@ -483,7 +480,7 @@ export default function FinancePage() {
                             <button
                               onClick={() => handleDelete(txn)}
                               disabled={deleting === txn.id}
-                              className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
                               style={{ color: '#be123c' }}
                               aria-label="Confirm deletion of this transaction"
                             >
@@ -491,7 +488,7 @@ export default function FinancePage() {
                             </button>
                             <button
                               onClick={() => setPendingDelete(null)}
-                              className="inline-flex items-center justify-center h-9 px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
                               style={{ color: '#747780' }}
                               aria-label="Cancel deletion"
                             >
@@ -501,7 +498,7 @@ export default function FinancePage() {
                         ) : (
                           <button
                             onClick={() => setPendingDelete(txn.id)}
-                            className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
                             style={{ color: '#be123c' }}
                             aria-label={`Delete transaction ${txn.reference ?? txn.id}`}
                           >
@@ -552,13 +549,13 @@ export default function FinancePage() {
         )}
       </div>
 
-      {/* Monthly Trend chart — Fix #5 surface-card */}
+      {/* Monthly Trend chart */}
       <div className="surface-card p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
           <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             Monthly Trend
           </h4>
-          {/* Fix #7 — chart legend uses icon + text, not color alone */}
+          {/* Chart legend */}
           <div className="flex gap-4">
             <span className="flex items-center gap-1.5" style={{ fontSize: '12px', color: '#44474f' }}>
               <TrendingUp size={12} strokeWidth={2} style={{ color: '#059669' }} aria-hidden="true" />

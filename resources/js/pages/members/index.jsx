@@ -11,7 +11,6 @@ import { usePermission } from '../../hooks/usePermission'
 import { useDebounce } from '../../hooks/useDebounce'
 import { TableSkeleton } from '../../components/ui/Skeletons'
 
-// Fix #7 — each status has a Lucide icon + WCAG-AA text contrast pair
 const STATUS_CONFIG = {
   active:      { bg: '#dcfce7', text: '#166534', icon: CheckCircle2,      label: 'Active' },
   inactive:    { bg: '#e2e8f0', text: '#475569', icon: MinusCircle,        label: 'Inactive' },
@@ -43,7 +42,6 @@ export default function MembersPage() {
   const [page,         setPage]         = useState(1)
   const [meta,         setMeta]         = useState(null)
   const [deleting,     setDeleting]     = useState(null)
-  // Fix #4 — inline confirm state replaces window.confirm()
   const [pendingDelete, setPendingDelete] = useState(null)
   const [exporting,    setExporting]    = useState(false)
 
@@ -109,7 +107,6 @@ export default function MembersPage() {
     }
   }, [debouncedSearch, statusFilter, genderFilter, page, refreshKey])
 
-  // Fix #4 — no confirm(); caller sets pendingDelete, this fires on Confirm click
   const handleDelete = async (member) => {
     setDeleting(member.id)
     try {
@@ -147,7 +144,6 @@ export default function MembersPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Fix #8 — Lucide Download icon replaces raw SVG path */}
           {can('export members') && (
             <button
               onClick={handleExport}
@@ -173,7 +169,6 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* Fix #5 — surface-card class replaces inline cardBase objects */}
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="surface-card p-6">
@@ -227,12 +222,12 @@ export default function MembersPage() {
       {/* Filters + Table card */}
       <div className="surface-card overflow-hidden">
 
-        {/* Fix #6 — fluid responsive padding (p-4 mobile → p-6 desktop) */}
+        {/* Fluid responsive padding */}
         <div
           className="flex flex-col lg:flex-row gap-4 p-4 md:p-6"
           style={{ borderBottom: '1px solid var(--color-surface-border)' }}
         >
-          {/* Fix #8 — Lucide Search icon */}
+          {/* Lucide Search icon */}
           <div className="relative flex-1">
             <Search
               size={16}
@@ -279,7 +274,7 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {/* Fix #3 — non-essential columns hidden on small viewports */}
+        {/* Non-essential columns hidden on small viewports */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -329,7 +324,7 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Fix #2 — TableSkeleton replaces the full-colspan spinner */}
+              {/* TableSkeleton for loading state */}
               {loading ? (
                 <TableSkeleton rows={8} cols={7} hasAvatar={true} />
               ) : members.length === 0 ? (
@@ -408,7 +403,7 @@ export default function MembersPage() {
                       {member.phone ?? '—'}
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      {/* Fix #7 — icon + text badge; not color alone */}
+                      {/* Icon + text badge */}
                       <span
                         className="inline-flex items-center gap-1.5 rounded-full text-xs font-bold"
                         style={{ padding: '4px 10px', backgroundColor: cfg.bg, color: cfg.text }}
@@ -424,12 +419,12 @@ export default function MembersPage() {
                     >
                       {member.join_date ?? '—'}
                     </td>
-                    {/* Fix #4 — inline confirm pattern; fix #4a — 44px-tall touch targets */}
+                    {/* Inline confirm with 44px touch targets */}
                     <td style={{ padding: '12px 24px' }}>
                       <div className="flex justify-end items-center gap-1">
                         <button
                           onClick={() => navigate(`/members/${member.id}`)}
-                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
+                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
                           style={{ color: 'var(--color-navy)' }}
                           aria-label={`View profile of ${member.full_name}`}
                         >
@@ -438,7 +433,7 @@ export default function MembersPage() {
                         {can('edit members') && (
                           <button
                             onClick={() => navigate(`/members/${member.id}/edit`)}
-                            className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
                             style={{ color: '#92400e' }}
                             aria-label={`Edit ${member.full_name}`}
                           >
@@ -451,15 +446,15 @@ export default function MembersPage() {
                               <button
                                 onClick={() => handleDelete(member)}
                                 disabled={deleting === member.id}
-                                className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
-                                style={{ color: '#be123c' }}
-                                aria-label={`Confirm deletion of ${member.full_name}`}
-                              >
-                                {deleting === member.id ? '…' : 'Confirm'}
-                              </button>
-                              <button
-                                onClick={() => setPendingDelete(null)}
-                                className="inline-flex items-center justify-center h-9 px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                              style={{ color: '#be123c' }}
+                              aria-label={`Confirm deletion of ${member.full_name}`}
+                            >
+                              {deleting === member.id ? '…' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={() => setPendingDelete(null)}
+                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
                                 style={{ color: '#747780' }}
                                 aria-label="Cancel deletion"
                               >
@@ -469,7 +464,7 @@ export default function MembersPage() {
                           ) : (
                             <button
                               onClick={() => setPendingDelete(member.id)}
-                              className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
                               style={{ color: '#be123c' }}
                               aria-label={`Delete ${member.full_name}`}
                             >
@@ -503,7 +498,7 @@ export default function MembersPage() {
               <button
                 disabled={page === 1}
                 onClick={() => setPage(p => p - 1)}
-                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-11 h-11 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
                 aria-label="Go to previous page"
               >
@@ -520,7 +515,7 @@ export default function MembersPage() {
               <button
                 disabled={page === meta.last_page}
                 onClick={() => setPage(p => p + 1)}
-                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-11 h-11 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
                 aria-label="Go to next page"
               >

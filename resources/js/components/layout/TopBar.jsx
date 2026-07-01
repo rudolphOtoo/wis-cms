@@ -28,7 +28,6 @@ export default function TopBar({ onMenuClick }) {
   const { pathname } = useLocation()
   const { user }     = useAuth()
 
-  // Fix #10 — global regex replaces every underscore (e.g. finance_department_head → finance department head)
   const roleDisplay = user?.roles?.[0]?.replace(/_/g, ' ')
 
   return (
@@ -36,7 +35,6 @@ export default function TopBar({ onMenuClick }) {
       className="bg-white px-4 md:px-6 py-3 md:py-4 flex items-center justify-between flex-shrink-0 gap-3"
       style={{ borderBottom: '1px solid var(--color-surface-border)' }}
     >
-      {/* Fix #9 — strict 44×44px touch target for the mobile hamburger */}
       <button
         onClick={onMenuClick}
         type="button"
@@ -64,12 +62,10 @@ export default function TopBar({ onMenuClick }) {
           <div className="text-sm font-semibold truncate max-w-[140px]" style={{ color: '#374151' }}>
             {user?.name}
           </div>
-          {/* Fix #10 — global underscore replace + proper casing */}
           <div className="text-xs capitalize" style={{ color: '#9ca3af' }}>
             {roleDisplay}
           </div>
         </div>
-        {/* Fix #10 — aria-label names the avatar for screen readers */}
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: 'rgba(27,58,107,0.1)' }}
