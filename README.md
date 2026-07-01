@@ -2,7 +2,7 @@
 
 **Wesleyan International Society Church Management System** — a full-stack web application for The Methodist Church Ghana — Wesleyan International Society.
 
-WIS-CMS replaces paper-based church administration with a secure, branch-scoped platform for member records, visitors, departments, and (planned) attendance, finance, and communications.
+WIS-CMS replaces paper-based church administration with a secure, branch-scoped platform for member records, visitors, departments, attendance, finance, communications, cells, and children's ministry.
 
 [![CI](https://github.com/rudolphOtoo/wis-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/rudolphOtoo/wis-cms/actions/workflows/ci.yml)
 ![Laravel](https://img.shields.io/badge/Laravel-13-red?style=flat-square&logo=laravel)
@@ -28,18 +28,14 @@ Built as a pro bono project for a congregation of approximately 800–1,000 memb
 | **Members** | CRUD, search, filters, pagination, stats, soft deletes, auto-generated member numbers (`WIS-YYYY-####`) |
 | **Visitors** | CRUD, search, filters, stats |
 | **Departments** | CRUD, leader assignment, attach/detach members |
+| **Cells** | CRUD, member management, attendance (recorded via attendance sessions), cell leader role with scoped access |
+| **Attendance** | Session creation, register taking, per-member history with attendance rate trends |
+| **Finance** | CRUD with income/expense categories, searchable transaction log |
+| **Children** | CRUD, stats, linked departures follow-up |
+| **Communication** | Compose, broadcast, per-member message history with delivery tracking |
+| **Dashboard & reports** | Live stats (member/visitor/child counts, growth, attendance trends), PDF export, CSV download |
+| **Users & roles** | Seven roles seeded via Spatie Permission, enforced by middleware and FormRequest `authorize()` |
 | **Activity log** | Audited writes on key actions (Spatie Activity Log) |
-| **Roles & permissions** | Six roles seeded via Spatie Permission (enforcement on API endpoints is in progress) |
-
-### Planned (v1.0)
-
-| Module | Status |
-|--------|--------|
-| **Attendance** | Database schema and seed data; API and UI not yet built |
-| **Finance** | Categories seeded; transactions API and UI not yet built |
-| **Communication** | Message schema; Arkesel SMS integration not yet wired |
-| **Dashboard & reports** | Endpoint exists; real-time stats and PDF/Excel exports pending |
-| **Children** | Database table exists; model and UI pending |
 
 ---
 
@@ -53,7 +49,7 @@ Built as a pro bono project for a congregation of approximately 800–1,000 memb
 | Auth | Laravel Sanctum (Bearer token) |
 | RBAC | [spatie/laravel-permission](https://github.com/spatie/laravel-permission) |
 | Audit | [spatie/laravel-activitylog](https://github.com/spatie/laravel-activitylog) |
-| PDF / Excel | DomPDF, OpenSpout (dependencies installed; features pending) |
+| PDF / Excel | DomPDF, OpenSpout (report download menu wired for attendance + members) |
 | Containers | Docker Compose (PostgreSQL) |
 
 ---
@@ -117,7 +113,7 @@ php artisan migrate --seed
 Seeders create:
 
 - Default branch (Wesleyan International Society, Kumasi)
-- Roles and permissions (six roles)
+- Roles and permissions (seven roles)
 - Service types and finance categories
 - Super admin user (see below)
 
@@ -237,6 +233,7 @@ Change this password before any production deployment.
 | Secretary | `secretary` | Members, visitors, attendance, departments, messaging |
 | Finance Officer | `finance_officer` | Finance transactions and reports |
 | Department Leader | `department_leader` | Department membership and attendance |
+| Cell Leader | `cell_leader` | Own cell's members and attendance (sidebar + queries auto-scoped) |
 | Usher | `usher` | Attendance capture |
 
 Permissions are defined in `database/seeders/RolesAndPermissionsSeeder.php`.
@@ -258,8 +255,12 @@ wis-cms/
 │   └── seeders/                # Branches, roles, defaults
 ├── resources/
 │   ├── js/
-│   │   ├── api/                # Axios API clients
-│   │   ├── components/layout/  # App shell, sidebar, top bar
+│   │   ├── api/                # Axios API clients (error toast interceptor)
+│   │   ├── components/
+│   │   │   ├── layout/         # App shell, sidebar, top bar
+│   │   │   ├── ConfirmDialog.jsx   # Accessible confirmation modal
+│   │   │   └── ErrorBoundary.jsx   # React error boundary
+│   │   ├── hooks/              # useConfirm hook, shared state
 │   │   ├── context/            # Auth context
 │   │   ├── pages/              # Feature pages
 │   │   └── routes/             # React Router
@@ -289,13 +290,27 @@ Base URL: `/api`
 | `POST` | `/auth/logout` | Revoke current token |
 | `GET` | `/auth/me` | Current user, roles, permissions |
 | `POST` | `/auth/change-password` | Update password |
-| `GET` | `/dashboard` | Dashboard stats (stub) |
+| `GET` | `/dashboard` | Dashboard stats (member/visitor/child counts, growth, attendance rate) |
 | `*` | `/members`, `/members/stats` | Member CRUD and statistics |
 | `*` | `/visitors`, `/visitors/stats` | Visitor CRUD and statistics |
+| `*` | `/children`, `/children/stats` | Children CRUD and statistics |
 | `*` | `/departments`, `/departments/stats` | Department CRUD and statistics |
-| `GET` | `/departments/{id}/members` | List department members |
-| `POST` | `/departments/{id}/members` | Add member to department |
-| `DELETE` | `/departments/{id}/members/{memberId}` | Remove member |
+| `GET/POST/DELETE` | `/departments/{id}/members` | Manage department members |
+| `*` | `/cells`, `/cells/stats` | Cell CRUD and statistics |
+| `GET/POST` | `/cells/{id}/members` | Manage cell members |
+| `POST` | `/cells/{id}/message` | Send SMS to cell members |
+| `*` | `/attendance/sessions` | Attendance session CRUD |
+| `GET/POST` | `/attendance/sessions/{id}/records` | Register records |
+| `GET` | `/attendance/history/{member}` | Per-member attendance history |
+| `*` | `/finance/transactions`, `/finance/stats` | Finance CRUD and statistics |
+| `*` | `/communication/messages`, `/communication/stats` | Message CRUD and statistics |
+| `GET` | `/portal/attendance` | Current member's recent attendance |
+| `GET/POST/PUT/DELETE` | `/users` | User management (admin) |
+| `POST` | `/users/{id}/link-member` | Link user to member record |
+| `POST` | `/users/{id}/create-and-link-member` | Create + link member in one step |
+| `POST` | `/users/{id}/unlink-member` | Sever user–member link |
+| `GET` | `/reports/attendance-trends` | Attendance trend data (grouped by week/month/quarter) |
+| `GET` | `/reports/export` | PDF/Excel export |
 
 List endpoints support query parameters such as `search`, `status`, `gender`, `page`, and `per_page` where applicable. All data is scoped to the authenticated user's `branch_id`.
 
@@ -309,19 +324,31 @@ List endpoints support query parameters such as `search`, `status`, `gender`, `p
 | `/dashboard` | Dashboard |
 | `/members`, `/members/new`, `/members/:id/edit` | Members |
 | `/visitors`, `/visitors/new`, `/visitors/:id/edit` | Visitors |
+| `/children`, `/children/new`, `/children/:id/edit` | Children |
 | `/departments`, `/departments/new`, `/departments/:id`, `/departments/:id/edit` | Departments |
-
-Sidebar links for attendance, finance, and messages are placeholders until those modules are implemented.
+| `/cells`, `/cells/new`, `/cells/:id`, `/cells/:id/edit` | Cells |
+| `/attendance`, `/attendance/new`, `/attendance/sessions/:id/register` | Attendance |
+| `/finance`, `/finance/new` | Finance |
+| `/communication`, `/communication/compose` | Communication |
+| `/reminders` | Reminders / departures follow-up |
+| `/birthdays` | Upcoming birthdays |
+| `/settings` | Follow-up configuration |
+| `/submissions` | Recent submissions |
+| `/admin/users`, `/admin/users/new`, `/admin/users/:id/edit` | User management |
 
 ---
 
 ## Testing
+
+The project uses **Pest** for both feature and unit tests.
 
 ```bash
 composer test
 # or
 php artisan test
 ```
+
+Tests cover authentication, member/visitor/child CRUD, attendance recording, cell management, role-based access control, branch scoping, and report generation.
 
 ---
 
@@ -345,16 +372,22 @@ Serve the application with a proper web server (nginx, Apache, or Laravel Forge)
 | `APP_URL` | Application URL (used for links and Sanctum) |
 | `DB_*` | Database connection (use `pgsql` in production) |
 | `VITE_APP_NAME` | Frontend app title |
-
-SMS (Arkesel) and mail settings will be added when the communication module is implemented.
+| `APP_DEBUG` | Keep `false` in production (disables verbose error pages) |
+| `SESSION_ENCRYPT` | Set `true` in production (encrypts session data at rest) |
+| `SESSION_SECURE_COOKIE` | Set `true` in production (HTTPS-only cookies) |
 
 ---
 
 ## Contributing
 
 1. Create a feature branch from `main`.
-2. Follow existing patterns: Form Requests, API Resources, branch scoping, activity logging.
-3. Run `php artisan test` and ensure the app loads at `http://127.0.0.1:8000` before opening a pull request.
+2. Follow existing patterns: Form Requests, API Resources (`UserResource`, `MemberResource`), the `BelongsToBranch` trait for branch scoping, and `activity()` logging on mutating actions.
+3. Run code style checks before committing:
+   ```bash
+   ./vendor/bin/pint          # Laravel Pint (PHP)
+   npm run lint               # ESLint (JS/JSX)
+   ```
+4. Run `php artisan test` and ensure the app loads at `http://127.0.0.1:8000` before opening a pull request.
 
 ---
 
