@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wis_cms_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wis_cms
+      POSTGRES_USER: wis_admin
+      POSTGRES_PASSWORD: wis_secret_2024
+    ports:
+      - "5433:5432"
+    volumes:
+      - wis_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wis_admin -d wis_cms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ghcr.io/rudolphotoo/wis-cms-app:${IMAGE_TAG:-latest}
+    container_name: wis_cms_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "php-fpm: master process"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  webserver:
+    image: ghcr.io/rudolphotoo/wis-cms-webserver:${IMAGE_TAG:-latest}
+    container_name: wis_cms_webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    depends_on:
+      app:
+        condition: service_healthy
+
+  queue:
+    image: ghcr.io/rudolphotoo/wis-cms-app:${IMAGE_TAG:-latest}
+    container_name: wis_cms_queue
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    depends_on:
+      app:
+        condition: service_healthy
+
+  scheduler:
+    image: ghcr.io/rudolphotoo/wis-cms-app:${IMAGE_TAG:-latest}
+    container_name: wis_cms_scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  wis_postgres_data:
