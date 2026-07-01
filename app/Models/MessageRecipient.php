@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Branch scoping is NOT applied here — the parent Message
+ * owns the branch boundary. Recipients are always accessed
+ * through the message relation.
+ */
 class MessageRecipient extends Model
 {
-    use BelongsToBranch, HasUuids;
+    use HasUuids;
 
     protected $keyType = 'string';
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,10 +18,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Raw DB::table() queries against attendance_records must now explicitly
  * add ->whereNull('ar.deleted_at') — Eloquent model queries handle this
  * automatically via the SoftDeletes global scope.
+ *
+ * Branch scoping is NOT applied here — the parent AttendanceSession
+ * owns the branch boundary. Queries should join through the session.
  */
 class AttendanceRecord extends Model
 {
-    use BelongsToBranch, HasUuids, SoftDeletes;
+    use HasUuids, SoftDeletes;
 
     protected $keyType = 'string';
 
