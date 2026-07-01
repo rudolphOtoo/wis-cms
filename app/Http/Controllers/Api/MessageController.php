@@ -178,15 +178,26 @@ class MessageController extends Controller
     public function stats(): JsonResponse
     {
         $now = now();
+        $branchId = request()->user()->branch_id;
+
+        $messageStats = Message::where('branch_id', $branchId)
+            ->selectRaw("
+                COUNT(*) FILTER (WHERE status = 'sent') AS total_sent,
+                COUNT(*) FILTER (
+                    WHERE EXTRACT(MONTH FROM created_at) = ?
+                      AND EXTRACT(YEAR FROM created_at) = ?
+                ) AS this_month
+            ", [$now->month, $now->year])
+            ->first();
+
+        $totalRecipients = MessageRecipient::whereHas('message', fn ($q) => $q->where('branch_id', $branchId)
+        )->count();
 
         return response()->json([
             'data' => [
-                'total_sent' => Message::where('status', 'sent')->count(),
-                'this_month' => Message::query()
-                    ->whereMonth('created_at', $now->month)
-                    ->whereYear('created_at', $now->year)
-                    ->count(),
-                'total_recipients' => MessageRecipient::whereHas('message')->count(),
+                'total_sent' => (int) $messageStats->total_sent,
+                'this_month' => (int) $messageStats->this_month,
+                'total_recipients' => $totalRecipients,
             ],
         ]);
     }

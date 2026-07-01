@@ -34,17 +34,23 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getDashboard()
-      .then(res => setData(res.data.data))
+    const controller = new AbortController()
+    let mounted = true
+
+    getDashboard(undefined, controller.signal)
+      .then(res => { if (mounted) setData(res.data.data) })
       .catch(err => {
-        // A non-admin member reaching /dashboard gets 403 — redirect to their portal.
+        if (err?.code === 'ERR_CANCELED') return
+        if (!mounted) return
         if (err.response?.status === 403) {
           navigate('/portal', { replace: true })
         } else {
           console.error(err)
         }
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (mounted) setLoading(false) })
+
+    return () => { mounted = false; controller.abort() }
   }, [])
 
   // Fix #2 — DashboardSkeleton replaces the full-page spinner

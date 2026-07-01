@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import {
   getSubmissions,
   getSubmission,
   approveSubmission,
   rejectSubmission,
 } from '../../api/submissions'
+import { useConfirm } from '../../hooks/useConfirm'
 
 function StatusBadge({ status }) {
   const colors = {
@@ -95,6 +97,7 @@ function SubmissionRow({ submission, onClick }) {
 }
 
 function DetailDrawer({ submissionId, onClose, onActionComplete }) {
+  const { confirm, dialog } = useConfirm()
   const [detail, setDetail] = useState(null)
   const [cells, setCells] = useState([])
   const [loading, setLoading] = useState(true)
@@ -135,21 +138,21 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
       onActionComplete?.()
       onClose()
     } catch (err) {
-      alert(err.response?.data?.message ?? 'Could not approve.')
+      toast.error(err.response?.data?.message ?? 'Could not approve.')
     } finally {
       setActing(false)
     }
   }
 
   const handleReject = async () => {
-    if (!confirm('Reject this submission? This cannot be undone.')) return
+    if (!(await confirm('Reject this submission? This cannot be undone.'))) return
     setActing(true)
     try {
       await rejectSubmission(submissionId, { notes: notes || null })
       onActionComplete?.()
       onClose()
     } catch (err) {
-      alert(err.response?.data?.message ?? 'Could not reject.')
+      toast.error(err.response?.data?.message ?? 'Could not reject.')
     } finally {
       setActing(false)
     }
@@ -306,6 +309,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
           </>
         )}
       </div>
+      {dialog}
     </>
   )
 }

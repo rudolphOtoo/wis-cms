@@ -8,7 +8,7 @@ class StoreVisitorRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create visitors') ?? false;
     }
 
     public function rules(): array
@@ -18,11 +18,11 @@ class StoreVisitorRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:150'],
-            'address' => ['nullable', 'string'],
+            'address' => ['nullable', 'string', 'max:500'],
             'how_they_heard' => ['nullable', 'string', 'max:150'],
             'visit_date' => ['required', 'date'],
             'follow_up_status' => ['in:pending,contacted,not_interested,joined'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { toast } from 'sonner'
 
 const api = axios.create({
   baseURL: '/api',
@@ -21,10 +22,28 @@ api.interceptors.response.use(
       localStorage.removeItem('wis_token')
       localStorage.removeItem('wis_user')
       window.location.href = '/login'
+      return Promise.reject(error)
     }
+
     if (error.response?.status === 423 && window.location.pathname !== '/change-password') {
       window.location.href = '/change-password'
+      return Promise.reject(error)
     }
+
+    const status = error.response?.status
+    const data   = error.response?.data
+
+    if (!error.response) {
+      toast.error('Network error. Check your connection.')
+    } else if (status === 403) {
+      toast.error(data?.message ?? 'You do not have permission to perform this action.')
+    } else if (status === 422 && data?.errors) {
+      const firstField = Object.values(data.errors)[0]
+      if (firstField) toast.error(firstField[0])
+    } else if (status === 500) {
+      toast.error('Something went wrong. Please try again.')
+    }
+
     return Promise.reject(error)
   }
 )

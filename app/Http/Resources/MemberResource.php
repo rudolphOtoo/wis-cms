@@ -31,6 +31,7 @@ class MemberResource extends JsonResource
             'photo_path' => $this->photo_path,
             'notes' => $this->notes,
             'branch_id' => $this->branch_id,
+            'cell_id' => $this->cell_id,
             // Whether this Member has a linked User account (login).
             // Used by the UI to decide whether to show 'Promote to Leader'.
             // Populated by ->withExists('user') on the query; falls back to

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getVisitors, deleteVisitor, getVisitorStats, convertVisitor } from '../../api/visitors'
 import { usePermission } from '../../hooks/usePermission'
+import { useConfirm } from '../../hooks/useConfirm'
 import { useDebounce } from '../../hooks/useDebounce'
 
 const STATUS_COLORS = {
@@ -37,6 +39,7 @@ const ICONS = {
 export default function VisitorsPage() {
   const navigate = useNavigate()
   const { can }  = usePermission()
+  const { confirm, dialog } = useConfirm()
   const [visitors,    setVisitors]    = useState([])
   const [stats,       setStats]       = useState(null)
   const [loading,     setLoading]     = useState(true)
@@ -69,13 +72,13 @@ export default function VisitorsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleDelete = async (visitor) => {
-    if (!confirm(`Delete ${visitor.full_name}?`)) return
+    if (!(await confirm(`Delete ${visitor.full_name}?`))) return
     setDeleting(visitor.id)
     try {
       await deleteVisitor(visitor.id)
       fetchData()
     } catch {
-      alert('Failed to delete visitor.')
+      toast.error('Failed to delete visitor.')
     } finally {
       setDeleting(null)
     }
@@ -255,6 +258,7 @@ export default function VisitorsPage() {
           onSuccess={() => { setConverting(null); fetchData() }}
         />
       )}
+      {dialog}
     </div>
   )
 }
@@ -279,14 +283,14 @@ function ConvertModal({ visitor, onClose, onSuccess }) {
     setErrors({})
     try {
       const res = await convertVisitor(visitor.id, form)
-      alert(res.data.message)
+      toast.success(res.data.message)
       onSuccess()
     } catch (err) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
-        if (err.response.data.message) alert(err.response.data.message)
+        if (err.response.data.message) toast.error(err.response.data.message)
       } else {
-        alert('Conversion failed. Please try again.')
+        toast.error('Conversion failed. Please try again.')
       }
     } finally {
       setLoading(false)

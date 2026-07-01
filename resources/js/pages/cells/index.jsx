@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getCells, deleteCell } from '../../api/cells'
 import { usePermission } from '../../hooks/usePermission'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -23,6 +25,7 @@ const ICONS = {
 export default function CellsPage() {
   const navigate = useNavigate()
   const { can }  = usePermission()
+  const { confirm, dialog } = useConfirm()
   const [cells,    setCells]    = useState([])
   const [loading,  setLoading]  = useState(true)
   const [deleting, setDeleting] = useState(null)
@@ -42,13 +45,13 @@ export default function CellsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleDelete = async (cell) => {
-    if (!confirm(`Delete "${cell.name}"? Members will be unassigned from this cell.`)) return
+    if (!(await confirm(`Delete "${cell.name}"? Members will be unassigned from this cell.`))) return
     setDeleting(cell.id)
     try {
       await deleteCell(cell.id)
       fetchData()
     } catch {
-      alert('Failed to delete cell.')
+      toast.error('Failed to delete cell.')
     } finally {
       setDeleting(null)
     }
@@ -182,6 +185,7 @@ export default function CellsPage() {
           ))}
         </div>
       )}
+      {dialog}
     </div>
   )
 }

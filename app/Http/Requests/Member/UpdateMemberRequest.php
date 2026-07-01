@@ -8,7 +8,7 @@ class UpdateMemberRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('edit members') ?? false;
     }
 
     public function rules(): array
@@ -21,14 +21,14 @@ class UpdateMemberRequest extends FormRequest
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:150'],
-            'address' => ['nullable', 'string'],
+            'address' => ['nullable', 'string', 'max:500'],
             'occupation' => ['nullable', 'string', 'max:100'],
             'marital_status' => ['nullable', 'in:single,married,widowed,divorced'],
             'join_date' => ['nullable', 'date'],
             'is_baptised' => ['boolean'],
             'baptism_date' => ['nullable', 'date'],
             'status' => ['in:active,inactive,transferred,deceased'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDepartment, getDeptMembers, addDeptMember, removeDeptMember } from '../../api/departments'
 import { getMembers } from '../../api/members'
 import MemberSearchPicker from '../../components/MemberSearchPicker'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function DepartmentDetail() {
   const navigate    = useNavigate()
   const { id }      = useParams()
-  const [dept,      setDept]      = useState(null)
+  const { confirm, dialog } = useConfirm()
+  const [dept,    setDept]    = useState(null)
   const [members,   setMembers]   = useState([])
   const [allMembers,setAllMembers]= useState([])
   const [loading,   setLoading]   = useState(true)
@@ -45,20 +48,20 @@ export default function DepartmentDetail() {
       setShowAdd(false)
       fetchData()
     } catch (err) {
-      alert(err.response?.data?.message ?? 'Failed to add member.')
+      toast.error(err.response?.data?.message ?? 'Failed to add member.')
     } finally {
       setAdding(false)
     }
   }
 
   const handleRemove = async (memberId) => {
-    if (!confirm('Remove this member from the department?')) return
+    if (!(await confirm('Remove this member from the department?'))) return
     setRemoving(memberId)
     try {
       await removeDeptMember(id, memberId)
       fetchData()
     } catch {
-      alert('Failed to remove member.')
+      toast.error('Failed to remove member.')
     } finally {
       setRemoving(null)
     }
@@ -218,6 +221,7 @@ export default function DepartmentDetail() {
           </table>
         )}
       </div>
+      {dialog}
     </div>
   )
 }

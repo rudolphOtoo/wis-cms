@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
 
 /**
  * A small download menu button. Click to open dropdown with PDF + CSV options.
@@ -43,7 +44,7 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Download failed:', err)
-      alert('Could not download the report. Please try again.')
+      toast.error('Could not download the report. Please try again.')
     } finally {
       setDownloading(false)
     }
