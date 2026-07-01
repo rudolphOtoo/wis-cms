@@ -88,7 +88,10 @@ export default function Login() {
         <div className="relative z-10 flex-grow flex flex-col items-center justify-center text-center login-fade">
           {/* Logo tile */}
           <div className="mb-2 flex items-center justify-center">
-            <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-24 h-24 object-contain" />
+            <picture>
+              <source srcSet="/images/wis-logo.webp" type="image/webp" />
+              <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" width={96} height={96} className="w-24 h-24 object-contain" fetchPriority="high" />
+            </picture>
           </div>
 
           <h1 className="font-bold mb-1 text-4xl md:text-5xl lg:text-6xl"

@@ -143,6 +143,7 @@ class AttendanceController extends Controller
             $people = Children::query()
                 ->where('is_active', true)
                 ->orderBy('first_name')
+                ->limit(500)
                 ->get()
                 ->map(fn ($c) => [
                     'id' => $c->id,

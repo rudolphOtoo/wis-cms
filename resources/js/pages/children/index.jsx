@@ -1,16 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useConfirm } from '../../hooks/useConfirm'
+import { useDebounce } from '../../hooks/useDebounce'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getChildren, deleteChild, getChildrenStats } from '../../api/children'
 import { usePermission } from '../../hooks/usePermission'
-
-const cardBase = {
-  backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
-  borderRadius: '16px',
-  boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
-}
+import { TableSkeleton } from '../../components/ui/Skeletons'
 
 const Icon = ({ d, size = 22 }) => (
   <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8}
@@ -36,11 +31,13 @@ export default function ChildrenPage() {
   const [meta,        setMeta]        = useState(null)
   const [deleting,    setDeleting]    = useState(null)
 
+  const debouncedSearch = useDebounce(search, 400)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [cRes, sRes] = await Promise.all([
-        getChildren({ search, class_group: classFilter, page, per_page: 15 }),
+        getChildren({ search: debouncedSearch, class_group: classFilter, page, per_page: 15 }),
         getChildrenStats(),
       ])
       setChildren(cRes.data.data)
@@ -51,13 +48,9 @@ export default function ChildrenPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, classFilter, page])
+  }, [debouncedSearch, classFilter, page])
 
   useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
-    return () => clearTimeout(t)
-  }, [search])
 
   const handleDelete = async (child) => {
     if (!(await confirm(`Remove ${child.full_name} from the children's register?`))) return
@@ -105,7 +98,7 @@ export default function ChildrenPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map(s => (
-          <div key={s.label} style={{...cardBase, padding:'24px'}}>
+          <div key={s.label} className="surface-card p-6">
             <div className="rounded-lg flex items-center justify-center mb-3"
                  style={{width:'40px',height:'40px',backgroundColor:s.bg,color:s.color}}>
               <Icon d={s.icon} size={20} />
@@ -117,7 +110,7 @@ export default function ChildrenPage() {
       </div>
 
       {/* Filters */}
-      <div style={{...cardBase, padding:'16px 24px'}}>
+      <div className="surface-card p-4 md:p-6">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#747780'}}
@@ -139,19 +132,27 @@ export default function ChildrenPage() {
       </div>
 
       {/* Table */}
-      <div style={{...cardBase, overflow:'hidden'}}>
+      <div className="surface-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
-                {[['Name'],['Age','center'],['Gender'],['Class'],['Guardian'],['Status'],['Actions','right']].map(([h, align]) => (
-                  <th key={h} className="uppercase tracking-wider" style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
+                {[
+                  ['Name'],
+                  ['Age', 'center', 'hidden sm:table-cell'],
+                  ['Gender', 'left', 'hidden sm:table-cell'],
+                  ['Class', 'left', 'hidden md:table-cell'],
+                  ['Guardian', 'left', 'hidden md:table-cell'],
+                  ['Status'],
+                  ['Actions', 'right'],
+                ].map(([h, align, extra]) => (
+                  <th key={h} className={`uppercase tracking-wider ${extra ?? ''}`} style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
+                <TableSkeleton rows={8} cols={7} hasAvatar={true} />
               ) : children.length === 0 ? (
                 <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">👶</div>
@@ -161,9 +162,7 @@ export default function ChildrenPage() {
               ) : children.map((child) => {
                 const isBoy = child.gender === 'male'
                 return (
-                  <tr key={child.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                  <tr key={child.id} className="transition-colors hover:bg-slate-50" style={{borderTop:'1px solid var(--color-surface-border)'}}>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold"
@@ -174,17 +173,17 @@ export default function ChildrenPage() {
                         <p className="font-bold" style={{color:'var(--color-navy)'}}>{child.full_name}</p>
                       </div>
                     </td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f',textAlign:'center'}}>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f',textAlign:'center'}} className="hidden sm:table-cell">
                       {child.age != null ? `${child.age} yrs` : '—'}
                     </td>
-                    <td style={{padding:'16px 24px'}}>
+                    <td style={{padding:'16px 24px'}} className="hidden sm:table-cell">
                       <span className="flex items-center gap-1" style={{fontSize:'14px',fontWeight:600,color: isBoy ? '#2563eb' : '#db2777'}}>
                         <Icon d={isBoy ? ICONS.boy : ICONS.girl} size={18} />
                         <span className="capitalize">{child.gender}</span>
                       </span>
                     </td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#191c1e'}}>{child.class_group ?? '—'}</td>
-                    <td style={{padding:'16px 24px'}}>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#191c1e'}} className="hidden md:table-cell">{child.class_group ?? '—'}</td>
+                    <td style={{padding:'16px 24px'}} className="hidden md:table-cell">
                       {child.guardian ? (
                         <div>
                           <p style={{fontSize:'14px',fontWeight:600,color:'#191c1e'}}>{child.guardian.name}</p>

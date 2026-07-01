@@ -72,7 +72,10 @@ export default function Portal() {
       <header className="shadow-sm" style={{backgroundColor:'var(--color-navy)'}}>
         <div className="flex justify-between items-center max-w-5xl mx-auto px-6 h-16">
           <div className="flex items-center gap-3">
-            <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-8 h-8 object-contain" />
+            <picture>
+              <source srcSet="/images/wis-logo.webp" type="image/webp" />
+              <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" width={32} height={32} className="w-8 h-8 object-contain" />
+            </picture>
             <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-gold-light)'}}>WIS-CMS</h1>
           </div>
           <div className="flex items-center gap-4">
