@@ -188,6 +188,31 @@ Services:
 docker compose build && docker compose up -d
 ```
 
+### Publishing images (no source access needed on the target machine)
+
+The `app` and `webserver` images are self-contained (code and built frontend assets are baked in), so they can be pushed to a registry and run elsewhere without cloning this repo.
+
+**CI (recommended):** `.github/workflows/docker-publish.yml` builds and pushes both images to GHCR on every push to `main` (tagged `latest` + short SHA) and on `v*` tags (tagged with the semver). Uses the built-in `GITHUB_TOKEN`, no extra secrets needed.
+
+**Manual push:**
+
+```bash
+docker/build-and-push.sh          # tags as :latest
+docker/build-and-push.sh v1.2.0   # or pass an explicit tag
+```
+
+Pushes `ghcr.io/rudolphotoo/wis-cms-app` and `ghcr.io/rudolphotoo/wis-cms-webserver`. Requires `docker login ghcr.io` with a PAT that has `write:packages`.
+
+**Running on another machine** (only `docker-compose.deploy.yml` and `.env` are needed — no repo checkout):
+
+```bash
+cp .env.example .env    # fill in real secrets
+docker compose -f docker-compose.deploy.yml pull
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+If the GHCR packages are private, that machine also needs `docker login ghcr.io` with a PAT that has `read:packages`. Set `IMAGE_TAG` in `.env` to pin a specific version instead of `latest`.
+
 ---
 
 ## Default login
