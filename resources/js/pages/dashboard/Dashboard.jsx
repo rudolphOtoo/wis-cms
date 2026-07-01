@@ -53,7 +53,6 @@ export default function Dashboard() {
     return () => { mounted = false; controller.abort() }
   }, [])
 
-  // Fix #2 — DashboardSkeleton replaces the full-page spinner
   if (loading) return <DashboardSkeleton />
 
   if (data.mode === 'department_leader') {
@@ -67,7 +66,6 @@ export default function Dashboard() {
   const malePct   = totalGender > 0 ? Math.round((gender_split.male   / totalGender) * 100) : 0
   const femalePct = totalGender > 0 ? Math.round((gender_split.female / totalGender) * 100) : 0
 
-  // Fix #8 — Lucide component references replace inline ICONS path strings
   const stats = [
     { label: 'Active Members',         value: hero.total_members,   icon: Users },
     { label: 'Last Sunday Attendance', value: hero.last_attendance, icon: CalendarDays },
@@ -78,7 +76,6 @@ export default function Dashboard() {
   return (
     <div className="space-y-6" style={{ maxWidth: '1440px' }}>
 
-      {/* Fix #6 — responsive banner padding (p-6 mobile → p-10 desktop) */}
       <section
         className="rounded-xl relative overflow-hidden p-6 md:p-10"
         style={{ background: 'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)' }}
@@ -100,7 +97,7 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Stat cards — Fix #5 surface-card replaces inline cardStyle */}
+      {/* Stat cards */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map(s => {
           const IconComp = s.icon
@@ -150,7 +147,6 @@ export default function Dashboard() {
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
               Attendance Trend
             </h3>
-            {/* Fix #10 — descriptive aria-label on "View all" button */}
             <button
               onClick={() => navigate('/attendance')}
               className="text-xs font-semibold hover:underline transition-colors"
@@ -270,7 +266,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Quick actions — Fix #8 Lucide icons, Fix #5 no JS hover handlers */}
         <div className="surface-card p-6">
           <h3 className="mb-6" style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             Quick Actions
@@ -362,7 +357,6 @@ export default function Dashboard() {
             <div className="space-y-3">
               {recent_transactions.map((t, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  {/* Fix #7 — colored bg avatar uses icon, not just color */}
                   <div
                     className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: t.type === 'income' ? '#dcfce7' : '#ffdad6' }}
@@ -398,7 +392,6 @@ function LeaderDashboard({ data, user, navigate }) {
   const [msgDept, setMsgDept] = useState(null)
   const [msgCell, setMsgCell] = useState(null)
 
-  // Fix #7 — role pill still uses color + text (no color-only)
   const ROLE_PILL = {
     president: { bg: '#ffedd5', text: '#9a3412' },
     secretary: { bg: 'rgba(27,58,107,0.1)', text: 'var(--color-navy)' },
@@ -414,7 +407,6 @@ function LeaderDashboard({ data, user, navigate }) {
   return (
     <div className="space-y-6" style={{ maxWidth: '1440px' }}>
 
-      {/* Fix #6 — responsive banner padding */}
       <section
         className="rounded-xl relative overflow-hidden p-6 md:p-10"
         style={{ background: 'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)' }}
@@ -793,7 +785,6 @@ function MessageModal({ dept, cell, onClose }) {
               {isCell ? 'Sent to your cell members with contact details.' : 'Sent to your department members with contact details.'}
             </p>
           </div>
-          {/* Fix #9 — 40px close button touch target */}
           <button
             onClick={onClose}
             type="button"

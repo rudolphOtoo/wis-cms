@@ -89,7 +89,7 @@ export default function CellForm() {
     <div className="max-w-xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/cells')}
-                className="p-2 rounded-lg"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
                 style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>

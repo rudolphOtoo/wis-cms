@@ -72,11 +72,9 @@ export default function Login() {
 
       {/* LEFT — Brand canvas */}
       <section ref={panelRef}
-               className="md:w-1/2 flex flex-col justify-between relative overflow-hidden"
+               className="md:w-1/2 flex flex-col justify-between relative overflow-hidden p-8 md:p-10 min-h-[280px] md:min-h-[400px]"
                style={{
                  background:'linear-gradient(135deg, #0d1f3c 0%, #1b3a6b 100%)',
-                 minHeight:'400px',
-                 padding:'40px',
                }}>
         {/* Blurred decorative circles */}
         <div data-blur className="absolute rounded-full"
@@ -93,12 +91,12 @@ export default function Login() {
             <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-24 h-24 object-contain" />
           </div>
 
-          <h1 className="font-bold mb-1"
-              style={{fontFamily:'var(--font-display)',fontSize:'48px',lineHeight:'60px',letterSpacing:'-0.02em',color:'var(--color-gold-light)'}}>
+          <h1 className="font-bold mb-1 text-4xl md:text-5xl lg:text-6xl"
+              style={{fontFamily:'var(--font-display)',letterSpacing:'-0.02em',color:'var(--color-gold-light)'}}>
             WIS-CMS
           </h1>
-          <p className="italic"
-             style={{fontFamily:'var(--font-display)',fontSize:'24px',lineHeight:'32px',color:'rgba(255,255,255,0.8)'}}>
+          <p className="italic text-xl md:text-2xl"
+             style={{fontFamily:'var(--font-display)',color:'rgba(255,255,255,0.8)'}}>
             Serving the body of Christ
           </p>
           <div className="mt-10 rounded-full"
