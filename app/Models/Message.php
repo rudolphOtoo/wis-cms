@@ -46,16 +46,37 @@ class Message extends Model
 
     public function getTotalRecipientsAttribute(): int
     {
+        if ($this->relationLoaded('recipients')) {
+            return $this->recipients->count();
+        }
+        if (array_key_exists('recipients_count', $this->attributes)) {
+            return (int) $this->attributes['recipients_count'];
+        }
+
         return $this->recipients()->count();
     }
 
     public function getDeliveredCountAttribute(): int
     {
+        if ($this->relationLoaded('recipients')) {
+            return $this->recipients->where('delivery_status', 'delivered')->count();
+        }
+        if (array_key_exists('delivered_count', $this->attributes)) {
+            return (int) $this->attributes['delivered_count'];
+        }
+
         return $this->recipients()->where('delivery_status', 'delivered')->count();
     }
 
     public function getFailedCountAttribute(): int
     {
+        if ($this->relationLoaded('recipients')) {
+            return $this->recipients->where('delivery_status', 'failed')->count();
+        }
+        if (array_key_exists('failed_count', $this->attributes)) {
+            return (int) $this->attributes['failed_count'];
+        }
+
         return $this->recipients()->where('delivery_status', 'failed')->count();
     }
 }

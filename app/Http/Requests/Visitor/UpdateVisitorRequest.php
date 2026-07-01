@@ -8,7 +8,7 @@ class UpdateVisitorRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('edit visitors') ?? false;
     }
 
     public function rules(): array

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getSession, markAttendance } from '../../api/attendance'
 
@@ -57,7 +58,7 @@ export default function TakeAttendance() {
       await markAttendance(id, { records })
       setSaved(true)
     } catch {
-      alert('Failed to save attendance. Please try again.')
+      toast.error('Failed to save attendance. Please try again.')
     } finally {
       setSaving(false)
     }

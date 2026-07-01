@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { getFollowUpSettings, updateFollowUpSettings } from '../../api/settings'
 
 // Sample data for the live preview — matches the placeholders the
@@ -110,7 +111,7 @@ export default function FollowUpSettings() {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
       } else {
-        alert(err.response?.data?.message ?? 'Could not save settings.')
+        toast.error(err.response?.data?.message ?? 'Could not save settings.')
       }
     } finally {
       setSaving(false)

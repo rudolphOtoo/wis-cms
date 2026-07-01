@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getDepartments, deleteDepartment, getDepartmentStats } from '../../api/departments'
 import { usePermission } from '../../hooks/usePermission'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -23,6 +25,7 @@ const ICONS = {
 export default function DepartmentsPage() {
   const navigate = useNavigate()
   const { can }  = usePermission()
+  const { confirm, dialog } = useConfirm()
   const [departments, setDepartments] = useState([])
   const [stats,       setStats]       = useState(null)
   const [loading,     setLoading]     = useState(true)
@@ -44,13 +47,13 @@ export default function DepartmentsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleDelete = async (dept) => {
-    if (!confirm(`Delete "${dept.name}"? Members will be removed from this department.`)) return
+    if (!(await confirm(`Delete "${dept.name}"? Members will be removed from this department.`))) return
     setDeleting(dept.id)
     try {
       await deleteDepartment(dept.id)
       fetchData()
     } catch {
-      alert('Failed to delete department.')
+      toast.error('Failed to delete department.')
     } finally {
       setDeleting(null)
     }
@@ -187,6 +190,7 @@ export default function DepartmentsPage() {
           ))}
         </div>
       )}
+      {dialog}
     </div>
   )
 }

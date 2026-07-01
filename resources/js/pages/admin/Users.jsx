@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { getUsers, getUserRoles, createUser, updateUser, deleteUser, linkMember, createAndLinkMember, unlinkMember } from '../../api/users'
 import { getMembers } from '../../api/members'
 import { useAuth } from '../../context/AuthContext'
 import { useDebounce } from '../../hooks/useDebounce'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -25,6 +27,7 @@ const AVATAR_BG = ['#1b3a6b', '#c7d7fd', '#ffdcc1', '#e0e7ff', '#dcfce7']
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
+  const { confirm: confirmDelete, dialog: dialogDelete } = useConfirm()
   const [users,    setUsers]    = useState([])
   const [roles,    setRoles]    = useState([])
   const [loading,  setLoading]  = useState(true)
@@ -57,13 +60,13 @@ export default function UsersPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleDelete = async (user) => {
-    if (!confirm(`Delete ${user.name}? This will remove their account permanently.`)) return
+    if (!(await confirmDelete(`Delete ${user.name}? This will remove their account permanently.`))) return
     setDeleting(user.id)
     try {
       await deleteUser(user.id)
       fetchData()
     } catch (err) {
-      alert(err.response?.data?.message ?? 'Failed to delete user.')
+      toast.error(err.response?.data?.message ?? 'Failed to delete user.')
     } finally {
       setDeleting(null)
     }
@@ -214,6 +217,7 @@ export default function UsersPage() {
           onSuccess={() => { setEditing(null); fetchData() }}
         />
       )}
+      {dialogDelete}
     </div>
   )
 }
@@ -269,9 +273,9 @@ function UserModal({ user, roles, onClose, onSuccess }) {
     } catch (err) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
-        if (err.response.data.message && !err.response.data.errors) alert(err.response.data.message)
+        if (err.response.data.message && !err.response.data.errors) toast.error(err.response.data.message)
       } else {
-        alert('Something went wrong.')
+        toast.error('Something went wrong.')
       }
     } finally {
       setLoading(false)
@@ -285,7 +289,7 @@ function UserModal({ user, roles, onClose, onSuccess }) {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // older browsers / non-https — fall back silently
-      alert('Could not copy automatically. Please copy the password manually.')
+      toast.error('Could not copy automatically. Please copy the password manually.')
     }
   }
 
@@ -429,6 +433,7 @@ function UserModal({ user, roles, onClose, onSuccess }) {
 
 function MemberLinkPanel({ user, onChanged }) {
   const linked = user.member  // populated when backend includes member
+  const { confirm: confirmUnlink, dialog: dialogUnlink } = useConfirm()
   const [mode, setMode]       = useState('view') // 'view' | 'pick' | 'create' | 'busy'
   const [members, setMembers] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -461,7 +466,7 @@ function MemberLinkPanel({ user, onChanged }) {
   }
 
   const doUnlink = async () => {
-    if (!confirm(`Unlink ${linked?.first_name ?? 'this member'} from this user? The user keeps their login.`)) return
+    if (!(await confirmUnlink(`Unlink ${linked?.first_name ?? 'this member'} from this user? The user keeps their login.`))) return
     setMode('busy')
     try {
       await unlinkMember(user.id)
@@ -598,6 +603,7 @@ function MemberLinkPanel({ user, onChanged }) {
       {mode === 'busy' && (
         <div className="text-sm" style={{color:'#747780'}}>Working…</div>
       )}
+      {dialogUnlink}
     </div>
   )
 }

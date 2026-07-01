@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, UserCheck, UserPlus, Scale, Search, Download,
@@ -64,7 +65,7 @@ export default function MembersPage() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error(err)
-      alert('Export failed. Please try again.')
+      toast.error('Export failed. Please try again.')
     } finally {
       setExporting(false)
     }
@@ -115,7 +116,7 @@ export default function MembersPage() {
       await deleteMember(member.id)
       triggerRefresh()
     } catch {
-      alert('Failed to delete member.')
+      toast.error('Failed to delete member.')
     } finally {
       setDeleting(null)
       setPendingDelete(null)

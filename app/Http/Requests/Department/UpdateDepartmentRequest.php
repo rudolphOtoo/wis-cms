@@ -8,14 +8,14 @@ class UpdateDepartmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('edit departments') ?? false;
     }
 
     public function rules(): array
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:100'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:1000'],
             'leader_user_id' => ['nullable', 'uuid', 'exists:users,id'],
             'is_active' => ['boolean'],
         ];

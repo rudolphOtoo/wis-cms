@@ -109,18 +109,28 @@ class ChildrenController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        // Branch scoping handled by BelongsToBranch trait on Children.
-        $all = Children::all();
+        $stats = Children::query()
+            ->selectRaw("
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE is_active = true) AS active,
+                COUNT(*) FILTER (WHERE gender = 'male') AS male,
+                COUNT(*) FILTER (WHERE gender = 'female') AS female
+            ")
+            ->first();
+
+        $byClass = Children::query()
+            ->selectRaw('class_group, COUNT(*) AS count')
+            ->whereNotNull('class_group')
+            ->groupBy('class_group')
+            ->pluck('count', 'class_group');
 
         return response()->json([
             'data' => [
-                'total' => $all->count(),
-                'active' => $all->where('is_active', true)->count(),
-                'male' => $all->where('gender', 'male')->count(),
-                'female' => $all->where('gender', 'female')->count(),
-                'by_class' => $all->groupBy('class_group')
-                    ->map(fn ($g) => $g->count())
-                    ->reject(fn ($_, $k) => empty($k)),
+                'total' => $stats->total,
+                'active' => $stats->active,
+                'male' => $stats->male,
+                'female' => $stats->female,
+                'by_class' => $byClass,
             ],
         ]);
     }

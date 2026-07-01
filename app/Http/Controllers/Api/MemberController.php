@@ -47,6 +47,14 @@ class MemberController extends Controller
             $query->where('gender', $gender);
         }
 
+        $user = $request->user();
+        if (! $request->input('unscoped') && $user->hasRole('cell_leader')) {
+            $cellIds = Cell::where('leader_user_id', $user->id)->pluck('id');
+            $query->whereIn('cell_id', $cellIds);
+        } elseif ($cellId = $request->input('cell_id')) {
+            $query->where('cell_id', $cellId);
+        }
+
         $members = $query
             // PERF FIX: withExists() adds a single correlated sub-select for
             // the entire page, injecting `user_exists` as a boolean column.
@@ -179,22 +187,30 @@ class MemberController extends Controller
     }
 
     // GET /api/members/stats
-    public function stats(): JsonResponse
+    public function stats(Request $request): JsonResponse
     {
-        return response()->json([
-            'data' => [
-                'total' => Member::query()->count(),
-                'active' => Member::query()->where('status', 'active')->count(),
-                'inactive' => Member::query()->where('status', 'inactive')->count(),
-                'transferred' => Member::query()->where('status', 'transferred')->count(),
-                'male' => Member::query()->where('gender', 'male')->count(),
-                'female' => Member::query()->where('gender', 'female')->count(),
-                'new_this_month' => Member::query()
-                    ->whereMonth('created_at', now()->month)
-                    ->whereYear('created_at', now()->year)
-                    ->count(),
-            ],
-        ]);
+        $query = Member::query();
+
+        $user = $request->user();
+        if ($user->hasRole('cell_leader')) {
+            $cellIds = Cell::where('leader_user_id', $user->id)->pluck('id');
+            $query->whereIn('cell_id', $cellIds);
+        }
+
+        $stats = $query->selectRaw("
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE status = 'active') AS active,
+            COUNT(*) FILTER (WHERE status = 'inactive') AS inactive,
+            COUNT(*) FILTER (WHERE status = 'transferred') AS transferred,
+            COUNT(*) FILTER (WHERE gender = 'male') AS male,
+            COUNT(*) FILTER (WHERE gender = 'female') AS female,
+            COUNT(*) FILTER (
+                WHERE EXTRACT(MONTH FROM created_at) = ?
+                  AND EXTRACT(YEAR FROM created_at) = ?
+            ) AS new_this_month
+        ", [now()->month, now()->year])->first();
+
+        return response()->json(['data' => $stats]);
     }
 
     /**

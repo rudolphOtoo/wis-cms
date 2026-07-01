@@ -82,7 +82,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $cellLeader = Role::firstOrCreate(['name' => 'cell_leader']);
         $cellLeader->syncPermissions([
-            'view members', 'view cells', 'manage cell members',
+            'view members', 'create members', 'edit members', 'view cells', 'manage cell members',
             'view attendance', 'create attendance', 'view reports',
             'message own cell',
             'view birthday messages',

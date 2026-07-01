@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getServiceTypes, createSession } from '../../api/attendance'
 import { getDepartments } from '../../api/departments'
@@ -79,9 +80,9 @@ export default function NewSession() {
           setErrors(err.response.data.errors ?? {})
         }
       } else if (err.response?.status === 403) {
-        alert(err.response.data.message ?? 'Not allowed.')
+        toast.error(err.response.data.message ?? 'Not allowed.')
       } else {
-        alert('Something went wrong.')
+        toast.error('Something went wrong.')
       }
     } finally {
       setLoading(false)

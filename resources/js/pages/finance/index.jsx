@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import {
@@ -70,7 +71,7 @@ export default function FinancePage() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error(err)
-      alert('Could not generate the report. Please check the date range and try again.')
+      toast.error('Could not generate the report. Please check the date range and try again.')
     } finally {
       setGenerating(false)
     }
@@ -88,7 +89,7 @@ export default function FinancePage() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error(err)
-      alert('Export failed. Please try again.')
+      toast.error('Export failed. Please try again.')
     } finally {
       setExporting(false)
     }
@@ -142,7 +143,7 @@ export default function FinancePage() {
       await deleteTransaction(txn.id)
       triggerRefresh()
     } catch {
-      alert('Failed to delete transaction.')
+      toast.error('Failed to delete transaction.')
     } finally {
       setDel(null)
       setPendingDelete(null)

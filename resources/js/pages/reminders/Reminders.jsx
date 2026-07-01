@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import {
   getReminderSettings,
   upsertReminderSettings,
@@ -82,7 +83,7 @@ function ConfigCard({ row, onSaved }) {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
       } else {
-        alert(err.response?.data?.message ?? 'Could not save settings.')
+        toast.error(err.response?.data?.message ?? 'Could not save settings.')
       }
     } finally {
       setSaving(false)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { resetPassword } from '../../api/auth'
 
@@ -42,7 +43,7 @@ export default function ResetPassword() {
       if (err.response?.status === 422) {
         setErrors(err.response.data.errors ?? {})
       } else {
-        alert('Could not reset password. Please try again.')
+        toast.error('Could not reset password. Please try again.')
       }
     } finally {
       setLoading(false)

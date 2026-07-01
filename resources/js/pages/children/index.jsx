@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useConfirm } from '../../hooks/useConfirm'
+import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getChildren, deleteChild, getChildrenStats } from '../../api/children'
 import { usePermission } from '../../hooks/usePermission'
@@ -24,6 +26,7 @@ const ICONS = {
 export default function ChildrenPage() {
   const navigate = useNavigate()
   const { can }  = usePermission()
+  const { confirm, dialog } = useConfirm()
   const [children,    setChildren]    = useState([])
   const [stats,       setStats]       = useState(null)
   const [loading,     setLoading]     = useState(true)
@@ -57,13 +60,13 @@ export default function ChildrenPage() {
   }, [search])
 
   const handleDelete = async (child) => {
-    if (!confirm(`Remove ${child.full_name} from the children's register?`)) return
+    if (!(await confirm(`Remove ${child.full_name} from the children's register?`))) return
     setDeleting(child.id)
     try {
       await deleteChild(child.id)
       fetchData()
     } catch {
-      alert('Failed to remove child.')
+      toast.error('Failed to remove child.')
     } finally {
       setDeleting(null)
     }
@@ -235,6 +238,7 @@ export default function ChildrenPage() {
           </div>
         )}
       </div>
+      {dialog}
     </div>
   )
 }

@@ -37,13 +37,11 @@ const MAIN_NAV = [
   { to: '/dashboard',         label: 'Dashboard',   icon: LayoutDashboard, permission: null },
   { to: '/members',           label: 'Members',     icon: Users,           permission: 'view members' },
   { to: '/children',          label: 'Children',    icon: GraduationCap,   permission: 'view children' },
-  { to: '/attendance',        label: 'Attendance',  icon: ClipboardCheck,  permission: 'view attendance' },
+  { to: '/attendance',        label: 'Attendance',  icon: ClipboardCheck,  permission: 'view attendance', hideForRoles: ['cell_leader'] },
   { to: '/departments',       label: 'Departments', icon: Building2,       permission: 'view departments' },
-  { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells' },
+  { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells',      hideForRoles: ['cell_leader'] },
   { to: '/visitors',          label: 'Visitors',    icon: UserPlus,        permission: 'view visitors' },
   { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
-  { to: '/birthdays',         label: 'Birthdays',   icon: Gift,            permission: 'view birthday messages' },
-  { to: '/reminders',         label: 'Reminders',   icon: Bell,            permission: 'view service reminders' },
   { to: '/admin/submissions', label: 'Submissions', icon: FileText,        permission: 'view member submissions' },
 ]
 
@@ -192,8 +190,8 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
-  const { user, logout } = useAuth()
-  const { can }          = usePermission()
+  const { user, logout, hasRole } = useAuth()
+  const { can }                   = usePermission()
   const { pathname }     = useLocation()
   const isDesktop        = useIsDesktop()
   const [collapsed, setCollapsed] = useState(false)
@@ -203,7 +201,10 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   // uses the md: prefix to scope the narrow width to desktop.
   const isCollapsed = collapsed && isDesktop
 
-  const visibleMain    = MAIN_NAV.filter(i => !i.permission || can(i.permission))
+  const visibleMain    = MAIN_NAV.filter(i => {
+    if (i.hideForRoles?.some(r => hasRole(r))) return false
+    return !i.permission || can(i.permission)
+  })
   const visibleFinance = FINANCE_NAV.filter(i => can(i.permission))
   const visibleAdmin   = ADMIN_NAV.filter(i => can(i.permission))
   const showFinance    = visibleFinance.length > 0

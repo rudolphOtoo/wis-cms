@@ -10,7 +10,7 @@ class StoreCellRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create cells') ?? false;
     }
 
     /**

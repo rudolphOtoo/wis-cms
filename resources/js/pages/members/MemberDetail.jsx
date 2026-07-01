@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader, createMemberLogin } from '../../api/members'
 import { getCells } from '../../api/cells'
@@ -80,7 +81,7 @@ export default function MemberDetail() {
       a.remove()
       window.URL.revokeObjectURL(url)
     } catch {
-      alert('Failed to download statement.')
+      toast.error('Failed to download statement.')
     } finally {
       setDownloading(false)
     }

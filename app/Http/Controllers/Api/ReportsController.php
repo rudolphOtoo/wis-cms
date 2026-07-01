@@ -185,19 +185,10 @@ class ReportsController extends Controller
 
         $periodRows = array_values($byPeriod);
 
-        // Pass B: overall summary across the whole range
-        $summary = (clone $base)
-            ->join('attendance_records', 'attendance_sessions.id', '=', 'attendance_records.session_id')
-            ->select([
-                DB::raw('COUNT(DISTINCT attendance_sessions.id) AS total_sessions'),
-                DB::raw('COUNT(attendance_records.id) AS records_total'),
-                DB::raw('SUM(CASE WHEN attendance_records.is_present THEN 1 ELSE 0 END) AS records_present'),
-            ])
-            ->first();
-
-        $totalSessions = (int) ($summary->total_sessions ?? 0);
-        $recordsTotal = (int) ($summary->records_total ?? 0);
-        $recordsPresent = (int) ($summary->records_present ?? 0);
+        // Derive overall summary from the period data (avoids a second scan)
+        $totalSessions = collect($periodRows)->sum('sessions_count');
+        $recordsTotal = collect($periodRows)->sum('records_total');
+        $recordsPresent = collect($periodRows)->sum('records_present');
         $recordsAbsent = $recordsTotal - $recordsPresent;
         $overallRate = $recordsTotal > 0
             ? round(($recordsPresent / $recordsTotal) * 100, 1)
