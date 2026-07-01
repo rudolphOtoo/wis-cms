@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { getAttendance, getAttendanceStats } from '../../api/attendance'
 import { usePermission } from '../../hooks/usePermission'
+import { TableSkeleton } from '../../components/ui/Skeletons'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -139,14 +140,14 @@ export default function AttendancePage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
-                {['Date','Service','Adults','Children','Total','Recorded By','Action'].map(h => (
-                  <th key={h} className="uppercase" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780'}}>{h}</th>
+                {[['Date'],['Service', 'hidden md:table-cell'],['Adults','hidden sm:table-cell'],['Children','hidden sm:table-cell'],['Total'],['Recorded By','hidden sm:table-cell'],['Action']].map(([h, extra]) => (
+                  <th key={h} className={`uppercase ${extra ?? ''}`} style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
+                <TableSkeleton rows={8} cols={7} />
               ) : sessions.length === 0 ? (
                 <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">📋</div>
@@ -156,15 +157,13 @@ export default function AttendancePage() {
               ) : sessions.map((session) => {
                 const t = tintFor(session.recorded_by)
                 return (
-                  <tr key={session.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                  <tr key={session.id} className="transition-colors hover:bg-slate-50" style={{borderTop:'1px solid var(--color-surface-border)'}}>
                     <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:600,color:'#191c1e'}}>{session.service_date}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.service_type?.name ?? '—'}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.adult_count}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.children_count}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden md:table-cell">{session.service_type?.name ?? '—'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{session.adult_count}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{session.children_count}</td>
                     <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:700,color:'var(--color-navy)'}}>{session.total_count}</td>
-                    <td style={{padding:'16px 24px'}}>
+                    <td style={{padding:'16px 24px'}} className="hidden sm:table-cell">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                              style={{backgroundColor:t.bg,color:t.text}}>{initials(session.recorded_by)}</div>

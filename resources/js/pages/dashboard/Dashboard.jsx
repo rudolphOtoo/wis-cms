@@ -282,7 +282,7 @@ export default function Dashboard() {
                 <button
                   key={a.to}
                   onClick={() => navigate(a.to)}
-                  className="group flex flex-col items-center justify-center gap-2 rounded-xl p-6 transition-all duration-200 hover:shadow-sm active:scale-95"
+                  className="group flex flex-col items-center justify-center gap-2 rounded-xl p-6 transition-shadow duration-200 hover:shadow-sm active:scale-95"
                   style={{ backgroundColor: '#f2f3f6', border: '1px solid transparent' }}
                 >
                   <span className="transition-transform duration-200 group-hover:scale-110">

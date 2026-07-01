@@ -36,6 +36,15 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
             return 'vendor-react'
           }
+          if (id.includes('@tanstack/react-query') || id.includes('node_modules/axios')) {
+            return 'vendor-data'
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons'
+          }
+          if (id.includes('node_modules/sonner')) {
+            return 'vendor-toast'
+          }
         },
       },
     },

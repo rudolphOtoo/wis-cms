@@ -40,15 +40,16 @@ class DepartmentController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $perPage = $request->integer('per_page', 50);
         $departments = $this->scopedQuery($request)
             ->with('leader')
             ->withCount('members')
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json([
-            'data' => DepartmentResource::collection($departments),
-        ]);
+        return response()->json(
+            DepartmentResource::collection($departments)->response()->getData(true)
+        );
     }
 
     public function store(StoreDepartmentRequest $request): JsonResponse
@@ -116,10 +117,11 @@ class DepartmentController extends Controller
         $department = $this->scopedQuery($request)
             ->findOrFail($id);
 
+        $perPage = $request->integer('per_page', 50);
         $members = $department->members()
             ->orderBy('first_name')
-            ->get()
-            ->map(fn ($m) => [
+            ->paginate($perPage)
+            ->through(fn ($m) => [
                 'id' => $m->id,
                 'full_name' => $m->full_name,
                 'member_number' => $m->member_number,
@@ -128,7 +130,7 @@ class DepartmentController extends Controller
                 'joined_at' => $m->pivot->joined_at,
             ]);
 
-        return response()->json(['data' => $members]);
+        return response()->json($members);
     }
 
     // POST /api/departments/{id}/members

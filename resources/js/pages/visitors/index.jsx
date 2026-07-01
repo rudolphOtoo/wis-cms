@@ -5,6 +5,7 @@ import { getVisitors, deleteVisitor, getVisitorStats, convertVisitor } from '../
 import { usePermission } from '../../hooks/usePermission'
 import { useConfirm } from '../../hooks/useConfirm'
 import { useDebounce } from '../../hooks/useDebounce'
+import { TableSkeleton } from '../../components/ui/Skeletons'
 
 const STATUS_COLORS = {
   pending:        { bg: '#fef9c3', text: '#854d0e' },
@@ -155,14 +156,21 @@ export default function VisitorsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
-                {[['Name'],['Phone'],['Visit Date'],['How They Heard'],['Status'],['Actions','right']].map(([h, align]) => (
-                  <th key={h} className="uppercase" style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
+                {[
+                  ['Name'],
+                  ['Phone',   'left',   'hidden sm:table-cell'],
+                  ['Visit Date', 'left', 'hidden md:table-cell'],
+                  ['How They Heard', 'left', 'hidden sm:table-cell'],
+                  ['Status'],
+                  ['Actions', 'right'],
+                ].map(([h, align, extra]) => (
+                  <th key={h} className={`uppercase ${extra ?? ''}`} style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
+                <TableSkeleton rows={8} cols={6} />
               ) : visitors.length === 0 ? (
                 <tr><td colSpan={6} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">🙏</div>
@@ -173,9 +181,7 @@ export default function VisitorsPage() {
                 const isConverted = Boolean(visitor.converted_member_id)
                 const sc = STATUS_COLORS[visitor.follow_up_status] ?? STATUS_COLORS.pending
                 return (
-                  <tr key={visitor.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                  <tr key={visitor.id} className="transition-colors hover:bg-slate-50" style={{borderTop:'1px solid var(--color-surface-border)'}}>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
@@ -195,9 +201,9 @@ export default function VisitorsPage() {
                         </div>
                       </div>
                     </td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.phone ?? '—'}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.visit_date}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.how_they_heard ?? '—'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{visitor.phone ?? '—'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden md:table-cell">{visitor.visit_date}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{visitor.how_they_heard ?? '—'}</td>
                     <td style={{padding:'16px 24px'}}>
                       <span className="uppercase" style={{padding:'4px 12px',borderRadius:'9999px',fontSize:'11px',fontWeight:700,backgroundColor:sc.bg,color:sc.text}}>
                         {STATUS_LABELS[visitor.follow_up_status]}
