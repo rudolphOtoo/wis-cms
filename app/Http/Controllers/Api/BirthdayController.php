@@ -148,17 +148,23 @@ class BirthdayController extends Controller
     {
         $validated = $request->validate([
             'days' => ['nullable', 'integer', 'min:1', 'max:31'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $days = $validated['days'] ?? 7;
         $user = $request->user();
 
+        $today = Carbon::today('Africa/Accra');
+        $endDate = $today->copy()->addDays($days);
+
+        $todayMD = $today->format('m-d');
+        $endMD = $endDate->format('m-d');
+
         $query = Member::query()
             ->where('status', 'active')
             ->whereNotNull('date_of_birth');
 
-        // Cell leaders (without admin-tier roles) see only their cells'
-        // members. Same routing pattern as the leader dashboard.
+        // Scope by cell leader if applicable
         $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
         if (! $isAdmin && $user->hasRole('cell_leader')) {
             $query->whereHas('cell', function ($q) use ($user) {
@@ -166,23 +172,26 @@ class BirthdayController extends Controller
             });
         }
 
-        $members = $query->with('cell:id,name')->get();
+        // Filter birthdays by month-day range using SQL, handling
+        // year-crossing windows (e.g. Dec 28 → Jan 4).
+        if ($todayMD <= $endMD) {
+            $query->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') BETWEEN ? AND ?", [$todayMD, $endMD]);
+        } else {
+            $query->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') >= ? OR DATE_FORMAT(date_of_birth, '%m-%d') <= ?", [$todayMD, $endMD]);
+        }
 
-        // Compute "days until next birthday" for each member, then
-        // filter to those within the window, ordered by soonest.
-        $today = Carbon::today('Africa/Accra');
+        $members = $query
+            ->with('cell:id,name')
+            ->orderByRaw('DAYOFYEAR(date_of_birth)')
+            ->get();
 
         $upcoming = $members
             ->map(function (Member $m) use ($today) {
                 $dob = Carbon::parse($m->date_of_birth);
-
-                // This year's birthday (Africa/Accra). If it's already
-                // passed, use next year's.
                 $thisYear = $dob->copy()->year($today->year);
                 if ($thisYear->lt($today)) {
                     $thisYear->addYear();
                 }
-
                 $daysAway = (int) $today->diffInDays($thisYear, false);
 
                 return [

@@ -123,4 +123,20 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination
+    |--------------------------------------------------------------------------
+    |
+    | Default number of records per page for API list endpoints.
+    | Individual endpoints can override via the per_page request param
+    | (capped by max_per_page).
+    |
+    */
+
+    'pagination' => [
+        'per_page' => env('PAGINATION_PER_PAGE', 15),
+        'max_per_page' => 100,
+    ],
+
 ];

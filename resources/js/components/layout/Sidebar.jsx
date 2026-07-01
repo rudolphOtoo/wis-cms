@@ -67,7 +67,7 @@ function NavItem({ to, icon: Icon, label, isCollapsed }) {
       {({ isActive }) => (
         <div className={[
           'relative flex items-center rounded-xl text-sm font-medium select-none cursor-pointer',
-          'transition-all duration-200',
+          'transition-colors duration-200',
           isCollapsed ? 'justify-center py-[10px] px-1' : 'gap-3 px-3 py-[10px]',
           isActive
             ? 'bg-white/[0.12] text-white'
@@ -105,8 +105,8 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
       <NavLink to="/finance" end title="Finance" className="block no-underline">
         {() => (
           <div className={[
-            'relative flex justify-center items-center rounded-xl py-[10px] px-1',
-            'transition-all duration-200 cursor-pointer select-none',
+          'relative flex justify-center items-center rounded-xl py-[10px] px-1',
+          'transition-colors duration-200 cursor-pointer select-none',
             isGroupActive
               ? 'bg-white/[0.12] text-white'
               : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
@@ -132,7 +132,7 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
         aria-controls="finance-subnav"
         className={[
           'relative w-full flex items-center gap-3 px-3 py-[10px] rounded-xl',
-          'text-sm font-medium transition-all duration-200 cursor-pointer select-none',
+          'text-sm font-medium transition-colors duration-200 cursor-pointer select-none',
           isGroupActive
             ? 'bg-white/[0.12] text-white'
             : 'text-slate-400 hover:text-white hover:bg-white/[0.07]',
@@ -154,13 +154,8 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
         />
       </button>
 
-      <div
-        id="finance-subnav"
-        className={[
-          'overflow-hidden transition-all duration-300 ease-in-out',
-          showChildren ? 'max-h-[360px] opacity-100' : 'max-h-0 opacity-0',
-        ].join(' ')}
-      >
+      {showChildren && (
+      <div id="finance-subnav" className="overflow-hidden">
         <div
           className="ml-[18px] mt-1 pl-3 pb-1 space-y-0.5"
           style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}
@@ -170,7 +165,7 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
               {({ isActive }) => (
                 <div className={[
                   'flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-xs font-medium',
-                  'transition-all duration-150 cursor-pointer select-none',
+                  'transition-colors duration-150 cursor-pointer select-none',
                   isActive
                     ? 'text-[#C9A84C] bg-white/[0.08]'
                     : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]',
@@ -183,6 +178,7 @@ function FinanceAccordion({ items, isCollapsed, isGroupActive }) {
           ))}
         </div>
       </div>
+      )}
     </div>
   )
 }
@@ -217,17 +213,30 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? 'U'
   const userRole    = user?.roles?.[0]?.replace(/_/g, ' ') ?? ''
 
+  const sidebarTranslate = isDesktop
+    ? (isCollapsed ? '-184px' : '0px')
+    : (isMobileOpen ? '0px' : '-100%')
+
   return (
+    // Outer wrapper: flex child with constant 256px allocation. overflow-hidden
+    // clips the rightmost 184px when collapsed so the visible portion is 72px.
+    // The inner aside uses transform: translateX() for a compositor-only
+    // animation — no layout repaint from animating width.
+    <div
+      className="flex-shrink-0 overflow-hidden z-40"
+      style={{ width: '256px' }}
+    >
     <aside
       className={[
-        'flex flex-col flex-shrink-0 z-40',
-        'transition-[width,transform] duration-300 ease-in-out',
-        'fixed inset-y-0 left-0 md:static md:translate-x-0 md:h-full',
-        isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        // Width: mobile always w-64; desktop narrows to 72px when collapsed
-        collapsed ? 'w-64 md:w-[72px]' : 'w-64',
+        'flex flex-col w-64',
+        'transition-transform duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 md:relative',
       ].join(' ')}
-      style={{ backgroundColor: 'var(--color-navy-deeper)', height: '100dvh' }}
+      style={{
+        backgroundColor: 'var(--color-navy-deeper)',
+        height: '100dvh',
+        transform: `translateX(${sidebarTranslate})`,
+      }}
     >
 
       {/* ── Header ─────────────────────────────────────────────────── */}
@@ -236,11 +245,16 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
         style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
       >
         <div className={`flex items-center gap-3 min-w-0 flex-1 ${isCollapsed ? 'justify-center' : ''}`}>
-          <img
-            src="/images/wis-logo.png"
-            alt="WIS Logo"
-            className={`object-contain flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
-          />
+          <picture>
+            <source srcSet="/images/wis-logo.webp" type="image/webp" />
+            <img
+              src="/images/wis-logo.png"
+              alt="WIS Logo"
+              width={36} height={36}
+              className={`object-contain flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
+              fetchPriority="high"
+            />
+          </picture>
           {!isCollapsed && (
             <div className="min-w-0">
               <div
@@ -388,7 +402,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
               type="button"
               onClick={logout}
               title="Sign out"
-              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl transition-all hover:bg-white/10 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl transition-opacity hover:bg-white/10 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'rgba(255,255,255,0.5)' }}
             >
               <LogOut size={15} strokeWidth={2} />
@@ -399,5 +413,6 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
       </div>
 
     </aside>
+    </div>
   )
 }

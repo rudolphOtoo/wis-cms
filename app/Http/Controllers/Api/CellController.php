@@ -41,14 +41,15 @@ class CellController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $perPage = $request->integer('per_page', 50);
         $cells = $this->scopedQuery($request)
             ->with('leader')
             ->withCount('members')
             ->orderBy('name')
-            ->get()
-            ->map(fn ($c) => $this->shape($c));
+            ->paginate($perPage)
+            ->through(fn ($c) => $this->shape($c));
 
-        return response()->json(['data' => $cells]);
+        return response()->json($cells);
     }
 
     public function store(StoreCellRequest $request): JsonResponse
