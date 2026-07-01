@@ -152,6 +152,44 @@ Runs `composer install`, generates the app key, migrates, `npm install`, and bui
 
 ---
 
+## Running with Docker
+
+The whole stack (Postgres, the Laravel app, nginx, a queue worker, and a scheduler loop) can run in containers — no PHP, Composer, or Node needed on the host.
+
+```bash
+cp .env.example .env
+php artisan key:generate   # requires PHP locally just for this one command, or generate manually and paste into .env
+
+docker compose build
+docker compose up -d
+```
+
+Then run migrations happen automatically on startup (`docker/entrypoint.sh` runs `migrate --force` before `php-fpm` starts). Seed on first run:
+
+```bash
+docker compose exec app php artisan db:seed --class=ProductionSeeder --force
+```
+
+The app is available at `http://localhost:8000`.
+
+Services:
+
+| Service | Role |
+|---------|------|
+| `postgres` | PostgreSQL 16, data persisted in the `wis_postgres_data` volume |
+| `app` | PHP-FPM; runs migrations + config/route/view cache on boot |
+| `webserver` | nginx, serves `public/` and proxies `.php` requests to `app` |
+| `queue` | `php artisan queue:work`, restarts hourly (matches `DEPLOYMENT.md` supervisor config) |
+| `scheduler` | Polls `php artisan schedule:run` every 60 seconds |
+
+`app`, `queue`, and `scheduler` share the same built image (`wis-cms-app`) so `docker compose build` only builds it once. Rebuild after dependency or code changes:
+
+```bash
+docker compose build && docker compose up -d
+```
+
+---
+
 ## Default login
 
 After seeding, sign in with:
