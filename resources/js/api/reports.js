@@ -1,16 +1,16 @@
 import api from './axios'
 
-export const getIncomeByCategoryReport = (params) =>
-  api.get('/reports/finance/income-by-category', { params })
+export const getIncomeByCategoryReport = (params, signal) =>
+  api.get('/reports/finance/income-by-category', { params, signal })
 
-export const getExpenseByCategoryReport = (params) =>
-  api.get('/reports/finance/expense-by-category', { params })
+export const getExpenseByCategoryReport = (params, signal) =>
+  api.get('/reports/finance/expense-by-category', { params, signal })
 
-export const getCellComparisonReport = (params) =>
-  api.get('/reports/cells/comparison', { params })
+export const getCellComparisonReport = (params, signal) =>
+  api.get('/reports/cells/comparison', { params, signal })
 
-export const getAttendanceTrendsReport = (params) =>
-  api.get('/reports/attendance/trends', { params })
+export const getAttendanceTrendsReport = (params, signal) =>
+  api.get('/reports/attendance/trends', { params, signal })
 
 // Downloads — return Blob responses for browser download
 

@@ -5,6 +5,7 @@ import TopBar  from './TopBar'
 import ErrorBoundary from '../ErrorBoundary'
 import { useAuth } from '../../context/AuthContext'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 export default function AppLayout() {
   const { user } = useAuth()
   const { pathname } = useLocation()
@@ -64,7 +65,7 @@ export default function AppLayout() {
           <ErrorBoundary>
             <Suspense fallback={
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
-                <svg style={{ width:32, height:32, color:'var(--color-navy)', animation:'spin 1s linear infinite' }}
+                <svg style={{ width:32, height:32, color:NAVY, animation:'spin 1s linear infinite' }}
                      fill="none" viewBox="0 0 24 24">
                   <circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path  style={{ opacity:0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>

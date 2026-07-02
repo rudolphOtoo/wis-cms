@@ -95,7 +95,7 @@ class DashboardController extends Controller
             $attendanceRate = ($memberCount > 0 && $lastMeeting)
                 ? round(($lastPresent / $memberCount) * 100)
                 : 0;
-            $meetingsThisMonth = $deptSessions->filter(fn ($s) => $s->service_date->isSameMonth(now()))->count();
+            $meetingsThisMonth = $deptSessions->filter(fn ($s) => $s->service_date?->isSameMonth(now()))->count();
             $trend = $deptSessions->take(6)->reverse()->map(fn ($s) => [
                 'date' => $s->service_date->format('d M'),
                 'count' => $s->present_count,

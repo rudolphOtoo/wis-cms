@@ -5,9 +5,10 @@ import { getCells, deleteCell } from '../../api/cells'
 import { usePermission } from '../../hooks/usePermission'
 import { useConfirm } from '../../hooks/useConfirm'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
+  border: BORDER,
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -63,9 +64,9 @@ export default function CellsPage() {
   const activePct = total > 0 ? (active / total) * 100 : 0
 
   const statCards = [
-    { label:'Total Cells',      value: total,    icon: ICONS.home,     barPct: 100,       barColor:'var(--color-navy)' },
+    { label:'Total Cells',      value: total,    icon: ICONS.home,     barPct: 100,       barColor:NAVY },
     { label:'Active',           value: active,   icon: ICONS.verified, barPct: activePct, barColor:'var(--color-gold)' },
-    { label:'Members Assigned', value: assigned, icon: ICONS.groups,   barPct: 75,        barColor:'var(--color-navy)' },
+    { label:'Members Assigned', value: assigned, icon: ICONS.groups,   barPct: 75,        barColor:NAVY },
   ]
 
   return (
@@ -73,7 +74,7 @@ export default function CellsPage() {
 
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
+          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
             Cells &amp; Classes
           </h2>
           <p style={{color:'#44474f',marginTop:'4px'}}>Home groups and classes. Each member belongs to one cell.</p>
@@ -93,11 +94,11 @@ export default function CellsPage() {
           <div key={s.label} className="transition-transform hover:-translate-y-0.5" style={{...cardBase, padding:'24px'}}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="uppercase tracking-wider mb-1" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>{s.label}</p>
-                <h3 style={{fontFamily:'var(--font-display)',fontSize:'32px',fontWeight:700,color:'var(--color-navy)'}}>{s.value}</h3>
+                <p className="uppercase tracking-wider mb-1" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>{s.label}</p>
+                <h3 style={{fontFamily:FONT_DISPLAY,fontSize:'32px',fontWeight:700,color:NAVY}}>{s.value}</h3>
               </div>
               <div className="rounded-lg flex items-center justify-center"
-                   style={{padding:'10px',backgroundColor:'rgba(27,58,107,0.08)',color:'var(--color-navy)'}}>
+                   style={{padding:'10px',backgroundColor:'rgba(27,58,107,0.08)',color:NAVY}}>
                 <Icon d={s.icon} />
               </div>
             </div>
@@ -110,7 +111,7 @@ export default function CellsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-24">
-          <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}} fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin w-8 h-8" style={{color:NAVY}} fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
@@ -118,7 +119,7 @@ export default function CellsPage() {
       ) : cells.length === 0 ? (
         <div className="text-center py-16" style={{...cardBase, padding:'40px'}}>
           <div className="text-5xl mb-4">🏠</div>
-          <h3 className="font-bold text-lg mb-2" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>No cells yet</h3>
+          <h3 className="font-bold text-lg mb-2" style={{fontFamily:FONT_DISPLAY,color:NAVY}}>No cells yet</h3>
           <p className="text-sm mb-6" style={{color:'#6b7280'}}>Create your first cell to group members into home groups or classes</p>
           {can('create cells') && (
             <button onClick={() => navigate('/cells/new')} className="btn-primary">Create First Cell</button>
@@ -131,13 +132,13 @@ export default function CellsPage() {
                  style={{...cardBase, padding:'24px'}}>
               <div className="flex gap-4 items-start">
                 <div className="rounded-xl flex items-center justify-center shrink-0 font-bold"
-                     style={{width:'56px',height:'56px',backgroundColor:'var(--color-navy)',color:'var(--color-gold-light)',
-                             fontFamily:'var(--font-display)',fontSize:'24px'}}>
+                     style={{width:'56px',height:'56px',backgroundColor:NAVY,color:'var(--color-gold-light)',
+                             fontFamily:FONT_DISPLAY,fontSize:'24px'}}>
                   {cell.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1 gap-2">
-                    <h4 className="leading-tight" style={{fontFamily:'var(--font-display)',fontSize:'18px',fontWeight:600,color:'var(--color-navy)'}}>
+                    <h4 className="leading-tight" style={{fontFamily:FONT_DISPLAY,fontSize:'18px',fontWeight:600,color:NAVY}}>
                       {cell.name}
                     </h4>
                     <span className="uppercase shrink-0" style={{padding:'2px 8px',borderRadius:'9999px',fontSize:'10px',fontWeight:700,
@@ -152,14 +153,14 @@ export default function CellsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between mt-6 pt-6" style={{borderTop:'1px solid var(--color-surface-border)'}}>
-                <div className="flex items-center gap-1.5" style={{color:'#747780'}}>
+              <div className="flex items-center justify-between mt-6 pt-6" style={{borderTop:BORDER}}>
+                <div className="flex items-center gap-1.5" style={{color:MUTED}}>
                   <Icon d={ICONS.groups} size={18} />
-                  <span style={{fontSize:'14px'}}><span className="font-semibold" style={{color:'var(--color-navy)'}}>{cell.members_count}</span> Members</span>
+                  <span style={{fontSize:'14px'}}><span className="font-semibold" style={{color:NAVY}}>{cell.members_count}</span> Members</span>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => navigate(`/cells/${cell.id}`)}
-                          className="rounded-full transition-colors" style={{padding:'6px 12px',fontSize:'12px',fontWeight:600,backgroundColor:'#edeef1',color:'var(--color-navy)'}}>
+                          className="rounded-full transition-colors" style={{padding:'6px 12px',fontSize:'12px',fontWeight:600,backgroundColor:'#edeef1',color:NAVY}}>
                     Manage
                   </button>
                   {can('edit cells') && (

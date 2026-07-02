@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Menu } from 'lucide-react'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const titles = {
   '/dashboard':     'Dashboard',
   '/members':       'Member Management',
@@ -33,13 +34,13 @@ export default function TopBar({ onMenuClick }) {
   return (
     <header
       className="bg-white px-4 md:px-6 py-3 md:py-4 flex items-center justify-between flex-shrink-0 gap-3"
-      style={{ borderBottom: '1px solid var(--color-surface-border)' }}
+      style={{ borderBottom: BORDER }}
     >
       <button
         onClick={onMenuClick}
         type="button"
         className="md:hidden w-11 h-11 -ml-2 flex items-center justify-center rounded-xl transition-colors hover:bg-slate-100"
-        style={{ color: 'var(--color-navy)' }}
+        style={{ color: NAVY }}
         aria-label="Open navigation menu"
       >
         <Menu size={20} strokeWidth={2} aria-hidden="true" />
@@ -48,11 +49,11 @@ export default function TopBar({ onMenuClick }) {
       <div className="flex-1 min-w-0">
         <h1
           className="text-lg md:text-xl font-semibold truncate"
-          style={{ fontFamily: 'var(--font-display)', color: 'var(--color-navy)' }}
+          style={{ fontFamily: FONT_DISPLAY, color: NAVY }}
         >
           {titles[pathname] ?? 'WIS-CMS'}
         </h1>
-        <p className="text-xs mt-0.5 hidden sm:block" style={{ color: '#9ca3af' }}>
+        <p className="text-xs mt-0.5 hidden sm:block" style={{ color: PLACEHOLDER }}>
           {new Date().toLocaleDateString('en-GH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -62,7 +63,7 @@ export default function TopBar({ onMenuClick }) {
           <div className="text-sm font-semibold truncate max-w-[140px]" style={{ color: '#374151' }}>
             {user?.name}
           </div>
-          <div className="text-xs capitalize" style={{ color: '#9ca3af' }}>
+          <div className="text-xs capitalize" style={{ color: PLACEHOLDER }}>
             {roleDisplay}
           </div>
         </div>
@@ -72,7 +73,7 @@ export default function TopBar({ onMenuClick }) {
           aria-label={`Signed in as ${user?.name ?? 'user'}`}
           role="img"
         >
-          <span className="text-sm font-bold select-none" style={{ color: 'var(--color-navy)' }}>
+          <span className="text-sm font-bold select-none" style={{ color: NAVY }}>
             {user?.name?.charAt(0)}
           </span>
         </div>

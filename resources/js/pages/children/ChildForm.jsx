@@ -1,29 +1,33 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, cloneElement, isValidElement } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createChild, updateChild, getChild } from '../../api/children'
 import { getMembers } from '../../api/members'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
+  border: BORDER,
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
 
-const FIELD = ({ label, error, children }) => (
-  <div>
-    <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>{label}</label>
-    {children}
-    {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
-  </div>
-)
+const FIELD = ({ label, error, children, name }) => {
+  const fieldId = name ? `field-${name}` : undefined
+  return (
+    <div>
+      <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor={fieldId}>{label}</label>
+      {fieldId && isValidElement(children) ? cloneElement(children, { id: fieldId }) : children}
+      {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
+    </div>
+  )
+}
 
 const SectionHeader = ({ num, title }) => (
   <div className="flex items-center gap-2 mb-4">
     <span className="rounded-full text-white flex items-center justify-center font-bold"
-          style={{width:'24px',height:'24px',fontSize:'12px',backgroundColor:'var(--color-navy)'}}>{num}</span>
-    <h3 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>{title}</h3>
+          style={{width:'24px',height:'24px',fontSize:'12px',backgroundColor:NAVY}}>{num}</span>
+    <h3 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:NAVY}}>{title}</h3>
   </div>
 )
 
@@ -48,13 +52,17 @@ export default function ChildForm() {
   const [fetching,   setFetching]   = useState(isEdit)
 
   useEffect(() => {
-    getMembers({ per_page: 500, status: 'active' })
-      .then(res => setMembers(res.data.data))
+    const controller = new AbortController()
+    let mounted = true
+
+    getMembers({ per_page: 500, status: 'active' }, controller.signal)
+      .then(res => { if (mounted) setMembers(res.data.data) })
 
     if (isEdit) {
       setFetching(true)
-      getChild(id)
+      getChild(id, controller.signal)
         .then(res => {
+          if (!mounted) return
           const c = res.data.data
           setForm({
             guardian_member_id: c.guardian?.id   ?? '',
@@ -67,9 +75,11 @@ export default function ChildForm() {
             notes:              c.notes          ?? '',
           })
         })
-        .catch(() => navigate('/children'))
-        .finally(() => setFetching(false))
+        .catch(() => { if (mounted) navigate('/children') })
+        .finally(() => { if (mounted) setFetching(false) })
     }
+
+    return () => { mounted = false; controller.abort() }
   }, [id, isEdit])
 
   const set = (field) => (e) => {
@@ -99,7 +109,7 @@ export default function ChildForm() {
 
   if (fetching) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}} fill="none" viewBox="0 0 24 24">
+      <svg className="animate-spin w-8 h-8" style={{color:NAVY}} fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
       </svg>
@@ -112,13 +122,13 @@ export default function ChildForm() {
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/children')}
                 className="w-11 h-11 flex items-center justify-center rounded-full"
-                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
+                style={{backgroundColor:'white',border:BORDER,color:NAVY}}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
-          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'24px',color:'var(--color-navy)'}}>
+          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'24px',color:NAVY}}>
             {isEdit ? 'Edit Child' : 'Add Child to Register'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -134,25 +144,25 @@ export default function ChildForm() {
           <SectionHeader num="1" title="Child's Information" />
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FIELD label="First Name *" error={errors.first_name?.[0]}>
+              <FIELD label="First Name *" error={errors.first_name?.[0]} name="child_first_name">
                 <input type="text" className="input-field" value={form.first_name} onChange={set('first_name')} required placeholder="e.g. Kojo"/>
               </FIELD>
-              <FIELD label="Last Name *" error={errors.last_name?.[0]}>
+              <FIELD label="Last Name *" error={errors.last_name?.[0]} name="child_last_name">
                 <input type="text" className="input-field" value={form.last_name} onChange={set('last_name')} required placeholder="e.g. Asante"/>
               </FIELD>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FIELD label="Gender *" error={errors.gender?.[0]}>
+              <FIELD label="Gender *" error={errors.gender?.[0]} name="child_gender">
                 <select className="input-field" value={form.gender} onChange={set('gender')} required>
                   <option value="">Select</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
               </FIELD>
-              <FIELD label="Date of Birth" error={errors.date_of_birth?.[0]}>
+              <FIELD label="Date of Birth" error={errors.date_of_birth?.[0]} name="child_dob">
                 <input type="date" className="input-field" value={form.date_of_birth} onChange={set('date_of_birth')}/>
               </FIELD>
-              <FIELD label="Class Group" error={errors.class_group?.[0]}>
+              <FIELD label="Class Group" error={errors.class_group?.[0]} name="child_class_group">
                 <select className="input-field" value={form.class_group} onChange={set('class_group')}>
                   <option value="">Select</option>
                   {CLASS_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -165,7 +175,7 @@ export default function ChildForm() {
         {/* Section 2 */}
         <div style={{...cardBase, padding:'24px'}}>
           <SectionHeader num="2" title="Guardian Information" />
-          <FIELD label="Guardian Member *" error={errors.guardian_member_id?.[0]}>
+          <FIELD label="Guardian Member *" error={errors.guardian_member_id?.[0]} name="guardian_member_id">
             <select className="input-field" value={form.guardian_member_id} onChange={set('guardian_member_id')} required>
               <option value="">Select the parent or guardian</option>
               {members.map(m => (
@@ -173,7 +183,7 @@ export default function ChildForm() {
               ))}
             </select>
           </FIELD>
-          <p className="text-xs mt-2" style={{color:'#9ca3af'}}>The guardian must already be a registered church member.</p>
+          <p className="text-xs mt-2" style={{color:PLACEHOLDER}}>The guardian must already be a registered church member.</p>
         </div>
 
         {/* Section 3 */}
@@ -181,26 +191,26 @@ export default function ChildForm() {
           <SectionHeader num="3" title="Settings" />
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg p-3"
-                 style={{border:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fc'}}>
+                 style={{border:BORDER,backgroundColor:'#f8f9fc'}}>
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" style={{color:'var(--color-navy)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" style={{color:NAVY}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <div>
                   <p style={{fontSize:'14px',fontWeight:600,color:'#191c1e'}}>Active Status</p>
-                  <p style={{fontSize:'12px',color:'#747780'}}>Child will be active in the register.</p>
+                  <p style={{fontSize:'12px',color:MUTED}}>Child will be active in the register.</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={form.is_active} onChange={set('is_active')}/>
                 <div className="peer rounded-full"
-                     style={{width:'44px',height:'24px',backgroundColor: form.is_active ? 'var(--color-navy)' : '#c4c6d0',transition:'background-color 0.2s'}}>
+                     style={{width:'44px',height:'24px',backgroundColor: form.is_active ? NAVY : '#c4c6d0',transition:'background-color 0.2s'}}>
                   <div className="rounded-full bg-white"
                        style={{width:'20px',height:'20px',marginTop:'2px',marginLeft: form.is_active ? '22px' : '2px',transition:'margin-left 0.2s',boxShadow:'0 1px 2px rgba(0,0,0,0.2)'}}/>
                 </div>
               </label>
             </div>
-            <FIELD label="Internal Notes" error={errors.notes?.[0]}>
+            <FIELD label="Internal Notes" error={errors.notes?.[0]} name="child_notes">
               <textarea className="input-field" value={form.notes} onChange={set('notes')} rows={3}
                         placeholder="Allergies, special needs, or pastoral notes..."/>
             </FIELD>
@@ -210,7 +220,7 @@ export default function ChildForm() {
         <div className="flex items-center justify-end gap-3">
           <button type="button" onClick={() => navigate('/children')}
                   className="px-6 py-2.5 rounded-lg text-sm font-semibold"
-                  style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>
+                  style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>
             Cancel
           </button>
           <button type="submit" disabled={loading} className="btn-primary px-8 py-2.5 gap-2">

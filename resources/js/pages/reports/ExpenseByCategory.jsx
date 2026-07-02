@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { getExpenseByCategoryReport, downloadExpenseByCategoryPdf, downloadExpenseByCategoryCsv } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 // Color palette for expense category bars.
 // Burgundy/rust-leaning to visually distinguish "money out" from
 // the navy/gold "money in" palette on the Income report. Eye scans
@@ -69,31 +70,36 @@ export default function ExpenseByCategory() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const load = async () => {
+  const load = async (signal) => {
     setLoading(true)
     setError(null)
     try {
       const res = await getExpenseByCategoryReport({
         from_date: fromDate,
         to_date: toDate,
-      })
+      }, signal)
       setData(res.data)
     } catch (err) {
+      if (err?.code === 'ERR_CANCELED') return
       setError(err?.response?.data?.message || 'Failed to load report')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [])
 
-  const chartData = data?.rows ? pivotForChart(data.rows) : []
-  const categoryNames = data?.summary?.category_totals?.map(c => c.category_name) ?? []
+  const chartData = useMemo(() => data?.rows ? pivotForChart(data.rows) : [], [data])
+  const categoryNames = useMemo(() => data?.summary?.category_totals?.map(c => c.category_name) ?? [], [data])
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',color:'var(--color-navy)'}}>
+        <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',color:NAVY}}>
           Expense by Category
         </h1>
         <p style={{color:'#44474f',marginTop:'4px'}}>
@@ -103,16 +109,16 @@ export default function ExpenseByCategory() {
 
       {/* Date range filter */}
       <div className="bg-white rounded-xl p-4 md:p-6 flex flex-wrap items-end gap-4"
-           style={{border:'1px solid var(--color-surface-border)'}}>
+           style={{border:BORDER}}>
         <div className="flex flex-col">
           <label className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#44474f'}}>From</label>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                 className="px-3 py-2 rounded-lg" style={{border:'1px solid var(--color-surface-border)'}} />
+                 className="px-3 py-2 rounded-lg" style={{border:BORDER}} />
         </div>
         <div className="flex flex-col">
           <label className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#44474f'}}>To</label>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                 className="px-3 py-2 rounded-lg" style={{border:'1px solid var(--color-surface-border)'}} />
+                 className="px-3 py-2 rounded-lg" style={{border:BORDER}} />
         </div>
         <button onClick={load} disabled={loading}
                 className="btn-primary px-6 py-2">
@@ -148,13 +154,13 @@ export default function ExpenseByCategory() {
 
           {/* Chart */}
           <div className="bg-white rounded-xl p-4 md:p-6"
-               style={{border:'1px solid var(--color-surface-border)'}}>
+               style={{border:BORDER}}>
             <h2 className="font-bold mb-4"
-                style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
+                style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
               Monthly Expense Breakdown
             </h2>
             {chartData.length === 0 ? (
-              <p style={{color:'#9ca3af'}}>No data in selected range.</p>
+              <p style={{color:PLACEHOLDER}}>No data in selected range.</p>
             ) : (
               <ResponsiveContainer width="100%" height={360}>
                 <BarChart data={chartData} margin={{top:20,right:20,left:0,bottom:20}}>
@@ -173,10 +179,10 @@ export default function ExpenseByCategory() {
 
           {/* Category breakdown table */}
           <div className="bg-white rounded-xl overflow-hidden"
-               style={{border:'1px solid var(--color-surface-border)'}}>
-            <div className="px-6 py-4" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
+               style={{border:BORDER}}>
+            <div className="px-6 py-4" style={{borderBottom:BORDER}}>
               <h2 className="font-bold"
-                  style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
+                  style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
                 Category Breakdown
               </h2>
             </div>
@@ -190,18 +196,18 @@ export default function ExpenseByCategory() {
               </thead>
               <tbody>
                 {data.summary.category_totals.map(c => (
-                  <tr key={c.category_id} style={{borderTop:'1px solid var(--color-surface-border)'}}>
-                    <td className="px-6 py-3" style={{color:'var(--color-navy)'}}>{c.category_name}</td>
+                  <tr key={c.category_id} style={{borderTop:BORDER}}>
+                    <td className="px-6 py-3" style={{color:NAVY}}>{c.category_name}</td>
                     <td className="px-6 py-3 text-right font-mono">{formatGHS(c.total)}</td>
                     <td className="px-6 py-3 text-right" style={{color:'#44474f'}}>{c.percentage.toFixed(1)}%</td>
                   </tr>
                 ))}
                 <tr style={{borderTop:'2px solid var(--color-navy)',backgroundColor:'#f8f9fa'}}>
-                  <td className="px-6 py-3 font-bold" style={{color:'var(--color-navy)'}}>Total Expenses</td>
-                  <td className="px-6 py-3 text-right font-mono font-bold" style={{color:'var(--color-navy)'}}>
+                  <td className="px-6 py-3 font-bold" style={{color:NAVY}}>Total Expenses</td>
+                  <td className="px-6 py-3 text-right font-mono font-bold" style={{color:NAVY}}>
                     {formatGHS(data.summary.grand_total)}
                   </td>
-                  <td className="px-6 py-3 text-right font-bold" style={{color:'var(--color-navy)'}}>100%</td>
+                  <td className="px-6 py-3 text-right font-bold" style={{color:NAVY}}>100%</td>
                 </tr>
               </tbody>
             </table>
@@ -210,7 +216,7 @@ export default function ExpenseByCategory() {
       )}
 
       {!data && !loading && !error && (
-        <div className="bg-white rounded-xl p-6 text-center" style={{border:'1px solid var(--color-surface-border)',color:'#9ca3af'}}>
+        <div className="bg-white rounded-xl p-6 text-center" style={{border:BORDER,color:PLACEHOLDER}}>
           Select a date range and click Update Report.
         </div>
       )}
@@ -221,13 +227,13 @@ export default function ExpenseByCategory() {
 function SummaryCard({ label, value, sub }) {
   return (
     <div className="bg-white rounded-xl p-5"
-         style={{border:'1px solid var(--color-surface-border)'}}>
+         style={{border:BORDER}}>
       <div className="text-xs font-bold uppercase tracking-wider" style={{color:'#44474f'}}>{label}</div>
       <div className="mt-2 font-bold"
-           style={{fontFamily:'var(--font-display)',fontSize:'28px',color:'var(--color-navy)'}}>
+           style={{fontFamily:FONT_DISPLAY,fontSize:'28px',color:NAVY}}>
         {value}
       </div>
-      {sub && <div className="text-xs mt-1" style={{color:'#9ca3af'}}>{sub}</div>}
+      {sub && <div className="text-xs mt-1" style={{color:PLACEHOLDER}}>{sub}</div>}
     </div>
   )
 }

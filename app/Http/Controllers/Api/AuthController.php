@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
@@ -51,9 +52,12 @@ class AuthController extends Controller
         // Success — clear rate limit counter
         RateLimiter::clear($key);
 
-        $user->update(['last_login_at' => now()]);
-        $user->tokens()->delete();
-        $token = $user->createToken('wis-cms-token')->plainTextToken;
+        $token = DB::transaction(function () use ($user) {
+            $user->update(['last_login_at' => now()]);
+            $user->tokens()->delete();
+
+            return $user->createToken('wis-cms-token')->plainTextToken;
+        });
 
         activity()->causedBy($user)->log('User logged in');
 

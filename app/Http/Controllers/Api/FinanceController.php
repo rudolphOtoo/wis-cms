@@ -215,7 +215,7 @@ class FinanceController extends Controller
         $groupByCategory = fn ($items) => $items
             ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
             ->map(fn ($group) => [
-                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'category' => $group->first()?->category?->name ?? 'Uncategorised',
                 'count' => $group->count(),
                 'total' => round($group->sum('amount'), 2),
             ])

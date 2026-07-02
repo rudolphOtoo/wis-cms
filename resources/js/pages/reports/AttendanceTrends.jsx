@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttendanceTrendsCsv } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid, ReferenceLine
@@ -87,7 +88,7 @@ export default function AttendanceTrends() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  async function load() {
+  async function load(signal) {
     setLoading(true)
     setError(null)
     try {
@@ -95,24 +96,29 @@ export default function AttendanceTrends() {
         from_date: fromDate,
         to_date: toDate,
         group_by: groupBy,
-      })
+      }, signal)
       setData(res.data)
     } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return
       setError(e?.response?.data?.message ?? 'Failed to load report.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])  // initial load only; user clicks Update for changes
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [])  // initial load only; user clicks Update for changes
 
-  const chartData = data?.rows ? pivotForChart(data.rows) : []
-  const stNames = data?.rows ? serviceTypeNames(data.rows) : []
+  const chartData = useMemo(() => data?.rows ? pivotForChart(data.rows) : [], [data])
+  const stNames = useMemo(() => data?.rows ? serviceTypeNames(data.rows) : [], [data])
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',color:'var(--color-navy)'}}>
+        <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',color:NAVY}}>
           Attendance Trends
         </h1>
         <p style={{color:'#44474f',marginTop:'4px'}}>
@@ -122,21 +128,21 @@ export default function AttendanceTrends() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl p-4 md:p-6 flex flex-wrap items-end gap-4"
-           style={{border:'1px solid var(--color-surface-border)'}}>
+           style={{border:BORDER}}>
         <div className="flex flex-col">
           <label className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#44474f'}}>From</label>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                 className="px-3 py-2 rounded-lg" style={{border:'1px solid var(--color-surface-border)'}} />
+                 className="px-3 py-2 rounded-lg" style={{border:BORDER}} />
         </div>
         <div className="flex flex-col">
           <label className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#44474f'}}>To</label>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                 className="px-3 py-2 rounded-lg" style={{border:'1px solid var(--color-surface-border)'}} />
+                 className="px-3 py-2 rounded-lg" style={{border:BORDER}} />
         </div>
         <div className="flex flex-col">
           <label className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#44474f'}}>Group By</label>
           <select value={groupBy} onChange={e => setGroupBy(e.target.value)}
-                  className="px-3 py-2 rounded-lg" style={{border:'1px solid var(--color-surface-border)'}}>
+                  className="px-3 py-2 rounded-lg" style={{border:BORDER}}>
             <option value="week">Week</option>
             <option value="month">Month</option>
           </select>
@@ -187,13 +193,13 @@ export default function AttendanceTrends() {
 
           {/* Chart */}
           <div className="bg-white rounded-xl p-4 md:p-6"
-               style={{border:'1px solid var(--color-surface-border)'}}>
+               style={{border:BORDER}}>
             <h2 className="font-bold mb-4"
-                style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
+                style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
               Attendance Count by Service Type
             </h2>
             {chartData.length === 0 ? (
-              <p style={{color:'#9ca3af'}}>No data in selected range.</p>
+              <p style={{color:PLACEHOLDER}}>No data in selected range.</p>
             ) : (
               <ResponsiveContainer width="100%" height={360}>
                 <LineChart data={chartData} margin={{top:20,right:20,left:0,bottom:20}}>
@@ -214,10 +220,10 @@ export default function AttendanceTrends() {
 
           {/* Per-period breakdown */}
           <div className="bg-white rounded-xl overflow-hidden"
-               style={{border:'1px solid var(--color-surface-border)'}}>
-            <div className="px-6 py-4" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
+               style={{border:BORDER}}>
+            <div className="px-6 py-4" style={{borderBottom:BORDER}}>
               <h2 className="font-bold"
-                  style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
+                  style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
                 Period Breakdown
               </h2>
             </div>
@@ -234,8 +240,8 @@ export default function AttendanceTrends() {
                 </thead>
                 <tbody>
                   {data.rows.map(r => (
-                    <tr key={r.period_start} style={{borderTop:'1px solid var(--color-surface-border)'}}>
-                      <td className="px-6 py-3" style={{color:'var(--color-navy)'}}>{r.period_label}</td>
+                    <tr key={r.period_start} style={{borderTop:BORDER}}>
+                      <td className="px-6 py-3" style={{color:NAVY}}>{r.period_label}</td>
                       <td className="px-6 py-3 text-right font-mono">{formatCount(r.sessions_count)}</td>
                       <td className="px-6 py-3 text-right font-mono">{formatCount(r.records_present)}</td>
                       <td className="px-6 py-3 text-right font-mono">{formatCount(r.records_absent)}</td>
@@ -250,7 +256,7 @@ export default function AttendanceTrends() {
       )}
 
       {!data && !loading && !error && (
-        <div className="bg-white rounded-xl p-6 text-center" style={{border:'1px solid var(--color-surface-border)',color:'#9ca3af'}}>
+        <div className="bg-white rounded-xl p-6 text-center" style={{border:BORDER,color:PLACEHOLDER}}>
           Select a date range and click Update Report.
         </div>
       )}
@@ -261,13 +267,13 @@ export default function AttendanceTrends() {
 function SummaryCard({ label, value, sub }) {
   return (
     <div className="bg-white rounded-xl p-5"
-         style={{border:'1px solid var(--color-surface-border)'}}>
+         style={{border:BORDER}}>
       <div className="text-xs font-bold uppercase tracking-wider" style={{color:'#44474f'}}>{label}</div>
       <div className="mt-2 font-bold"
-           style={{fontFamily:'var(--font-display)',fontSize:'28px',color:'var(--color-navy)'}}>
+           style={{fontFamily:FONT_DISPLAY,fontSize:'28px',color:NAVY}}>
         {value}
       </div>
-      {sub && <div className="text-xs mt-1" style={{color:'#9ca3af'}}>{sub}</div>}
+      {sub && <div className="text-xs mt-1" style={{color:PLACEHOLDER}}>{sub}</div>}
     </div>
   )
 }

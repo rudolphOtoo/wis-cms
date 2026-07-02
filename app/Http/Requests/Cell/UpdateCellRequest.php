@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Cell;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateCellRequest extends FormRequest
 {
@@ -21,7 +22,12 @@ class UpdateCellRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:150'],
             'description' => ['nullable', 'string'],
-            'leader_user_id' => ['nullable', 'uuid', 'exists:users,id'],
+            'leader_user_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('users', 'id')
+                    ->where('branch_id', $this->user()->branch_id),
+            ],
             'is_active' => ['boolean'],
         ];
     }

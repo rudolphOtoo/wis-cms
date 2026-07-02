@@ -241,7 +241,7 @@ class MemberController extends Controller
             ->getCollection()
             ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
             ->map(fn ($group) => [
-                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'category' => $group->first()?->category?->name ?? 'Uncategorised',
                 'count' => $group->count(),
                 'total' => round($group->sum('amount'), 2),
             ])->values();
@@ -304,7 +304,7 @@ class MemberController extends Controller
         $byCategory = $transactions
             ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
             ->map(fn ($group) => [
-                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'category' => $group->first()?->category?->name ?? 'Uncategorised',
                 'total' => round($group->sum('amount'), 2),
             ])->values();
 

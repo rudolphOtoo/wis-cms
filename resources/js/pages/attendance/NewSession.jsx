@@ -6,6 +6,7 @@ import { getDepartments } from '../../api/departments'
 import { getCells } from '../../api/cells'
 import { useAuth } from '../../context/AuthContext'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 export default function NewSession() {
   const navigate = useNavigate()
   const { hasRole } = useAuth()
@@ -94,13 +95,13 @@ export default function NewSession() {
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/attendance')}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
-                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
+                style={{backgroundColor:'white',border:BORDER}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
-          <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
+          <h2 className="text-xl font-bold" style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
             {isCellLeader ? 'Record Cell Meeting' : isDeptLeader ? 'Record Department Meeting' : 'Take Attendance'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -119,7 +120,7 @@ export default function NewSession() {
               Department *
             </label>
             {myDepartments.length === 0 ? (
-              <div className="input-field" style={{color:'#9ca3af'}}>You don't lead a department yet.</div>
+              <div className="input-field" style={{color:PLACEHOLDER}}>You don't lead a department yet.</div>
             ) : (
               <select className="input-field" value={form.department_id}
                       onChange={set('department_id')} required>
@@ -142,7 +143,7 @@ export default function NewSession() {
               Cell *
             </label>
             {myCells.length === 0 ? (
-              <div className="input-field" style={{color:'#9ca3af'}}>You don't lead a cell yet.</div>
+              <div className="input-field" style={{color:PLACEHOLDER}}>You don't lead a cell yet.</div>
             ) : (
               <select className="input-field" value={form.cell_id}
                       onChange={set('cell_id')} required>
@@ -165,7 +166,7 @@ export default function NewSession() {
               Service Type *
             </label>
             {fetching ? (
-              <div className="input-field" style={{color:'#9ca3af'}}>Loading services...</div>
+              <div className="input-field" style={{color:PLACEHOLDER}}>Loading services...</div>
             ) : (
               <select className="input-field" value={form.service_type_id}
                       onChange={set('service_type_id')} required>
@@ -204,7 +205,7 @@ export default function NewSession() {
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={() => navigate('/attendance')}
                   className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
-                  style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                  style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>
             Cancel
           </button>
           <button type="submit" disabled={loading || (isDeptLeader && myDepartments.length === 0) || (isCellLeader && myCells.length === 0)} className="flex-1 btn-primary py-2.5">

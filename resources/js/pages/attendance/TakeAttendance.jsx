@@ -3,9 +3,10 @@ import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getSession, markAttendance } from '../../api/attendance'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
+  border: BORDER,
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -76,7 +77,7 @@ export default function TakeAttendance() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}} fill="none" viewBox="0 0 24 24">
+      <svg className="animate-spin w-8 h-8" style={{color:NAVY}} fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
       </svg>
@@ -90,14 +91,15 @@ export default function TakeAttendance() {
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/attendance')}
-                  className="w-11 h-11 flex items-center justify-center rounded-full"
-                  style={{border:'1px solid var(--color-surface-border)',backgroundColor:'white',color:'var(--color-navy)'}}>
+                   aria-label="Back to attendance"
+                   className="w-11 h-11 flex items-center justify-center rounded-full"
+                   style={{border:BORDER,backgroundColor:'white',color:NAVY}}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
             </svg>
           </button>
           <div>
-            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'28px',lineHeight:'36px',color:'var(--color-navy)'}}>
+            <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'28px',lineHeight:'36px',color:NAVY}}>
               Take Attendance: {session?.service_type?.name}
             </h2>
             <p style={{color:'#44474f'}}>{session?.service_date} · {total} people</p>
@@ -149,12 +151,12 @@ export default function TakeAttendance() {
         {[
           { label:'Present', value: presentCount, color:'#15803d' },
           { label:'Absent',  value: absentCount,  color:'#ba1a1a' },
-          { label:'Total',   value: total,        color:'var(--color-navy)' },
-          { label:'Completion', value:`${completion}%`, color:'var(--color-navy)' },
+          { label:'Total',   value: total,        color:NAVY },
+          { label:'Completion', value:`${completion}%`, color:NAVY },
         ].map(s => (
           <div key={s.label} className="flex flex-col justify-between" style={{...cardBase, padding:'24px', minHeight:'96px'}}>
-            <span className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>{s.label}</span>
-            <span style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:700,color:s.color}}>{s.value}</span>
+            <span className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>{s.label}</span>
+            <span style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:700,color:s.color}}>{s.value}</span>
           </div>
         ))}
       </div>
@@ -163,7 +165,7 @@ export default function TakeAttendance() {
       <div style={{...cardBase, padding:'16px 24px'}}>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#747780'}}
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:MUTED}}
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
@@ -183,29 +185,29 @@ export default function TakeAttendance() {
       {/* People list — big toggle buttons */}
       <div style={{...cardBase, overflow:'hidden'}}>
         <div className="flex justify-between items-center"
-             style={{padding:'12px 24px',backgroundColor:'#f2f3f6',borderBottom:'1px solid var(--color-surface-border)'}}>
-          <span className="uppercase tracking-widest" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>Congregant Details</span>
-          <span className="uppercase tracking-widest" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>Status Toggle</span>
+             style={{padding:'12px 24px',backgroundColor:'#f2f3f6',borderBottom:BORDER}}>
+          <span className="uppercase tracking-widest" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>Congregant Details</span>
+          <span className="uppercase tracking-widest" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>Status Toggle</span>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="text-center" style={{padding:'48px',color:'#9ca3af'}}>No results for "{search}"</div>
+          <div className="text-center" style={{padding:'48px',color:PLACEHOLDER}}>No results for "{search}"</div>
         ) : (
           <div>
             {filtered.map(person => (
               <div key={person.id}
                    className="flex items-center justify-between gap-3 transition-colors"
-                   style={{padding:'12px 16px',borderTop:'1px solid var(--color-surface-border)'}}>
+                   style={{padding:'12px 16px',borderTop:BORDER}}>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
                        style={{backgroundColor: person.is_present ? '#dcfce7' : '#e1e2e5',
                                color: person.is_present ? '#15803d' : '#44474f',
-                               border:'1px solid var(--color-surface-border)'}}>
+                               border:BORDER}}>
                     {person.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold truncate" style={{fontSize:'17px',color:'var(--color-navy)'}}>{person.name}</h3>
-                    <p className="truncate" style={{fontSize:'12px',color:'#747780'}}>{person.member_number ?? person.class ?? ''}</p>
+                    <h3 className="font-bold truncate" style={{fontSize:'17px',color:NAVY}}>{person.name}</h3>
+                    <p className="truncate" style={{fontSize:'12px',color:MUTED}}>{person.member_number ?? person.class ?? ''}</p>
                   </div>
                 </div>
                 <button onClick={() => togglePerson(person.id)}
@@ -226,7 +228,7 @@ export default function TakeAttendance() {
 
         {/* Footer actions */}
         <div className="flex justify-between items-center flex-wrap gap-3"
-             style={{padding:'16px 24px',backgroundColor:'#edeef1',borderTop:'1px solid var(--color-surface-border)'}}>
+             style={{padding:'16px 24px',backgroundColor:'#edeef1',borderTop:BORDER}}>
           <p style={{fontSize:'14px',color:'#44474f'}}>
             Showing {filtered.length} of {total} {search ? '(filtered)' : 'members'}
           </p>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { memo, useState, useEffect, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCell, assignToCell, unassignFromCell } from '../../api/cells'
@@ -7,6 +7,7 @@ import MemberSearchPicker from '../../components/MemberSearchPicker'
 import { Users } from 'lucide-react'
 import { useConfirm } from '../../hooks/useConfirm'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 export default function CellDetail() {
   const navigate = useNavigate()
   const { id }   = useParams()
@@ -24,12 +25,12 @@ export default function CellDetail() {
   const [creating,   setCreating]   = useState(false)
   const [notice,     setNotice]     = useState(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     setLoading(true)
     try {
       const [cRes, amRes] = await Promise.all([
-        getCell(id),
-        getMembers({ per_page: 200, unscoped: 1 }),
+        getCell(id, signal),
+        getMembers({ per_page: 200, unscoped: 1 }, signal),
       ])
       setCell(cRes.data.data)
       setMembers(cRes.data.data.members ?? [])
@@ -41,7 +42,11 @@ export default function CellDetail() {
     }
   }, [id])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchData(controller.signal)
+    return () => controller.abort()
+  }, [fetchData])
 
   const handleAssign = async () => {
     if (!selected) return
@@ -95,11 +100,13 @@ export default function CellDetail() {
     }
   }
 
-  const unassignedMembers = allMembers.filter(m => m.cell_id === null)
+  const unassignedMembers = useMemo(() => {
+    return allMembers.filter(m => m.cell_id === null)
+  }, [allMembers])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
+      <svg className="animate-spin w-8 h-8" style={{color:NAVY}}
            fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -111,14 +118,15 @@ export default function CellDetail() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/cells')}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
-                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
+                 aria-label="Back to cells"
+                 className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
+                 style={{backgroundColor:'white',border:BORDER}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div className="flex-1">
-          <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
+          <h2 className="text-xl font-bold" style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
             {cell?.name}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -128,7 +136,7 @@ export default function CellDetail() {
         </div>
         <button onClick={() => navigate(`/cells/${id}/edit`)}
                 className="px-4 py-2 rounded-lg text-sm font-semibold"
-                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>
           Edit Cell
         </button>
       </div>
@@ -148,8 +156,8 @@ export default function CellDetail() {
 
       <div className="card p-0">
         <div className="px-6 py-4 flex items-center justify-between"
-             style={{borderBottom:'1px solid var(--color-surface-border)'}}>
-          <h3 className="font-semibold" style={{color:'var(--color-navy)'}}>Cell Members</h3>
+             style={{borderBottom:BORDER}}>
+          <h3 className="font-semibold" style={{color:NAVY}}>Cell Members</h3>
           <button onClick={() => setShowAdd(!showAdd)} className="btn-primary text-sm min-h-[44px] min-w-[44px] px-3 py-1.5 gap-1">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
@@ -164,7 +172,7 @@ export default function CellDetail() {
               <button onClick={() => setAddTab('new')}
                       className="px-4 py-2.5 text-sm font-semibold transition-colors"
                       style={{
-                        color: addTab === 'new' ? 'var(--color-navy)' : '#6b7280',
+                        color: addTab === 'new' ? NAVY : '#6b7280',
                         borderBottom: addTab === 'new' ? '2px solid var(--color-navy)' : '2px solid transparent',
                       }}>
                 New Member
@@ -172,7 +180,7 @@ export default function CellDetail() {
               <button onClick={() => setAddTab('existing')}
                       className="px-4 py-2.5 text-sm font-semibold transition-colors"
                       style={{
-                        color: addTab === 'existing' ? 'var(--color-navy)' : '#6b7280',
+                        color: addTab === 'existing' ? NAVY : '#6b7280',
                         borderBottom: addTab === 'existing' ? '2px solid var(--color-navy)' : '2px solid transparent',
                       }}>
                 From Church
@@ -180,7 +188,7 @@ export default function CellDetail() {
             </div>
 
             <div className="px-6 py-4"
-                 style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
+                 style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
               {addTab === 'new' ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -218,7 +226,7 @@ export default function CellDetail() {
                     </button>
                     <button onClick={() => { setShowAdd(false); setNewMember({ first_name: '', last_name: '', phone: '', gender: '' }) }}
                             className="px-4 py-2 rounded-lg text-sm font-semibold"
-                            style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                            style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>
                       Cancel
                     </button>
                   </div>
@@ -238,11 +246,11 @@ export default function CellDetail() {
                     </button>
                     <button onClick={() => { setShowAdd(false); setSelected('') }}
                             className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-                            style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                            style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>
                       Cancel
                     </button>
                   </div>
-                  <p className="text-xs mt-2" style={{color:'#9ca3af'}}>
+                  <p className="text-xs mt-2" style={{color:PLACEHOLDER}}>
                     Only members not currently assigned to any cell are shown.
                   </p>
                 </div>
@@ -253,15 +261,15 @@ export default function CellDetail() {
 
         {members.length === 0 ? (
           <div className="text-center py-12">
-            <Users size={40} strokeWidth={1.2} className="mx-auto mb-3" style={{color:'var(--color-navy)'}} aria-hidden="true" />
-            <p className="font-semibold" style={{color:'var(--color-navy)'}}>No members yet</p>
-            <p className="text-sm mt-1" style={{color:'#9ca3af'}}>Click "Add Member" to add members to this cell</p>
+            <Users size={40} strokeWidth={1.2} className="mx-auto mb-3" style={{color:NAVY}} aria-hidden="true" />
+            <p className="font-semibold" style={{color:NAVY}}>No members yet</p>
+            <p className="text-sm mt-1" style={{color:PLACEHOLDER}}>Click "Add Member" to add members to this cell</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
+                <tr style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
                   {['Member', 'Phone', 'Status', 'Action'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{color:'#6b7280'}}>{h}</th>
                   ))}
@@ -269,29 +277,13 @@ export default function CellDetail() {
               </thead>
               <tbody>
                 {members.map((member, i) => (
-                  <tr key={member.id}
-                      style={{borderBottom:'1px solid var(--color-surface-border)', backgroundColor: i % 2 === 0 ? 'white' : '#fafafa'}}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                             style={{backgroundColor:'var(--color-navy)'}}>
-                          {(member.first_name ?? '?').charAt(0)}
-                        </div>
-                        <span className="text-sm font-semibold" style={{color:'#111827'}}>
-                          {member.first_name} {member.last_name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono" style={{color:'#6b7280'}}>{member.phone ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm capitalize" style={{color:'#374151'}}>{member.status}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleRemove(member.id)} disabled={removing === member.id}
-                              className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-sm font-medium"
-                              style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                        {removing === member.id ? '...' : 'Remove'}
-                      </button>
-                    </td>
-                  </tr>
+                  <CellMemberRow
+                    key={member.id}
+                    member={member}
+                    index={i}
+                    handleRemove={handleRemove}
+                    removing={removing}
+                  />
                 ))}
               </tbody>
             </table>
@@ -302,3 +294,31 @@ export default function CellDetail() {
     </div>
   )
 }
+
+const CellMemberRow = memo(function CellMemberRow({ member, index, handleRemove, removing }) {
+  return (
+    <tr
+      style={{borderBottom:BORDER, backgroundColor: index % 2 === 0 ? 'white' : '#fafafa'}}>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
+               style={{backgroundColor:NAVY}}>
+            {(member.first_name ?? '?').charAt(0)}
+          </div>
+          <span className="text-sm font-semibold" style={{color:'#111827'}}>
+            {member.first_name} {member.last_name}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-sm font-mono" style={{color:'#6b7280'}}>{member.phone ?? '—'}</td>
+      <td className="px-4 py-3 text-sm capitalize" style={{color:'#374151'}}>{member.status}</td>
+      <td className="px-4 py-3">
+        <button onClick={() => handleRemove(member.id)} disabled={removing === member.id}
+                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-sm font-medium"
+                style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+          {removing === member.id ? '...' : 'Remove'}
+        </button>
+      </td>
+    </tr>
+  )
+})

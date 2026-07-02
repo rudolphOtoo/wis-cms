@@ -208,7 +208,7 @@ class ServiceReminderController extends Controller
                 'member_name' => $log->member ? trim("{$log->member->first_name} {$log->member->last_name}") : '(deleted)',
                 'service_type' => $log->serviceType?->name,
                 'sent_at' => $log->sent_at,
-                'intended_service_date' => $log->intended_service_date->toDateString(),
+                'intended_service_date' => $log->intended_service_date?->toDateString(),
                 'status' => $log->status,
                 'phone_used' => $log->phone_used,
                 'message_body' => $log->message_body,

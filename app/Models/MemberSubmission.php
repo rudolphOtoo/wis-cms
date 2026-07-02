@@ -185,6 +185,15 @@ class MemberSubmission extends Model
         ?string $notes = null,
     ): Member {
         return DB::transaction(function () use ($reviewer, $cellId, $notes): Member {
+            // Pessimistic lock prevents race condition where two concurrent
+            // requests both see "no row" and both INSERT duplicate members
+            // with the same phone in the same branch.
+            DB::table('members')
+                ->where('branch_id', $this->branch_id)
+                ->where('phone', $this->phone)
+                ->lockForUpdate()
+                ->first();
+
             $member = Member::updateOrCreate(
                 [
                     'branch_id' => $this->branch_id,

@@ -218,7 +218,8 @@ class CellController extends Controller
             ], 422);
         }
 
-        $msg = DB::transaction(function () use ($request, $validated, $cell, $recipients) {
+        $recipientIds = [];
+        $msg = DB::transaction(function () use ($request, $validated, $cell, $recipients, &$recipientIds) {
             $message = Message::create([
                 'branch_id' => $request->user()->branch_id,
                 'sender_id' => $request->user()->id,
@@ -239,13 +240,17 @@ class CellController extends Controller
                     'email' => $member->email,
                     'delivery_status' => 'pending',
                 ]);
-                SendBroadcastMessageJob::dispatch($r->id);
+                $recipientIds[] = $r->id;
             }
 
             $message->update(['status' => 'sent']);
 
             return $message;
         });
+
+        foreach ($recipientIds as $rid) {
+            SendBroadcastMessageJob::dispatch($rid);
+        }
 
         activity()->causedBy($request->user())
             ->performedOn($msg)

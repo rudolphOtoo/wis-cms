@@ -1,7 +1,7 @@
 import api from './axios'
 
-export const getCells         = ()        => api.get('/cells')
-export const getCell          = (id)      => api.get(`/cells/${id}`)
+export const getCells         = (params, signal) => api.get('/cells', { params, signal })
+export const getCell          = (id, signal)      => api.get(`/cells/${id}`, { signal })
 export const createCell       = (data)    => api.post('/cells', data)
 export const updateCell       = (id, data)=> api.put(`/cells/${id}`, data)
 export const deleteCell       = (id)      => api.delete(`/cells/${id}`)

@@ -2,6 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermission } from '../hooks/usePermission'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../constants/styles'
 /**
  * Wrap a page in this component to require a permission.
  * Shows a friendly "no permission" screen if the user lacks access.
@@ -23,7 +24,7 @@ export default function PermissionGate({ permission, children }) {
         </svg>
       </div>
       <h2 className="text-xl font-bold mb-2"
-          style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
+          style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
         Access Restricted
       </h2>
       <p className="text-sm mb-6" style={{color:'#6b7280'}}>
