@@ -6,6 +6,11 @@ set -euo pipefail
 REGISTRY="ghcr.io/rudolphotoo"
 TAG="${1:-latest}"
 
+# 1. Export current database data into the church-data.json file that
+#    will be bundled in the Docker image.
+php artisan app:data-migrate --export
+
+# 2. Build and push images.
 docker build --target app -t "$REGISTRY/wis-cms-app:$TAG" .
 docker build --target webserver -t "$REGISTRY/wis-cms-webserver:$TAG" .
 

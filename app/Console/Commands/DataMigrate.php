@@ -12,7 +12,8 @@ class DataMigrate extends Command
         {--export : Export church data to a portable JSON file}
         {--import : Import church data from a JSON file into the database}
         {--output=database/church-data.json : Output path for export}
-        {--input=database/church-data.json : Input path for import}';
+        {--input=database/church-data.json : Input path for import}
+        {--exclude-tables= : Comma-separated list of tables to exclude from export}';
 
     protected $description = 'One-time production data migration tool (old server → Docker).';
 
@@ -67,8 +68,16 @@ class DataMigrate extends Command
 
         $this->info('Exporting data...');
 
+        $tables = $this->tables;
+        $exclude = $this->option('exclude-tables');
+        if ($exclude) {
+            $excluded = array_map('trim', explode(',', $exclude));
+            $tables = array_values(array_diff($tables, $excluded));
+            $this->line('  Excluding tables: '.implode(', ', $excluded));
+        }
+
         $data = [];
-        foreach ($this->tables as $table) {
+        foreach ($tables as $table) {
             if (! Schema::hasTable($table)) {
                 $this->warn("  Table '{$table}' does not exist — skipping.");
 
@@ -145,6 +154,9 @@ class DataMigrate extends Command
 
         $this->line('  Database empty, data file found — importing church data...');
         $this->importFromFile($dataFile);
+
+        $this->line('  Syncing reference data from ProductionSeeder...');
+        $this->call('db:seed', ['--class' => 'ProductionSeeder', '--force' => true]);
 
         return self::SUCCESS;
     }
