@@ -151,7 +151,7 @@ class BirthdayController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $days = $validated['days'] ?? 7;
+        $days = (int) ($validated['days'] ?? 7);
         $user = $request->user();
 
         $today = Carbon::today('Africa/Accra');
@@ -234,7 +234,7 @@ class BirthdayController extends Controller
             'status' => ['nullable', 'in:sent,no_phone,failed'],
         ]);
 
-        $days = $validated['days'] ?? 30;
+        $days = (int) ($validated['days'] ?? 30);
         $cutoff = Carbon::today('Africa/Accra')->subDays($days);
 
         $query = BirthdayMessageLog::query()

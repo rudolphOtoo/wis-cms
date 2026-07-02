@@ -83,12 +83,12 @@ export default function Dashboard() {
     <div className="space-y-6" style={{ maxWidth: '1440px' }}>
 
       <section
-        className="rounded-xl relative overflow-hidden p-6 md:p-10"
+        className="rounded-xl relative overflow-hidden p-5 md:p-10"
         style={{ background: 'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)' }}
       >
         <div className="relative z-10">
           <h2
-            className="font-bold text-white text-2xl md:text-4xl leading-tight"
+            className="font-bold text-white text-xl sm:text-2xl md:text-4xl leading-tight"
             style={{ fontFamily: FONT_DISPLAY }}
           >
             {greeting()}, {user?.name?.split(' ')[0]}
@@ -117,8 +117,8 @@ export default function Dashboard() {
                 {s.money ? (
                   <>
                     <div className="flex items-baseline gap-1">
-                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: '22px', fontWeight: 700, color: NAVY }}>GHS</span>
-                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: '40px', fontWeight: 700, lineHeight: 1, color: NAVY }}>
+                      <span className="text-sm sm:text-base" style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, color: NAVY }}>GHS</span>
+                      <span className="text-2xl sm:text-3xl md:text-4xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, lineHeight: 1, color: NAVY }}>
                         {Number(s.value).toLocaleString('en-GH')}
                       </span>
                     </div>
@@ -136,7 +136,7 @@ export default function Dashboard() {
                     )}
                   </>
                 ) : (
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: '48px', fontWeight: 700, lineHeight: 1, color: NAVY }}>
+                  <span className="text-3xl sm:text-4xl md:text-5xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, lineHeight: 1, color: NAVY }}>
                     {s.value}
                   </span>
                 )}
@@ -150,7 +150,7 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="surface-card p-6">
           <div className="flex justify-between items-center mb-6">
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+            <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
               Attendance Trend
             </h3>
             <button
@@ -180,7 +180,7 @@ export default function Dashboard() {
 
         <div className="surface-card p-6">
           <div className="flex justify-between items-center mb-6">
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+            <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
               Finance Overview
             </h3>
             <button
@@ -211,9 +211,9 @@ export default function Dashboard() {
 
         {/* Membership composition */}
         <div className="surface-card p-6">
-          <h3 className="mb-6" style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
-            Membership Composition
-          </h3>
+            <h3 className="mb-4 sm:mb-6 text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
+              Membership Composition
+            </h3>
           <div className="space-y-6">
             <div className="space-y-3">
               <div className="flex justify-between" style={{ fontSize: '14px', fontWeight: 600, color: '#191c1e' }}>
@@ -246,7 +246,7 @@ export default function Dashboard() {
 
         {/* Top income sources */}
         <div className="surface-card p-6">
-          <h3 className="mb-6" style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <h3 className="mb-4 sm:mb-6 text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             Top Income Sources
           </h3>
           {top_categories.length === 0 ? (
@@ -273,7 +273,7 @@ export default function Dashboard() {
         </div>
 
         <div className="surface-card p-6">
-          <h3 className="mb-6" style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <h3 className="mb-4 sm:mb-6 text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             Quick Actions
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -308,7 +308,7 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="surface-card p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+            <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
               Recent Members
             </h3>
             <button
@@ -345,7 +345,7 @@ export default function Dashboard() {
 
         <div className="surface-card p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+            <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
               Recent Transactions
             </h3>
             <button

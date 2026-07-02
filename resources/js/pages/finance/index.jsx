@@ -217,15 +217,15 @@ export default function FinancePage() {
         <div className="surface-card p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+              <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
                 Financial Report
               </h3>
               <p style={{ fontSize: '14px', color: MUTED, marginTop: '4px' }}>
                 Generate a PDF income &amp; expense ledger for any date range.
               </p>
             </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-none">
                 <label
                   htmlFor="report-from"
                   style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
@@ -238,10 +238,9 @@ export default function FinancePage() {
                   value={reportFrom}
                   onChange={e => setReportFrom(e.target.value)}
                   className="input-field"
-                  style={{ width: 'auto' }}
                 />
               </div>
-              <div>
+              <div className="flex-1 sm:flex-none">
                 <label
                   htmlFor="report-to"
                   style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
@@ -254,7 +253,6 @@ export default function FinancePage() {
                   value={reportTo}
                   onChange={e => setReportTo(e.target.value)}
                   className="input-field"
-                  style={{ width: 'auto' }}
                 />
               </div>
               <button
@@ -304,7 +302,7 @@ export default function FinancePage() {
           style={{ borderBottom: BORDER }}
         >
           <div>
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+            <h3 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
               Transactions
             </h3>
             <p style={{ fontSize: '14px', color: MUTED }}>
@@ -439,7 +437,7 @@ export default function FinancePage() {
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
           <div
-            className="flex items-center justify-between p-4 md:p-6"
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6"
             style={{ borderTop: BORDER }}
           >
             <span style={{ fontSize: '14px', color: MUTED }}>
@@ -474,7 +472,7 @@ export default function FinancePage() {
       {/* Monthly Trend chart */}
       <div className="surface-card p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
-          <h4 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <h4 className="text-lg sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             Monthly Trend
           </h4>
           {/* Chart legend */}

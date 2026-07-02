@@ -135,8 +135,8 @@ export default function MembersPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2
-            className="font-bold"
-            style={{ fontFamily: FONT_DISPLAY, fontSize: '32px', lineHeight: '40px', color: NAVY }}
+            className="font-bold text-2xl md:text-4xl"
+            style={{ fontFamily: FONT_DISPLAY, lineHeight: '1.2', color: NAVY }}
           >
             Members
           </h2>
@@ -177,7 +177,7 @@ export default function MembersPage() {
             <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Total Members</p>
             <StatIcon><Users size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             {total}
           </p>
         </div>
@@ -187,7 +187,7 @@ export default function MembersPage() {
             <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Active</p>
             <StatIcon><UserCheck size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             {active}
           </p>
           <div className="w-full rounded-full mt-2" style={{ height: '6px', backgroundColor: '#e7e8eb' }}>
@@ -200,7 +200,7 @@ export default function MembersPage() {
             <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>New This Month</p>
             <StatIcon><UserPlus size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             {stats?.new_this_month ?? '—'}
           </p>
         </div>
@@ -210,7 +210,7 @@ export default function MembersPage() {
             <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Male / Female Split</p>
             <StatIcon><Scale size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
+          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
             {malePct}% / {femalePct}%
           </p>
           <div className="flex gap-1 mt-2">
@@ -275,8 +275,119 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {/* Non-essential columns hidden on small viewports */}
-        <div className="overflow-x-auto">
+        {/* ── Mobile card view (below 640px) ── */}
+        <div className="mobile-table-cards">
+          {loading ? (
+            <div className="p-6 space-y-4">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="surface-card p-4 animate-pulse space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-200" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-slate-200 rounded w-3/4" />
+                      <div className="h-3 bg-slate-200 rounded w-1/2" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : members.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                style={{ backgroundColor: 'rgba(27,58,107,0.08)' }}
+              >
+                <Users size={26} strokeWidth={1.5} style={{ color: NAVY }} aria-hidden="true" />
+              </div>
+              <p className="font-semibold text-base mb-1" style={{ color: NAVY }}>
+                {search ? 'No members found' : 'No members yet'}
+              </p>
+              <p className="text-sm mb-5 max-w-xs" style={{ color: MUTED }}>
+                {search
+                  ? `No results for "${search}". Try a different name, phone, or member number.`
+                  : 'Add your first member to start building your congregation register.'}
+              </p>
+              {!search && can('create members') && (
+                <button onClick={() => navigate('/members/new')} className="btn-primary" style={{ padding: '10px 24px' }}>
+                  Add First Member
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 space-y-3">
+              {members.map(member => {
+                const cfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive
+                const StatusIcon = cfg.icon
+                return (
+                  <div key={member.id} className="surface-card p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
+                             style={{ backgroundColor: NAVY }}>
+                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-sm truncate" style={{ color: NAVY }}>{member.full_name}</p>
+                          <p className="text-xs" style={{ color: MUTED }}>
+                            #{member.member_number} · {member.gender}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-bold flex-shrink-0 ml-2"
+                            style={{ padding: '3px 8px', backgroundColor: cfg.bg, color: cfg.text }}>
+                        <StatusIcon size={10} strokeWidth={2.5} aria-hidden="true" />
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs" style={{ color: MUTED }}>
+                      {member.phone && <span>📞 {member.phone}</span>}
+                      {member.email && <span className="truncate">✉ {member.email}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--color-surface-border)' }}>
+                      <button onClick={() => navigate(`/members/${member.id}`)}
+                              className="flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
+                              style={{ color: NAVY }}>
+                        View
+                      </button>
+                      {can('edit members') && (
+                        <button onClick={() => navigate(`/members/${member.id}/edit`)}
+                                className="flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+                                style={{ color: '#92400e' }}>
+                          Edit
+                        </button>
+                      )}
+                      {can('delete members') && (
+                        pendingDelete === member.id ? (
+                          <div className="flex gap-1">
+                            <button onClick={() => handleDelete(member)} disabled={deleting === member.id}
+                                    className="min-h-[44px] px-4 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                                    style={{ color: '#be123c' }}>
+                              {deleting === member.id ? '…' : 'Confirm'}
+                            </button>
+                            <button onClick={() => setPendingDelete(null)}
+                                    className="min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                                    style={{ color: MUTED }}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setPendingDelete(member.id)}
+                                  className="min-h-[44px] px-4 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                                  style={{ color: '#be123c' }}>
+                            Delete
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Desktop table (640px and above) ── */}
+        <div className="desktop-table overflow-x-auto w-full">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{ backgroundColor: '#f8f9fc' }}>

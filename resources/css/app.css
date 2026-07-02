@@ -126,6 +126,34 @@ h1, h2, h3 { font-family: var(--font-display); }
   font-size: clamp(0.875rem, 1vw + 0.25rem, 1rem);
 }
 
+/* ===== Mobile Card (replaces wide tables on small viewports) ===== */
+
+.mobile-member-card {
+  display: block;
+}
+@media (min-width: 640px) {
+  .mobile-member-card {
+    display: none;
+  }
+}
+
+.mobile-table-cards {
+  display: block;
+}
+@media (min-width: 640px) {
+  .mobile-table-cards {
+    display: none;
+  }
+}
+.desktop-table {
+  display: none;
+}
+@media (min-width: 640px) {
+  .desktop-table {
+    display: table;
+  }
+}
+
 /* ===== Scrollbar ===== */
 
 .sidebar-scroll {

@@ -92,7 +92,7 @@ export default function AttendancePage() {
       {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+          <h2 className="font-bold text-2xl md:text-4xl" style={{fontFamily:FONT_DISPLAY,lineHeight:'1.2',color:NAVY}}>
             Attendance Overview
           </h2>
           <p style={{color:'#44474f'}}>Track Sunday and weekday service attendance</p>
@@ -117,7 +117,7 @@ export default function AttendancePage() {
             </div>
             <div>
               <p style={{fontSize:'14px',fontWeight:600,color:'#44474f'}}>{s.label}</p>
-              <h3 style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:NAVY}}>{s.value}</h3>
+              <h3 className="text-xl sm:text-2xl" style={{fontFamily:FONT_DISPLAY,fontWeight:600,color:NAVY}}>{s.value}</h3>
               {s.badge !== null && s.badge !== undefined ? (
                 <div className="flex items-center gap-1" style={{fontSize:'12px',fontWeight:700,color: s.badge >= 0 ? '#15803d' : '#ba1a1a'}}>
                   <Icon d={s.badge >= 0 ? ICONS.trendUp : ICONS.trendDown} size={14} />
@@ -188,20 +188,20 @@ export default function AttendancePage() {
           </table>
         </div>
         {meta && meta.last_page > 1 && (
-          <div className="flex justify-between items-center"
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4"
                style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:BORDER}}>
             <p style={{fontSize:'14px',color:'#44474f'}}>
               Page <span className="font-bold" style={{color:NAVY}}>{meta.current_page}</span> of <span className="font-bold" style={{color:NAVY}}>{meta.last_page}</span> · {meta.total} records
             </p>
             <div className="flex items-center gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50 transition-colors hover:bg-white"
                       style={{border:BORDER,color:NAVY}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
               </button>
               <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:NAVY}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50 transition-colors hover:bg-white"
                       style={{border:BORDER,color:NAVY}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
               </button>
@@ -216,7 +216,7 @@ export default function AttendancePage() {
         {/* Monthly Trend — REAL Recharts */}
         <div style={{...cardBase, padding:'24px'}}>
           <div className="flex justify-between items-center mb-6">
-            <h4 style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:NAVY}}>Monthly Trend</h4>
+            <h4 className="text-lg sm:text-2xl" style={{fontFamily:FONT_DISPLAY,fontWeight:600,color:NAVY}}>Monthly Trend</h4>
             {insights && (
               <span className="px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"
                     style={{backgroundColor: insights.trend_direction === 'up' ? '#dcfce7' : insights.trend_direction === 'down' ? '#ffdad6' : '#edeef1',
@@ -245,7 +245,7 @@ export default function AttendancePage() {
              style={{borderRadius:'16px',padding:'24px',background:'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)',boxShadow:'0 4px 12px rgba(13,31,60,0.05)'}}>
           <div className="absolute rounded-full" style={{bottom:'-40px',right:'-40px',width:'192px',height:'192px',background:'rgba(255,255,255,0.05)'}}/>
           <div className="relative z-10">
-            <h4 className="mb-4" style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600}}>Attendance Insights</h4>
+            <h4 className="text-lg sm:text-2xl mb-4" style={{fontFamily:FONT_DISPLAY,fontWeight:600}}>Attendance Insights</h4>
             {insights ? (
               <div className="space-y-4">
                 <div>
