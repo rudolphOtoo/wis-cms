@@ -266,28 +266,61 @@ export default function CellDetail() {
             <p className="text-sm mt-1" style={{color:PLACEHOLDER}}>Click "Add Member" to add members to this cell</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
-                  {['Member', 'Phone', 'Status', 'Action'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{color:'#6b7280'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          <>
+            {/* Mobile card view (below 640px) */}
+            <div className="mobile-table-cards">
+              <div className="divide-y" style={{borderColor:'var(--color-surface-border)'}}>
                 {members.map((member, i) => (
-                  <CellMemberRow
-                    key={member.id}
-                    member={member}
-                    index={i}
-                    handleRemove={handleRemove}
-                    removing={removing}
-                  />
+                  <div key={member.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                           style={{backgroundColor:NAVY}}>
+                        {(member.first_name ?? '?').charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate" style={{color:'#111827'}}>
+                          {member.first_name} {member.last_name}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs" style={{color:'#6b7280'}}>
+                          <span>{member.phone ?? '—'}</span>
+                          <span className="capitalize">· {member.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRemove(member.id)} disabled={removing === member.id}
+                            className="min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-medium flex-shrink-0"
+                            style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                      {removing === member.id ? '...' : 'Remove'}
+                    </button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </div>
+
+            {/* Desktop table (640px and above) */}
+            <div className="desktop-table overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
+                    {['Member', 'Phone', 'Status', 'Action'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{color:'#6b7280'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((member, i) => (
+                    <CellMemberRow
+                      key={member.id}
+                      member={member}
+                      index={i}
+                      handleRemove={handleRemove}
+                      removing={removing}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
       {dialog}

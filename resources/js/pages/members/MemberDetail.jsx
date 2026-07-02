@@ -116,7 +116,7 @@ export default function MemberDetail() {
             </svg>
           </button>
           <div>
-            <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+            <h1 className="font-bold text-xl sm:text-2xl md:text-4xl" style={{fontFamily:FONT_DISPLAY,lineHeight:'1.2',color:NAVY}}>
               {member.full_name}
             </h1>
             <p style={{fontSize:'14px',color:'#44474f'}}>Member ID: {member.member_number}</p>
@@ -216,7 +216,7 @@ export default function MemberDetail() {
                   <svg className="w-6 h-6" style={{color:NAVY}} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 12V7H5a2 2 0 010-4h14v4M3 5v14a2 2 0 002 2h16v-5M18 12a2 2 0 000 4h4v-4h-4z"/>
                   </svg>
-                  <h3 style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:NAVY}}>Giving History</h3>
+                  <h3 className="text-lg sm:text-2xl" style={{fontFamily:FONT_DISPLAY,fontWeight:600,color:NAVY}}>Giving History</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   {giving?.available_years?.length > 0 && (
@@ -261,7 +261,7 @@ export default function MemberDetail() {
                       <span className="relative z-10 mb-2" style={{fontSize:'14px',fontWeight:600,color:'rgba(255,255,255,0.7)'}}>
                         Total Given in {givingYear}
                       </span>
-                      <h2 className="relative z-10" style={{fontFamily:FONT_DISPLAY,fontSize:'42px',fontWeight:700,color:'var(--color-gold-light)'}}>
+                      <h2 className="text-2xl sm:text-3xl md:text-4xl" style={{fontFamily:FONT_DISPLAY,fontWeight:700,color:'var(--color-gold-light)'}}>
                         {fmt(giving.total)}
                       </h2>
                       <div className="relative z-10 flex gap-3 mt-6 flex-wrap justify-center">
