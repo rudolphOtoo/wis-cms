@@ -65,6 +65,7 @@ export default function Birthdays() {
       setPreviewData(res.data.data)
       setPreviewError(null)
     } catch (err) {
+      console.error('[Birthdays] preview failed:', err?.response?.status, err?.response?.data || err)
       setPreviewError(err?.response?.data?.message || 'Preview failed')
       setPreviewData(null)
     }
@@ -78,6 +79,7 @@ export default function Birthdays() {
       setEditedActive(res.data.data.is_active)
       await refreshPreview(res.data.data.template)
     } catch (err) {
+      console.error('[Birthdays] loadSettings failed:', err?.response?.status, err?.response?.data || err)
       setSettingsError(err?.response?.data?.message || 'Failed to load settings')
     }
   }
@@ -87,7 +89,8 @@ export default function Birthdays() {
     try {
       const res = await getUpcomingBirthdays(days)
       setUpcoming(res.data)
-    } catch {
+    } catch (err) {
+      console.error('[Birthdays] loadUpcoming failed:', err?.response?.status, err?.response?.data || err)
       setUpcoming({ data: [], meta: { scope: '', count: 0 } })
     } finally {
       setLoadingUpcoming(false)
@@ -99,7 +102,8 @@ export default function Birthdays() {
     try {
       const res = await getBirthdayLog(status ? { days: 30, status } : { days: 30 })
       setLog(res.data)
-    } catch {
+    } catch (err) {
+      console.error('[Birthdays] loadLog failed:', err?.response?.status, err?.response?.data || err)
       setLog({ data: [], meta: { summary: {}, total_in_window: 0 } })
     } finally {
       setLoadingLog(false)
