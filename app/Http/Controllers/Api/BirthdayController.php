@@ -175,14 +175,14 @@ class BirthdayController extends Controller
         // Filter birthdays by month-day range using SQL, handling
         // year-crossing windows (e.g. Dec 28 → Jan 4).
         if ($todayMD <= $endMD) {
-            $query->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') BETWEEN ? AND ?", [$todayMD, $endMD]);
+            $query->whereRaw("TO_CHAR(date_of_birth, 'MM-DD') BETWEEN ? AND ?", [$todayMD, $endMD]);
         } else {
-            $query->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') >= ? OR DATE_FORMAT(date_of_birth, '%m-%d') <= ?", [$todayMD, $endMD]);
+            $query->whereRaw("TO_CHAR(date_of_birth, 'MM-DD') >= ? OR TO_CHAR(date_of_birth, 'MM-DD') <= ?", [$todayMD, $endMD]);
         }
 
         $members = $query
             ->with('cell:id,name')
-            ->orderByRaw('DAYOFYEAR(date_of_birth)')
+            ->orderByRaw('EXTRACT(DOY FROM date_of_birth)')
             ->get();
 
         $upcoming = $members
