@@ -9,6 +9,7 @@ use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
 use App\Http\Resources\TransactionResource;
+use App\Jobs\SendMemberWelcomeSmsJob;
 use App\Models\Cell;
 use App\Models\Department;
 use App\Models\Member;
