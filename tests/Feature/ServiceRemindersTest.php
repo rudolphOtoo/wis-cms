@@ -47,13 +47,16 @@ class ServiceRemindersTest extends TestCase
 
     protected function makeMember(array $attrs = []): Member
     {
+        static $counter = 0;
+        $counter++;
+
         return Member::create(array_merge([
             'branch_id' => $this->branch->id,
             'first_name' => 'Ama',
             'last_name' => 'Mensah',
             'gender' => 'female',
             'status' => 'active',
-            'phone' => '0241234567',
+            'phone' => '024123456'.$counter,
         ], $attrs));
     }
 
