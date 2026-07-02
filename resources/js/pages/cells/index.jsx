@@ -74,7 +74,7 @@ export default function CellsPage() {
 
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+          <h2 className="font-bold text-2xl md:text-4xl" style={{fontFamily:FONT_DISPLAY,lineHeight:'1.2',color:NAVY}}>
             Cells &amp; Classes
           </h2>
           <p style={{color:'#44474f',marginTop:'4px'}}>Home groups and classes. Each member belongs to one cell.</p>
@@ -95,7 +95,7 @@ export default function CellsPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="uppercase tracking-wider mb-1" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>{s.label}</p>
-                <h3 style={{fontFamily:FONT_DISPLAY,fontSize:'32px',fontWeight:700,color:NAVY}}>{s.value}</h3>
+                <h3 className="text-xl sm:text-3xl" style={{fontFamily:FONT_DISPLAY,fontWeight:700,color:NAVY}}>{s.value}</h3>
               </div>
               <div className="rounded-lg flex items-center justify-center"
                    style={{padding:'10px',backgroundColor:'rgba(27,58,107,0.08)',color:NAVY}}>
