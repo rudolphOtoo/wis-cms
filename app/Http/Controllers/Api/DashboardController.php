@@ -62,8 +62,9 @@ class DashboardController extends Controller
             ->with(['members' => fn ($q) => $q->orderBy('first_name')])
             ->get();
 
+        $departmentIds = $departments->pluck('id');
         $departmentSessions = AttendanceSession::query()
-            ->whereIn('department_id', $departments->pluck('id')->all())
+            ->whereIn('department_id', $departmentIds)
             ->withCount(['records as present_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id')])
             ->orderByDesc('service_date')
             ->get()

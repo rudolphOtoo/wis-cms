@@ -208,7 +208,7 @@ class FinanceController extends Controller
 
         $transactions = Transaction::query()
             ->whereBetween('transaction_date', [$from, $to])
-            ->with('category')
+            ->with(['category', 'member'])
             ->orderBy('transaction_date')
             ->get();
 

@@ -32,7 +32,11 @@ class AttendanceController extends Controller
             // getChildrenCountAttribute() use the in-memory collection
             // (zero extra queries) rather than falling back to a per-session
             // COUNT query (2 queries × N rows = N+1 on every page load).
-            ->with(['serviceType', 'recorder', 'branch', 'records'])
+            ->withCount([
+                'records as adult_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id'),
+                'records as children_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('child_id'),
+            ])
+            ->with(['serviceType', 'recorder', 'branch'])
             ->orderByDesc('service_date')
             ->paginate($request->integer('per_page', 20));
 
