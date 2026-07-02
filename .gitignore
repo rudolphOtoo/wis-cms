@@ -29,6 +29,7 @@ docker-compose.override.yml
 npm-debug.log
 yarn-error.log
 /.fleet
+/database/church-data.json
 # Vim swap files
 *.swp
 *.swo
