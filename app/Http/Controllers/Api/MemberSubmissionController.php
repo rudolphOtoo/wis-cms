@@ -118,7 +118,7 @@ class MemberSubmissionController extends Controller
     {
         $submission = MemberSubmission::where('branch_id', $request->user()->branch_id)
             ->where('id', $id)
-            ->with(['reviewedBy:id,name', 'approvedMember:id,first_name,last_name'])
+            ->with(['reviewedBy:id,name', 'approvedMember:id,first_name,last_name', 'approvedMember.cell'])
             ->firstOrFail();
 
         $existing = $submission->existingMemberWithSamePhone();
@@ -239,6 +239,7 @@ class MemberSubmissionController extends Controller
         // Both jobs are fire-and-forget. Failures are retried by the queue
         // worker and do not affect the HTTP response to the admin.
         NotifyAdminOfApprovalJob::dispatch($submission->id, $member->id);
+        SendMemberWelcomeSmsJob::dispatch($member->id, $member->cell?->name);
 
         return response()->json([
             'message' => 'Submission approved and promoted to member.',

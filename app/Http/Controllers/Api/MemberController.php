@@ -99,7 +99,7 @@ class MemberController extends Controller
     // GET /api/members/{id}
     public function show(string $id): JsonResponse
     {
-        $member = Member::query()->withExists('user')->findOrFail($id);
+        $member = Member::query()->withExists('user', 'cell')->findOrFail($id);
 
         return response()->json(['data' => new MemberResource($member)]);
     }
@@ -412,6 +412,8 @@ class MemberController extends Controller
         activity()->causedBy($request->user())
             ->performedOn($user)
             ->log("Created member-portal login for {$member->first_name} {$member->last_name}");
+
+        SendMemberWelcomeSmsJob::dispatch($member->id, $member->cell?->name);
 
         return response()->json([
             'message' => "Login created for {$member->first_name}.",
