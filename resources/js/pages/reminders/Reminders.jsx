@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 import {
   getReminderSettings,
   upsertReminderSettings,
@@ -92,7 +93,7 @@ function ConfigCard({ row, onSaved }) {
 
   const card = {
     backgroundColor: '#fff',
-    border: '1px solid var(--color-surface-border)',
+    border: BORDER,
     borderRadius: '14px',
     boxShadow: '0 2px 8px rgba(13,31,60,0.04)',
     padding: '20px',
@@ -103,7 +104,7 @@ function ConfigCard({ row, onSaved }) {
     <div style={card}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-bold" style={{ color: 'var(--color-navy)', fontSize: '16px' }}>
+          <h3 className="font-bold" style={{ color: NAVY, fontSize: '16px' }}>
             {row.service_type_name}
           </h3>
           <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
@@ -113,7 +114,7 @@ function ConfigCard({ row, onSaved }) {
                 {!row.is_active && <span style={{ color: '#b91c1c', marginLeft: '8px' }}>(paused)</span>}
               </>
             ) : (
-              <span style={{ color: '#9ca3af' }}>Not configured yet</span>
+              <span style={{ color: PLACEHOLDER }}>Not configured yet</span>
             )}
           </p>
         </div>
@@ -122,7 +123,7 @@ function ConfigCard({ row, onSaved }) {
             type="button"
             onClick={() => setEditing(true)}
             className="px-3 py-1.5 text-sm rounded-lg"
-            style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
+            style={{ border: BORDER, color: NAVY }}
           >
             {row.configured ? 'Edit' : 'Configure'}
           </button>
@@ -130,7 +131,7 @@ function ConfigCard({ row, onSaved }) {
       </div>
 
       {editing && (
-        <div className="mt-4 space-y-4" style={{ borderTop: '1px solid var(--color-surface-border)', paddingTop: '16px' }}>
+        <div className="mt-4 space-y-4" style={{ borderTop: BORDER, paddingTop: '16px' }}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold uppercase tracking-wider" style={{ color: '#44474f' }}>
@@ -138,7 +139,7 @@ function ConfigCard({ row, onSaved }) {
               </label>
               <select value={form.send_day_of_week} onChange={set('send_day_of_week')}
                 className="w-full mt-1 px-3 py-2 rounded-lg"
-                style={{ border: '1px solid var(--color-surface-border)' }}>
+                style={{ border: BORDER }}>
                 {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
               </select>
             </div>
@@ -148,7 +149,7 @@ function ConfigCard({ row, onSaved }) {
               </label>
               <select value={form.send_hour} onChange={set('send_hour')}
                 className="w-full mt-1 px-3 py-2 rounded-lg"
-                style={{ border: '1px solid var(--color-surface-border)' }}>
+                style={{ border: BORDER }}>
                 {HOURS.map(h => <option key={h} value={h}>{formatHour12(h)}</option>)}
               </select>
             </div>
@@ -161,7 +162,7 @@ function ConfigCard({ row, onSaved }) {
               </label>
               <select value={form.service_hour} onChange={set('service_hour')}
                 className="w-full mt-1 px-3 py-2 rounded-lg"
-                style={{ border: '1px solid var(--color-surface-border)' }}>
+                style={{ border: BORDER }}>
                 {HOURS.map(h => <option key={h} value={h}>{formatHour12(h)}</option>)}
               </select>
             </div>
@@ -171,7 +172,7 @@ function ConfigCard({ row, onSaved }) {
               </label>
               <select value={form.service_minute} onChange={set('service_minute')}
                 className="w-full mt-1 px-3 py-2 rounded-lg"
-                style={{ border: '1px solid var(--color-surface-border)' }}>
+                style={{ border: BORDER }}>
                 {MINUTES.map(m => <option key={m} value={m}>:{String(m).padStart(2, '0')}</option>)}
               </select>
             </div>
@@ -191,7 +192,7 @@ function ConfigCard({ row, onSaved }) {
               rows={4}
               maxLength={500}
               className="w-full mt-1 px-3 py-2 rounded-lg font-mono text-sm"
-              style={{ border: '1px solid var(--color-surface-border)' }}
+              style={{ border: BORDER }}
             />
             <div className="flex justify-between text-xs mt-1" style={{ color: '#6b7280' }}>
               <span>
@@ -206,14 +207,14 @@ function ConfigCard({ row, onSaved }) {
 
           <div style={{
             backgroundColor: '#f8f9fa',
-            border: '1px solid var(--color-surface-border)',
+            border: BORDER,
             borderRadius: '10px',
             padding: '12px',
           }}>
             <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#44474f' }}>
               Preview
             </div>
-            <div className="text-sm" style={{ color: 'var(--color-navy)' }}>
+            <div className="text-sm" style={{ color: NAVY }}>
               {preview || '(typing...)'}
             </div>
             <div className="text-xs mt-2" style={{ color: '#6b7280' }}>
@@ -221,7 +222,7 @@ function ConfigCard({ row, onSaved }) {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-navy)' }}>
+          <label className="flex items-center gap-2 text-sm" style={{ color: NAVY }}>
             <input type="checkbox" checked={form.is_active} onChange={set('is_active')} />
             <span>Active (uncheck to pause without losing the config)</span>
           </label>
@@ -232,7 +233,7 @@ function ConfigCard({ row, onSaved }) {
             </button>
             <button type="button" onClick={() => setEditing(false)} disabled={saving}
               className="px-5 py-2 rounded-lg"
-              style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}>
+              style={{ border: BORDER, color: NAVY }}>
               Cancel
             </button>
           </div>
@@ -250,13 +251,13 @@ function UpcomingPanel({ upcoming }) {
     <div className="space-y-2">
       {upcoming.map((u, i) => (
         <div key={i} className="flex items-center justify-between p-3 rounded-lg"
-          style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}>
+          style={{ backgroundColor: '#f8f9fa', border: BORDER }}>
           <div>
-            <div className="font-medium" style={{ color: 'var(--color-navy)' }}>{u.service_type}</div>
+            <div className="font-medium" style={{ color: NAVY }}>{u.service_type}</div>
             <div className="text-xs" style={{ color: '#6b7280' }}>Service at {u.service_time}</div>
           </div>
           <div className="text-right">
-            <div className="text-sm font-medium" style={{ color: 'var(--color-navy)' }}>
+            <div className="text-sm font-medium" style={{ color: NAVY }}>
               {u.send_day} {u.send_time}
             </div>
             <div className="text-xs" style={{ color: '#6b7280' }}>
@@ -283,9 +284,9 @@ function LogPanel({ logs, statusFilter, setStatusFilter }) {
           <button key={s} type="button" onClick={() => setStatusFilter(s)}
             className="px-3 py-1 text-xs rounded-full"
             style={{
-              border: '1px solid var(--color-surface-border)',
-              backgroundColor: statusFilter === s ? 'var(--color-navy)' : 'white',
-              color: statusFilter === s ? 'white' : 'var(--color-navy)',
+              border: BORDER,
+              backgroundColor: statusFilter === s ? NAVY : 'white',
+              color: statusFilter === s ? 'white' : NAVY,
             }}>
             {s === 'no_phone' ? 'No Phone' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
@@ -300,9 +301,9 @@ function LogPanel({ logs, statusFilter, setStatusFilter }) {
             const c = statusColors[log.status] ?? { bg: '#f3f4f6', fg: '#4b5563' }
             return (
               <div key={log.id} className="p-3 rounded-lg"
-                style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}>
+                style={{ backgroundColor: '#f8f9fa', border: BORDER }}>
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-sm" style={{ color: 'var(--color-navy)' }}>{log.member_name}</div>
+                  <div className="font-medium text-sm" style={{ color: NAVY }}>{log.member_name}</div>
                   <span className="text-xs px-2 py-0.5 rounded-full"
                     style={{ backgroundColor: c.bg, color: c.fg, fontWeight: 600 }}>
                     {log.status === 'no_phone' ? 'no phone' : log.status}
@@ -355,7 +356,7 @@ export default function Reminders() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <svg className="animate-spin w-8 h-8" style={{ color: 'var(--color-navy)' }} fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin w-8 h-8" style={{ color: NAVY }} fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
         </svg>
@@ -366,7 +367,7 @@ export default function Reminders() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div>
-        <h1 className="font-bold" style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-navy)' }}>
+        <h1 className="font-bold" style={{ fontFamily: FONT_DISPLAY, fontSize: '32px', color: NAVY }}>
           Service Reminders
         </h1>
         <p className="mt-1" style={{ color: '#44474f' }}>
@@ -375,7 +376,7 @@ export default function Reminders() {
       </div>
 
       <div>
-        <h2 className="font-bold mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--color-navy)' }}>
+        <h2 className="font-bold mb-3" style={{ fontFamily: FONT_DISPLAY, fontSize: '20px', color: NAVY }}>
           Reminder Configurations
         </h2>
         {settings.map(row => (
@@ -384,14 +385,14 @@ export default function Reminders() {
       </div>
 
       <div>
-        <h2 className="font-bold mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--color-navy)' }}>
+        <h2 className="font-bold mb-3" style={{ fontFamily: FONT_DISPLAY, fontSize: '20px', color: NAVY }}>
           Upcoming This Week
         </h2>
         <UpcomingPanel upcoming={upcoming} />
       </div>
 
       <div>
-        <h2 className="font-bold mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--color-navy)' }}>
+        <h2 className="font-bold mb-3" style={{ fontFamily: FONT_DISPLAY, fontSize: '20px', color: NAVY }}>
           Send Log (last 30 days)
         </h2>
         <LogPanel logs={logs} statusFilter={statusFilter} setStatusFilter={setStatusFilter} />

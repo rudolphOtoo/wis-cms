@@ -37,7 +37,7 @@ class CaptchaService
         }
 
         try {
-            $response = Http::asForm()->post(
+            $response = Http::timeout(5)->connectTimeout(3)->asForm()->post(
                 'https://www.google.com/recaptcha/api/siteverify',
                 [
                     'secret' => config('services.google_recaptcha.secret_key'),

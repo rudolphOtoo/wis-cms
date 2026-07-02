@@ -77,7 +77,7 @@ class PortalController extends Controller
         $byCategory = $transactions
             ->groupBy(fn ($t) => $t->category?->name ?? 'Uncategorised')
             ->map(fn ($group) => [
-                'category' => $group->first()->category?->name ?? 'Uncategorised',
+                'category' => $group->first()?->category?->name ?? 'Uncategorised',
                 'count' => $group->count(),
                 'total' => round($group->sum('amount'), 2),
             ])->values();
@@ -96,7 +96,7 @@ class PortalController extends Controller
                 'by_category' => $byCategory,
                 'transactions' => $transactions->map(fn ($t) => [
                     'id' => $t->id,
-                    'date' => $t->transaction_date->format('Y-m-d'),
+                    'date' => $t->transaction_date?->format('Y-m-d'),
                     'category' => $t->category?->name ?? 'Uncategorised',
                     'amount' => round($t->amount, 2),
                     'reference' => $t->reference,

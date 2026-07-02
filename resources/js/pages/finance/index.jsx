@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { memo, useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
@@ -11,6 +11,7 @@ import { usePermission } from '../../hooks/usePermission'
 import { useDebounce } from '../../hooks/useDebounce'
 import { TableSkeleton } from '../../components/ui/Skeletons'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtShort = (n) => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -202,7 +203,7 @@ export default function FinancePage() {
                 </div>
               </div>
               <div className="relative z-10">
-                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: 700, letterSpacing: '-0.01em', color: c.figureColor }}>
+                <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '30px', fontWeight: 700, letterSpacing: '-0.01em', color: c.figureColor }}>
                   {stats ? fmt(c.value) : '—'}
                 </h3>
               </div>
@@ -216,10 +217,10 @@ export default function FinancePage() {
         <div className="surface-card p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
                 Financial Report
               </h3>
-              <p style={{ fontSize: '14px', color: '#747780', marginTop: '4px' }}>
+              <p style={{ fontSize: '14px', color: MUTED, marginTop: '4px' }}>
                 Generate a PDF income &amp; expense ledger for any date range.
               </p>
             </div>
@@ -227,7 +228,7 @@ export default function FinancePage() {
               <div>
                 <label
                   htmlFor="report-from"
-                  style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#747780', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
+                  style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
                 >
                   From
                 </label>
@@ -243,7 +244,7 @@ export default function FinancePage() {
               <div>
                 <label
                   htmlFor="report-to"
-                  style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#747780', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
+                  style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}
                 >
                   To
                 </label>
@@ -270,9 +271,9 @@ export default function FinancePage() {
           </div>
           <div
             className="flex flex-wrap gap-2 mt-4 pt-4"
-            style={{ borderTop: '1px solid var(--color-surface-border)' }}
+            style={{ borderTop: BORDER }}
           >
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#747780', textTransform: 'uppercase', letterSpacing: '0.04em', alignSelf: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em', alignSelf: 'center' }}>
               Quick:
             </span>
             {[
@@ -285,7 +286,7 @@ export default function FinancePage() {
                 type="button"
                 onClick={() => applyPreset(p.kind)}
                 className="transition-colors hover:bg-slate-200"
-                style={{ padding: '6px 14px', backgroundColor: '#f2f3f6', color: 'var(--color-navy)', border: '1px solid var(--color-surface-border)', borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}
+                style={{ padding: '6px 14px', backgroundColor: '#f2f3f6', color: NAVY, border: BORDER, borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}
               >
                 {p.label}
               </button>
@@ -300,13 +301,13 @@ export default function FinancePage() {
         {/* Header */}
         <div
           className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6"
-          style={{ borderBottom: '1px solid var(--color-surface-border)' }}
+          style={{ borderBottom: BORDER }}
         >
           <div>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
               Transactions
             </h3>
-            <p style={{ fontSize: '14px', color: '#747780' }}>
+            <p style={{ fontSize: '14px', color: MUTED }}>
               {meta ? `${meta.total} total recorded` : 'Loading…'}
             </p>
           </div>
@@ -339,10 +340,10 @@ export default function FinancePage() {
         {/* Filter bar */}
         <div
           className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 md:p-6"
-          style={{ borderBottom: '1px solid var(--color-surface-border)', backgroundColor: '#fafbfc' }}
+          style={{ borderBottom: BORDER, backgroundColor: '#fafbfc' }}
         >
           <div className="relative">
-            <Search size={16} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#747780' }} aria-hidden="true" />
+            <Search size={16} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: MUTED }} aria-hidden="true" />
             <input
               type="text"
               placeholder="Search reference, notes, or member"
@@ -379,12 +380,12 @@ export default function FinancePage() {
           <table className="w-full text-left">
             <thead>
               <tr style={{ backgroundColor: '#f2f3f6' }}>
-                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}>Date</th>
-                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}>Category</th>
-                <th className="hidden sm:table-cell uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}>Member</th>
-                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}>Amount</th>
-                <th className="hidden md:table-cell uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}>Reference</th>
-                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: '#747780', textAlign: 'right' }}>Actions</th>
+                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}>Date</th>
+                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}>Category</th>
+                <th className="hidden sm:table-cell uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}>Member</th>
+                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}>Amount</th>
+                <th className="hidden md:table-cell uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}>Reference</th>
+                <th className="uppercase tracking-wider" style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 700, color: MUTED, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -399,12 +400,12 @@ export default function FinancePage() {
                         className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                         style={{ backgroundColor: 'rgba(27,58,107,0.08)' }}
                       >
-                        <Wallet size={26} strokeWidth={1.5} style={{ color: 'var(--color-navy)' }} aria-hidden="true" />
+                        <Wallet size={26} strokeWidth={1.5} style={{ color: NAVY }} aria-hidden="true" />
                       </div>
-                      <p className="font-semibold text-base mb-1" style={{ color: 'var(--color-navy)' }}>
+                      <p className="font-semibold text-base mb-1" style={{ color: NAVY }}>
                         No transactions yet
                       </p>
-                      <p className="text-sm mb-5 max-w-xs" style={{ color: '#747780' }}>
+                      <p className="text-sm mb-5 max-w-xs" style={{ color: MUTED }}>
                         Record your first transaction to get started.
                       </p>
                       {can('create transactions') && (
@@ -420,95 +421,16 @@ export default function FinancePage() {
                   </td>
                 </tr>
               ) : transactions.map((txn) => (
-                /* Replace onMouseEnter/Leave with Tailwind hover utility */
-                <tr
+                <TransactionRow
                   key={txn.id}
-                  className="hover:bg-slate-50 transition-colors duration-150"
-                  style={{ borderTop: '1px solid var(--color-surface-border)' }}
-                >
-                  <td style={{ padding: '16px 24px', fontSize: '15px', color: '#191c1e', whiteSpace: 'nowrap' }}>
-                    {txn.transaction_date}
-                  </td>
-                  <td style={{ padding: '16px 24px', whiteSpace: 'nowrap' }}>
-                    {/* Icon + text pill */}
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide rounded-md"
-                        style={{
-                          padding: '3px 7px',
-                          backgroundColor: txn.type === 'income' ? '#dcfce7' : '#ffe4e6',
-                          color: txn.type === 'income' ? '#15803d' : '#be123c',
-                        }}
-                        aria-label={txn.type === 'income' ? 'Income' : 'Expense'}
-                      >
-                        {txn.type === 'income'
-                          ? <ArrowUpCircle size={10} strokeWidth={2.5} aria-hidden="true" />
-                          : <ArrowDownCircle size={10} strokeWidth={2.5} aria-hidden="true" />
-                        }
-                        {txn.type}
-                      </span>
-                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1e' }}>
-                        {txn.category?.name ?? '—'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="hidden sm:table-cell" style={{ padding: '16px 24px', fontSize: '15px', color: '#44474f', whiteSpace: 'nowrap' }}>
-                    {txn.member ? txn.member.name : <em style={{ color: '#747780' }}>Anonymous</em>}
-                  </td>
-                  <td style={{ padding: '16px 24px', fontSize: '15px', fontWeight: 700, whiteSpace: 'nowrap', color: txn.type === 'income' ? '#059669' : '#e11d48' }}>
-                    {txn.type === 'income' ? '+ ' : '− '}{fmt(txn.amount)}
-                  </td>
-                  <td className="hidden md:table-cell" style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: '#747780', whiteSpace: 'nowrap' }}>
-                    {txn.reference ?? '—'}
-                  </td>
-                  {/* Inline confirm with 44px touch targets */}
-                  <td style={{ padding: '12px 24px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <div className="flex justify-end items-center gap-1">
-                      {can('edit transactions') && (
-                        <button
-                          onClick={() => navigate(`/finance/${txn.id}/edit`)}
-                          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
-                          style={{ color: '#92400e' }}
-                          aria-label={`Edit transaction ${txn.reference ?? txn.id}`}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {can('delete transactions') && (
-                        pendingDelete === txn.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDelete(txn)}
-                              disabled={deleting === txn.id}
-                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
-                              style={{ color: '#be123c' }}
-                              aria-label="Confirm deletion of this transaction"
-                            >
-                              {deleting === txn.id ? '…' : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => setPendingDelete(null)}
-                              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
-                              style={{ color: '#747780' }}
-                              aria-label="Cancel deletion"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setPendingDelete(txn.id)}
-                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
-                            style={{ color: '#be123c' }}
-                            aria-label={`Delete transaction ${txn.reference ?? txn.id}`}
-                          >
-                            Delete
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                  txn={txn}
+                  can={can}
+                  navigate={navigate}
+                  pendingDelete={pendingDelete}
+                  deleting={deleting}
+                  handleDelete={handleDelete}
+                  setPendingDelete={setPendingDelete}
+                />
               ))}
             </tbody>
           </table>
@@ -518,9 +440,9 @@ export default function FinancePage() {
         {meta && meta.last_page > 1 && (
           <div
             className="flex items-center justify-between p-4 md:p-6"
-            style={{ borderTop: '1px solid var(--color-surface-border)' }}
+            style={{ borderTop: BORDER }}
           >
-            <span style={{ fontSize: '14px', color: '#747780' }}>
+            <span style={{ fontSize: '14px', color: MUTED }}>
               Page {meta.current_page} of {meta.last_page} · {meta.total} transactions
             </span>
             <div className="flex gap-2" role="navigation" aria-label="Pagination">
@@ -528,7 +450,7 @@ export default function FinancePage() {
                 disabled={page === 1}
                 onClick={() => setPage(p => p - 1)}
                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
-                style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
+                style={{ border: BORDER, color: NAVY }}
                 aria-label="Go to previous page"
               >
                 <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
@@ -538,7 +460,7 @@ export default function FinancePage() {
                 disabled={page === meta.last_page}
                 onClick={() => setPage(p => p + 1)}
                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-sm font-semibold transition-colors text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-                style={{ backgroundColor: 'var(--color-navy)' }}
+                style={{ backgroundColor: NAVY }}
                 aria-label="Go to next page"
               >
                 Next
@@ -552,7 +474,7 @@ export default function FinancePage() {
       {/* Monthly Trend chart */}
       <div className="surface-card p-4 md:p-6">
         <div className="flex items-center justify-between mb-6">
-          <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
+          <h4 style={{ fontFamily: FONT_DISPLAY, fontSize: '24px', fontWeight: 600, color: NAVY }}>
             Monthly Trend
           </h4>
           {/* Chart legend */}
@@ -568,7 +490,7 @@ export default function FinancePage() {
           </div>
         </div>
         {chart.length === 0 ? (
-          <div className="text-center py-12 text-sm" style={{ color: '#9ca3af' }}>No data yet</div>
+          <div className="text-center py-12 text-sm" style={{ color: PLACEHOLDER }}>No data yet</div>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chart}>
@@ -576,7 +498,7 @@ export default function FinancePage() {
               <XAxis dataKey="month" stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} tickFormatter={fmtShort} />
               <Tooltip
-                contentStyle={{ backgroundColor: 'white', border: '1px solid var(--color-surface-border)', borderRadius: '8px', fontSize: '12px' }}
+                contentStyle={{ backgroundColor: 'white', border: BORDER, borderRadius: '8px', fontSize: '12px' }}
                 formatter={(v) => fmt(v)}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -589,3 +511,93 @@ export default function FinancePage() {
     </div>
   )
 }
+
+const TransactionRow = memo(function TransactionRow({ txn, can, navigate, pendingDelete, deleting, handleDelete, setPendingDelete }) {
+  return (
+    <tr
+      className="hover:bg-slate-50 transition-colors duration-150"
+      style={{ borderTop: BORDER }}
+    >
+      <td style={{ padding: '16px 24px', fontSize: '15px', color: '#191c1e', whiteSpace: 'nowrap' }}>
+        {txn.transaction_date}
+      </td>
+      <td style={{ padding: '16px 24px', whiteSpace: 'nowrap' }}>
+        <div className="flex items-center gap-2.5">
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide rounded-md"
+            style={{
+              padding: '3px 7px',
+              backgroundColor: txn.type === 'income' ? '#dcfce7' : '#ffe4e6',
+              color: txn.type === 'income' ? '#15803d' : '#be123c',
+            }}
+            aria-label={txn.type === 'income' ? 'Income' : 'Expense'}
+          >
+            {txn.type === 'income'
+              ? <ArrowUpCircle size={10} strokeWidth={2.5} aria-hidden="true" />
+              : <ArrowDownCircle size={10} strokeWidth={2.5} aria-hidden="true" />
+            }
+            {txn.type}
+          </span>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1e' }}>
+            {txn.category?.name ?? '—'}
+          </span>
+        </div>
+      </td>
+      <td className="hidden sm:table-cell" style={{ padding: '16px 24px', fontSize: '15px', color: '#44474f', whiteSpace: 'nowrap' }}>
+        {txn.member ? txn.member.name : <em style={{ color: MUTED }}>Anonymous</em>}
+      </td>
+      <td style={{ padding: '16px 24px', fontSize: '15px', fontWeight: 700, whiteSpace: 'nowrap', color: txn.type === 'income' ? '#059669' : '#e11d48' }}>
+        {txn.type === 'income' ? '+ ' : '− '}{fmt(txn.amount)}
+      </td>
+      <td className="hidden md:table-cell" style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: MUTED, whiteSpace: 'nowrap' }}>
+        {txn.reference ?? '—'}
+      </td>
+      <td style={{ padding: '12px 24px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        <div className="flex justify-end items-center gap-1">
+          {can('edit transactions') && (
+            <button
+              onClick={() => navigate(`/finance/${txn.id}/edit`)}
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+              style={{ color: '#92400e' }}
+              aria-label={`Edit transaction ${txn.reference ?? txn.id}`}
+            >
+              Edit
+            </button>
+          )}
+          {can('delete transactions') && (
+            pendingDelete === txn.id ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleDelete(txn)}
+                  disabled={deleting === txn.id}
+                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                  style={{ color: '#be123c' }}
+                  aria-label="Confirm deletion of this transaction"
+                >
+                  {deleting === txn.id ? '…' : 'Confirm'}
+                </button>
+                <button
+                  onClick={() => setPendingDelete(null)}
+                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                  style={{ color: MUTED }}
+                  aria-label="Cancel deletion"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setPendingDelete(txn.id)}
+                className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                style={{ color: '#be123c' }}
+                aria-label={`Delete transaction ${txn.reference ?? txn.id}`}
+              >
+                Delete
+              </button>
+            )
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+})

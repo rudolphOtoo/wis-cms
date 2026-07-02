@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -54,13 +55,24 @@ class SendBroadcastMessageJob implements ShouldQueue
 
     public function handle(MnotifySmsService $sms): void
     {
-        $recipient = MessageRecipient::with(['message.sender', 'member'])->find($this->recipientId);
+        $recipient = DB::transaction(function () {
+            $r = MessageRecipient::with(['message.sender', 'member'])
+                ->lockForUpdate()
+                ->find($this->recipientId);
+
+            if (! $r) {
+                return null;
+            }
+
+            // Increment retry counter for observability inside the lock
+            $r->increment('delivery_attempts');
+
+            return $r;
+        });
+
         if (! $recipient) {
             return;
         }
-
-        // Increment retry counter for observability
-        $recipient->increment('delivery_attempts');
 
         $message = $recipient->message;
         // Personalised per-recipient body wins; falls back to shared

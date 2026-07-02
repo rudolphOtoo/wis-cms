@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Children;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreChildrenRequest extends FormRequest
 {
@@ -14,7 +15,13 @@ class StoreChildrenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'guardian_member_id' => ['required', 'uuid', 'exists:members,id'],
+            'guardian_member_id' => [
+                'required',
+                'uuid',
+                Rule::exists('members', 'id')
+                    ->where('branch_id', $this->user()->branch_id)
+                    ->whereNull('deleted_at'),
+            ],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'gender' => ['required', 'in:male,female'],
