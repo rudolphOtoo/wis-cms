@@ -20,24 +20,24 @@ return new class extends Migration
         // members table - many N+1 sites, high activity
         Schema::table('members', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('cell_id');
+            $table->index('cell_id', 'members_cell_id_batched_index'); // Add explicit name to avoid conflict with 2026_06_03 migration
             $table->index('status');
             $table->index('is_active');
             $table->index('phone');
             $table->index('email');
-            $table->index(['branch_id', 'status']); // Dashboard department-specific lookups
-            $table->index(['cell_id', 'is_active']); // Cell leader dashboards
+            $table->index(['branch_id', 'status'], 'members_branch_id_status_batched_index'); // Add explicit name
+            $table->index(['cell_id', 'is_active'], 'members_cell_id_is_active_batched_index'); // Add explicit name
         });
 
         // attendance_sessions table - critical for N+1 query fixes
         Schema::table('attendance_sessions', function (Blueprint $table) {
-            $table->index('department_id');
-            $table->index('cell_id');
-            $table->index('branch_id');
-            $table->index(['branch_id', 'service_date']); // Dashboard filtering
-            $table->index(['department_id', 'service_date']);
-            $table->index(['cell_id', 'service_date']);
-            $table->index('follow_up_status');
+            $table->index('department_id', 'attendance_sessions_department_id_batched_index');
+            $table->index('cell_id', 'attendance_sessions_cell_id_batched_index');
+            $table->index('branch_id', 'attendance_sessions_branch_id_batched_index');
+            $table->index(['branch_id', 'service_date'], 'attendance_sessions_branch_date_batched_index');
+            $table->index(['department_id', 'service_date'], 'attendance_sessions_department_date_batched_index');
+            $table->index(['cell_id', 'service_date'], 'attendance_sessions_cell_date_batched_index');
+            $table->index('follow_up_status', 'attendance_sessions_follow_up_status_batched_index');
         });
 
         // attendance_records table - many child lookups from sessions
@@ -266,25 +266,25 @@ return new class extends Migration
         });
 
         Schema::table('attendance_sessions', function (Blueprint $table) {
-            $table->dropIndex('follow_up_status');
-            $table->dropIndex(['cell_id', 'service_date']);
-            $table->dropIndex(['department_id', 'service_date']);
-            $table->dropIndex(['branch_id', 'service_date']);
+            $table->dropIndex('attendance_sessions_follow_up_status_batched_index');
+            $table->dropIndex(['cell_id', 'service_date'], 'attendance_sessions_cell_date_batched_index');
+            $table->dropIndex(['department_id', 'service_date'], 'attendance_sessions_department_date_batched_index');
+            $table->dropIndex(['branch_id', 'service_date'], 'attendance_sessions_branch_date_batched_index');
             $table->dropIndex('service_date');
-            $table->dropIndex('branch_id');
-            $table->dropIndex('cell_id');
-            $table->dropIndex('department_id');
+            $table->dropIndex('attendance_sessions_branch_id_batched_index');
+            $table->dropIndex('attendance_sessions_cell_id_batched_index');
+            $table->dropIndex('attendance_sessions_department_id_batched_index');
             $table->dropIndex('service_type_id');
         });
 
         Schema::table('members', function (Blueprint $table) {
-            $table->dropIndex(['cell_id', 'is_active']);
-            $table->dropIndex(['branch_id', 'status']);
+            $table->dropIndex('members_cell_id_batched_index');
+            $table->dropIndex('members_branch_id_status_batched_index');
+            $table->dropIndex('members_cell_id_is_active_batched_index');
             $table->dropIndex('status');
             $table->dropIndex('is_active');
             $table->dropIndex('email');
             $table->dropIndex('phone');
-            $table->dropIndex('cell_id');
             $table->dropIndex('branch_id');
         });
 
