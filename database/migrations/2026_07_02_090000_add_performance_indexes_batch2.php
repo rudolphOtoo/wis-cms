@@ -22,11 +22,10 @@ return new class extends Migration
             $table->index('branch_id');
             $table->index('cell_id', 'members_cell_id_batched_index'); // Add explicit name to avoid conflict with 2026_06_03 migration
             $table->index('status');
-            $table->index('is_active');
             $table->index('phone');
             $table->index('email');
             $table->index(['branch_id', 'status'], 'members_branch_id_status_batched_index'); // Add explicit name
-            $table->index(['cell_id', 'is_active'], 'members_cell_id_is_active_batched_index'); // Add explicit name
+            $table->index(['cell_id', 'status'], 'members_cell_id_status_batched_index');
         });
 
         // attendance_sessions table - critical for N+1 query fixes
@@ -41,10 +40,8 @@ return new class extends Migration
         });
 
         // attendance_records table - many child lookups from sessions
+        // (session_id, member_id, child_id indexes already exist from 2026_06_16_100002)
         Schema::table('attendance_records', function (Blueprint $table) {
-            $table->index('session_id');
-            $table->index('member_id');
-            $table->index('child_id');
             $table->index(['session_id', 'member_id']);
             $table->index(['session_id', 'child_id']);
             $table->index(['is_present', 'member_id']);
@@ -52,81 +49,76 @@ return new class extends Migration
         });
 
         // finance tables - high transaction volume
+        // (member_id, category_id indexes already exist from 2026_06_03_155047;
+        //  branch_id+transaction_date index already exists from table creation)
         Schema::table('transactions', function (Blueprint $table) {
-            $table->index('member_id');
-            $table->index('category_id');
             $table->index('branch_id');
-            $table->index(['branch_id', 'transaction_date']); // Financial reports
             $table->index(['member_id', 'transaction_date']);
             $table->index(['type', 'transaction_date']); // Income/expense summaries
             $table->index('currency');
         });
 
+        // (finance_categories has no branch_id column — only type and display_order exist)
         Schema::table('finance_categories', function (Blueprint $table) {
-            $table->index('branch_id');
             $table->index('type');
             $table->index('is_active');
-            $table->index(['branch_id', 'type', 'display_order']); // Category ordering
         });
 
         // department_members pivot table - many-to-many lookups
+        // (department_id, member_id indexes already exist from 2026_07_01_195355)
         Schema::table('department_members', function (Blueprint $table) {
-            $table->index('department_id');
-            $table->index('member_id');
             $table->index(['department_id', 'role']); // Department roles filtering
             $table->index(['member_id', 'role']); // Member departments filtering
             $table->index('joined_at');
         });
 
         // cell relationships
+        // (leader_user_id index already exists from 2026_06_03_155047)
         Schema::table('cells', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('leader_user_id');
             $table->index('is_active');
         });
 
         // message queues and communications
+        // (sender_id, ['branch_id', 'status', 'created_at'] already exist from 2026_07_01_195355)
         Schema::table('messages', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('sender_id');
-            $table->index(['branch_id', 'status', 'created_at']); // Admin message history
             $table->index('channel'); // SMS/email/message routing
         });
 
+        // (message_id index already exists from 2026_07_01_195355)
         Schema::table('message_recipients', function (Blueprint $table) {
-            $table->index('message_id');
             $table->index('member_id'); // Member message history
             $table->index(['message_id', 'delivery_status']); // Queue processing
             $table->index(['member_id', 'delivery_status']); // Member inbox
         });
 
         // service structures
+        // (leader_user_id index already exists from 2026_06_03_155047)
         Schema::table('departments', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('leader_user_id');
             $table->index('is_active');
             $table->index(['branch_id', 'is_active']); // Dashboard filtering
         });
 
+        // (service_types has no branch_id column)
         Schema::table('service_types', function (Blueprint $table) {
-            $table->index('branch_id');
             $table->index('is_active');
         });
 
         // visitor tracking
+        // (visit_date index already exists from 2026_07_01_195355)
         Schema::table('visitors', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('visit_date'); // Daily reporting
             $table->index(['visit_date', 'follow_up_status']); // Follow-up pipeline
             $table->index('phone'); // Visitor lookup
         });
 
         // children table (related to member relationships)
+        // (guardian_member_id, class_group indexes already exist from 2026_07_01_195355)
         Schema::table('children', function (Blueprint $table) {
             $table->index('branch_id');
-            $table->index('guardian_member_id'); // Member kids filtering
             $table->index('is_active');
-            $table->index('class_group'); // Programs/reports
         });
 
         // submissions and approvals
@@ -139,20 +131,19 @@ return new class extends Migration
         });
 
         // activity logs and auditing
+        // (activity_log has no branch_id column — subject_type and causer_type+subject_id/causer_id
+        //  composites already exist from table creation)
         Schema::table('activity_log', function (Blueprint $table) {
-            $table->index('subject_type', 'subject_type'); // Polymorphic lookups
             $table->index('causer_id'); // User action history
-            $table->index(['branch_id', 'log_name', 'created_at']); // Console actions
         });
 
         // Spatie permission tables (essential for RBAC performance)
+        // (model_type+model_uuid composite already indexed from Spatie migration)
         Schema::table('model_has_roles', function (Blueprint $table) {
-            $table->index(['model_type', 'model_id']); // Permission checks
             $table->index('role_id');
         });
 
         Schema::table('model_has_permissions', function (Blueprint $table) {
-            $table->index(['model_type', 'model_id']);
             $table->index('permission_id');
         });
 
@@ -167,42 +158,35 @@ return new class extends Migration
         // Undo all created indexes - order matters for foreign key dependencies
 
         Schema::table('activity_log', function (Blueprint $table) {
-            $table->dropIndex('branch_id', 'log_name', 'created_at');
             $table->dropIndex('causer_id');
-            $table->dropIndex('subject_type', 'subject_type');
         });
 
         Schema::table('member_submissions', function (Blueprint $table) {
-            $table->dropIndex('phone', 'branch_id');
-            $table->dropIndex(['branch_id', 'status', 'submitted_at']);
             $table->dropIndex('email');
-            $table->dropIndex(['branch_id', 'status']);
+            $table->dropIndex(['phone', 'branch_id']);
+            $table->dropIndex(['branch_id', 'status', 'submitted_at']);
+            $table->dropIndex('status');
+            $table->dropIndex('branch_id');
         });
 
         Schema::table('children', function (Blueprint $table) {
-            $table->dropIndex('class_group');
-            $table->dropIndex('guardian_member_id');
             $table->dropIndex('is_active');
             $table->dropIndex('branch_id');
         });
 
         Schema::table('visitors', function (Blueprint $table) {
             $table->dropIndex(['visit_date', 'follow_up_status']);
-            $table->dropIndex('visit_date');
-            $table->dropIndex('follow_up_status');
             $table->dropIndex('phone');
             $table->dropIndex('branch_id');
         });
 
         Schema::table('service_types', function (Blueprint $table) {
             $table->dropIndex('is_active');
-            $table->dropIndex('branch_id');
         });
 
         Schema::table('departments', function (Blueprint $table) {
             $table->dropIndex(['branch_id', 'is_active']);
             $table->dropIndex('is_active');
-            $table->dropIndex('leader_user_id');
             $table->dropIndex('branch_id');
         });
 
@@ -210,21 +194,15 @@ return new class extends Migration
             $table->dropIndex(['member_id', 'delivery_status']);
             $table->dropIndex(['message_id', 'delivery_status']);
             $table->dropIndex('member_id');
-            $table->dropIndex('message_id');
-            $table->dropIndex('delivery_status');
         });
 
         Schema::table('messages', function (Blueprint $table) {
-            $table->dropIndex(['branch_id', 'status', 'created_at']);
-            $table->dropIndex('sender_id');
             $table->dropIndex('channel');
             $table->dropIndex('branch_id');
-            $table->dropIndex('status');
         });
 
         Schema::table('cells', function (Blueprint $table) {
             $table->dropIndex('is_active');
-            $table->dropIndex('leader_user_id');
             $table->dropIndex('branch_id');
         });
 
@@ -232,27 +210,18 @@ return new class extends Migration
             $table->dropIndex(['member_id', 'role']);
             $table->dropIndex(['department_id', 'role']);
             $table->dropIndex('joined_at');
-            $table->dropIndex('member_id');
-            $table->dropIndex('department_id');
         });
 
         Schema::table('finance_categories', function (Blueprint $table) {
-            $table->dropIndex(['branch_id', 'type', 'display_order']);
-            $table->dropIndex('display_order');
             $table->dropIndex('type');
             $table->dropIndex('is_active');
-            $table->dropIndex('branch_id');
         });
 
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropIndex('currency');
             $table->dropIndex(['type', 'transaction_date']);
             $table->dropIndex(['member_id', 'transaction_date']);
-            $table->dropIndex(['branch_id', 'transaction_date']);
-            $table->dropIndex('transaction_date');
             $table->dropIndex('branch_id');
-            $table->dropIndex('category_id');
-            $table->dropIndex('member_id');
         });
 
         Schema::table('attendance_records', function (Blueprint $table) {
@@ -260,29 +229,23 @@ return new class extends Migration
             $table->dropIndex(['is_present', 'member_id']);
             $table->dropIndex(['session_id', 'child_id']);
             $table->dropIndex(['session_id', 'member_id']);
-            $table->dropIndex('child_id');
-            $table->dropIndex('member_id');
-            $table->dropIndex('session_id');
         });
 
         Schema::table('attendance_sessions', function (Blueprint $table) {
-            $table->dropIndex('attendance_sessions_follow_up_status_batched_index');
-            $table->dropIndex(['cell_id', 'service_date'], 'attendance_sessions_cell_date_batched_index');
-            $table->dropIndex(['department_id', 'service_date'], 'attendance_sessions_department_date_batched_index');
-            $table->dropIndex(['branch_id', 'service_date'], 'attendance_sessions_branch_date_batched_index');
-            $table->dropIndex('service_date');
-            $table->dropIndex('attendance_sessions_branch_id_batched_index');
-            $table->dropIndex('attendance_sessions_cell_id_batched_index');
             $table->dropIndex('attendance_sessions_department_id_batched_index');
-            $table->dropIndex('service_type_id');
+            $table->dropIndex('attendance_sessions_cell_id_batched_index');
+            $table->dropIndex('attendance_sessions_branch_id_batched_index');
+            $table->dropIndex('attendance_sessions_branch_date_batched_index');
+            $table->dropIndex('attendance_sessions_department_date_batched_index');
+            $table->dropIndex('attendance_sessions_cell_date_batched_index');
+            $table->dropIndex('attendance_sessions_follow_up_status_batched_index');
         });
 
         Schema::table('members', function (Blueprint $table) {
             $table->dropIndex('members_cell_id_batched_index');
             $table->dropIndex('members_branch_id_status_batched_index');
-            $table->dropIndex('members_cell_id_is_active_batched_index');
+            $table->dropIndex('members_cell_id_status_batched_index');
             $table->dropIndex('status');
-            $table->dropIndex('is_active');
             $table->dropIndex('email');
             $table->dropIndex('phone');
             $table->dropIndex('branch_id');
@@ -296,12 +259,10 @@ return new class extends Migration
 
         Schema::table('model_has_permissions', function (Blueprint $table) {
             $table->dropIndex('permission_id');
-            $table->dropIndex(['model_type', 'model_id']);
         });
 
         Schema::table('model_has_roles', function (Blueprint $table) {
             $table->dropIndex('role_id');
-            $table->dropIndex(['model_type', 'model_id']);
         });
 
         Schema::table('role_has_permissions', function (Blueprint $table) {
