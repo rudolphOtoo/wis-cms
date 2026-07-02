@@ -1,6 +1,6 @@
 import api from './axios'
 
-export const getUsers      = (params) => api.get('/users', { params })
+export const getUsers      = (params, signal) => api.get('/users', { params, signal })
 export const getUserRoles  = ()       => api.get('/users/roles')
 export const getUser       = (id)     => api.get(`/users/${id}`)
 export const createUser    = (data)   => api.post('/users', data)

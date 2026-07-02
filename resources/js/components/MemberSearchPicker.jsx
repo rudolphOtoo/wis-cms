@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../constants/styles'
 /**
  * Searchable member picker. Filters a passed-in list of members by
  * name, phone, or member_number as the user types.
@@ -70,9 +71,12 @@ export default function MemberSearchPicker({
           className="input-field flex items-center justify-between"
           style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
           onClick={() => { if (!disabled) { onChange?.(''); setQuery('') } }}
+          onKeyDown={(e) => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onChange?.(''); setQuery('') } }}
+          role="button"
+          tabIndex={disabled ? -1 : 0}
         >
           <div>
-            <span className="font-semibold" style={{ color: 'var(--color-navy)' }}>
+            <span className="font-semibold" style={{ color: NAVY }}>
               {displayName}
             </span>
             <span className="text-sm ml-2" style={{ color: '#6b7280' }}>
@@ -100,13 +104,14 @@ export default function MemberSearchPicker({
             onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
             disabled={disabled}
+            aria-label={placeholder}
           />
           {open && (
             <div
               className="absolute left-0 right-0 z-10 mt-1 rounded-lg shadow-lg max-h-80 overflow-y-auto"
               style={{
                 backgroundColor: 'white',
-                border: '1px solid var(--color-surface-border)',
+                border: BORDER,
               }}
             >
               {filteredMembers.length === 0 ? (
@@ -123,7 +128,7 @@ export default function MemberSearchPicker({
                       className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors"
                       style={{ borderBottom: '1px solid #f3f4f6' }}
                     >
-                      <div className="font-medium" style={{ color: 'var(--color-navy)' }}>
+                      <div className="font-medium" style={{ color: NAVY }}>
                         {m.full_name ?? `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim()}
                       </div>
                       <div className="text-xs" style={{ color: '#6b7280' }}>
@@ -132,7 +137,7 @@ export default function MemberSearchPicker({
                     </button>
                   ))}
                   {filteredMembers.length === 50 && members.length > 50 && !query.trim() && (
-                    <div className="px-4 py-2 text-xs italic" style={{ color: '#9ca3af', backgroundColor: '#f9fafb' }}>
+                    <div className="px-4 py-2 text-xs italic" style={{ color: PLACEHOLDER, backgroundColor: '#f9fafb' }}>
                       Showing first 50. Type to search through {members.length} members.
                     </div>
                   )}

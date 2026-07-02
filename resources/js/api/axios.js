@@ -33,6 +33,10 @@ api.interceptors.response.use(
     const status = error.response?.status
     const data   = error.response?.data
 
+    if (error.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
+
     if (!error.response) {
       toast.error('Network error. Check your connection.')
     } else if (status === 403) {

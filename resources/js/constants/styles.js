@@ -1,0 +1,5 @@
+export const NAVY = 'var(--color-navy)'
+export const MUTED = '#747780'
+export const PLACEHOLDER = '#9ca3af'
+export const BORDER = '1px solid var(--color-surface-border)'
+export const FONT_DISPLAY = 'var(--font-display)'

@@ -68,16 +68,20 @@ class UserController extends Controller
         // (must_change_password = true + EnsurePasswordChanged middleware).
         $tempPassword = Str::password(12);
 
-        $user = User::create([
-            'branch_id' => $request->user()->branch_id,
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($tempPassword),
-            'is_active' => $request->boolean('is_active', true),
-            'must_change_password' => true,
-            'member_id' => $request->input('member_id'),
-        ]);
-        $user->assignRole($request->role);
+        $user = DB::transaction(function () use ($request, $tempPassword) {
+            $u = User::create([
+                'branch_id' => $request->user()->branch_id,
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($tempPassword),
+                'is_active' => $request->boolean('is_active', true),
+                'must_change_password' => true,
+                'member_id' => $request->input('member_id'),
+            ]);
+            $u->assignRole($request->role);
+
+            return $u;
+        });
 
         // Audit trail: log the issuance, NOT the password itself.
         activity()->causedBy($request->user())
@@ -119,11 +123,13 @@ class UserController extends Controller
             $data['password'] = Hash::make($request->password);
         }
 
-        $user->update($data);
+        DB::transaction(function () use ($user, $data, $request): void {
+            $user->update($data);
 
-        if ($request->has('role')) {
-            $user->syncRoles([$request->role]);
-        }
+            if ($request->has('role')) {
+                $user->syncRoles([$request->role]);
+            }
+        });
 
         activity()->causedBy($request->user())
             ->performedOn($user)

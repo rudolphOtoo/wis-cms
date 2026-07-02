@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 /**
  * A small download menu button. Click to open dropdown with PDF + CSV options.
  *
@@ -56,11 +57,13 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
         type="button"
         onClick={() => setOpen(!open)}
         disabled={disabled || downloading}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="px-4 py-2 rounded-lg font-medium inline-flex items-center gap-2"
         style={{
-          border: '1px solid var(--color-surface-border)',
+          border: BORDER,
           backgroundColor: disabled || downloading ? '#f3f4f6' : 'white',
-          color: 'var(--color-navy)',
+          color: NAVY,
           cursor: disabled || downloading ? 'not-allowed' : 'pointer',
         }}
       >
@@ -84,7 +87,7 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
           className="absolute right-0 mt-1 z-10 rounded-lg overflow-hidden"
           style={{
             backgroundColor: 'white',
-            border: '1px solid var(--color-surface-border)',
+            border: BORDER,
             boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             minWidth: '160px',
           }}
@@ -93,23 +96,23 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
             type="button"
             onClick={() => trigger(pdfHandler, 'pdf')}
             className="block w-full text-left px-4 py-2 text-sm"
-            style={{ color: 'var(--color-navy)', borderBottom: '1px solid var(--color-surface-border)' }}
+            style={{ color: NAVY, borderBottom: BORDER }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
           >
             <span style={{ fontWeight: 600 }}>PDF</span>
-            <span style={{ color: '#9ca3af', marginLeft: '6px', fontSize: '11px' }}>For printing / council</span>
+            <span style={{ color: PLACEHOLDER, marginLeft: '6px', fontSize: '11px' }}>For printing / council</span>
           </button>
           <button
             type="button"
             onClick={() => trigger(csvHandler, 'csv')}
             className="block w-full text-left px-4 py-2 text-sm"
-            style={{ color: 'var(--color-navy)' }}
+            style={{ color: NAVY }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
           >
             <span style={{ fontWeight: 600 }}>CSV</span>
-            <span style={{ color: '#9ca3af', marginLeft: '6px', fontSize: '11px' }}>Opens in Excel</span>
+            <span style={{ color: PLACEHOLDER, marginLeft: '6px', fontSize: '11px' }}>Opens in Excel</span>
           </button>
         </div>
       )}

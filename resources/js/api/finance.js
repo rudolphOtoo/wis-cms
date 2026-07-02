@@ -1,7 +1,7 @@
 import api from './axios'
 
 export const getTransactions      = (params, signal) => api.get('/finance/transactions', { params, signal })
-export const getTransaction       = (id)             => api.get(`/finance/transactions/${id}`)
+export const getTransaction       = (id, signal)             => api.get(`/finance/transactions/${id}`, { signal })
 export const createTransaction    = (data)           => api.post('/finance/transactions', data)
 export const updateTransaction    = (id, data)       => api.put(`/finance/transactions/${id}`, data)
 export const deleteTransaction    = (id)             => api.delete(`/finance/transactions/${id}`)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 import {
   LayoutDashboard, Users, GraduationCap, ClipboardCheck,
   Building2, Home, UserPlus, MessageSquare, Gift, Bell, FileText,
@@ -41,8 +42,10 @@ const MAIN_NAV = [
   { to: '/departments',       label: 'Departments', icon: Building2,       permission: 'view departments' },
   { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells',      hideForRoles: ['cell_leader'] },
   { to: '/visitors',          label: 'Visitors',    icon: UserPlus,        permission: 'view visitors' },
-  { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
-  { to: '/admin/submissions', label: 'Submissions', icon: FileText,        permission: 'view member submissions' },
+  { to: '/communication',     label: 'Messages',          icon: MessageSquare,   permission: 'view messages' },
+  { to: '/birthdays',         label: 'Birthday Messages', icon: Gift,           permission: 'view birthday messages' },
+  { to: '/reminders',         label: 'Service Reminders',  icon: Bell,           permission: 'view service reminders' },
+  { to: '/admin/submissions', label: 'Submissions',       icon: FileText,        permission: 'view member submissions' },
 ]
 
 const FINANCE_NAV = [
@@ -259,7 +262,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
             <div className="min-w-0">
               <div
                 className="text-white text-sm font-bold leading-tight truncate"
-                style={{ fontFamily: 'var(--font-display)' }}
+                style={{ fontFamily: FONT_DISPLAY }}
               >
                 WIS-CMS
               </div>
@@ -361,14 +364,14 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
               style={{ backgroundColor: 'rgba(201,168,76,0.2)', color: 'var(--color-gold)' }}
-              title={user?.name}
+              aria-label={user?.name}
             >
               {userInitial}
             </div>
             <button
               type="button"
               onClick={logout}
-              title="Sign out"
+              aria-label="Sign out"
               className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/10"
               style={{ color: 'rgba(255,255,255,0.35)' }}
             >
@@ -401,7 +404,7 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
             <button
               type="button"
               onClick={logout}
-              title="Sign out"
+              aria-label="Sign out"
               className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl transition-opacity hover:bg-white/10 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100"
               style={{ color: 'rgba(255,255,255,0.5)' }}
             >

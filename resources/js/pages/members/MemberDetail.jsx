@@ -6,6 +6,7 @@ import { getCells } from '../../api/cells'
 import { getDepartments } from '../../api/departments'
 import { usePermission } from '../../hooks/usePermission'
 
+import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const STATUS_COLORS = {
@@ -24,7 +25,7 @@ const badgeFor = (cat) => CATEGORY_BADGE[cat] ?? { bg: '#edeef1', text: '#44474f
 const softLift = { boxShadow: '0 4px 12px rgba(13,31,60,0.05)' }
 const cardBase = {
   backgroundColor: '#fff',
-  border: '1px solid var(--color-surface-border)',
+  border: BORDER,
   borderRadius: '16px',
   ...softLift,
 }
@@ -89,7 +90,7 @@ export default function MemberDetail() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}} fill="none" viewBox="0 0 24 24">
+      <svg className="animate-spin w-8 h-8" style={{color:NAVY}} fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
       </svg>
@@ -109,13 +110,13 @@ export default function MemberDetail() {
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/members')}
                   className="w-11 h-11 flex items-center justify-center rounded-full transition-colors"
-                  style={{border:'1px solid var(--color-surface-border)',backgroundColor:'white',color:'var(--color-navy)'}}>
+                  style={{border:BORDER,backgroundColor:'white',color:NAVY}}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
             </svg>
           </button>
           <div>
-            <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
+            <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
               {member.full_name}
             </h1>
             <p style={{fontSize:'14px',color:'#44474f'}}>Member ID: {member.member_number}</p>
@@ -134,7 +135,7 @@ export default function MemberDetail() {
         {can('manage users') && !member.has_user_account && (
           <button onClick={() => setPromoteOpen(true)}
                   className="gap-2 inline-flex items-center"
-                  style={{padding:'10px 24px', backgroundColor:'var(--color-gold)', color:'var(--color-navy)', borderRadius:'8px', fontWeight:600}}>
+                  style={{padding:'10px 24px', backgroundColor:'var(--color-gold)', color:NAVY, borderRadius:'8px', fontWeight:600}}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -145,7 +146,7 @@ export default function MemberDetail() {
         {can('manage users') && !member.has_user_account && (
           <button onClick={() => setLoginOpen(true)}
                   className="gap-2 inline-flex items-center"
-                  style={{padding:'10px 24px', backgroundColor:'white', color:'var(--color-navy)', border:'1px solid var(--color-navy)', borderRadius:'8px', fontWeight:600}}>
+                  style={{padding:'10px 24px', backgroundColor:'white', color:NAVY, border:'1px solid var(--color-navy)', borderRadius:'8px', fontWeight:600}}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
@@ -163,13 +164,13 @@ export default function MemberDetail() {
           <div style={{...cardBase, padding:'24px'}}>
             <div className="flex items-center gap-4 mb-8">
               <div className="flex items-center justify-center flex-shrink-0 text-white font-bold"
-                   style={{width:'96px',height:'96px',borderRadius:'16px',fontSize:'36px',fontFamily:'var(--font-display)',
+                   style={{width:'96px',height:'96px',borderRadius:'16px',fontSize:'36px',fontFamily:FONT_DISPLAY,
                            background:'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)',boxShadow:'0 8px 16px rgba(0,36,82,0.12)'}}>
                 {member.first_name.charAt(0)}{member.last_name.charAt(0)}
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>
+                  <h2 style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:NAVY}}>
                     {member.full_name}
                   </h2>
                   <span className="uppercase tracking-wider"
@@ -182,7 +183,7 @@ export default function MemberDetail() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-y-6 pt-8" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+            <div className="grid grid-cols-2 gap-y-6 pt-8" style={{borderTop:BORDER}}>
               {[
                 ['Gender', member.gender, true],
                 ['Phone', member.phone],
@@ -194,7 +195,7 @@ export default function MemberDetail() {
                 ['Address', member.address],
               ].map(([label, value, cap]) => (
                 <div key={label}>
-                  <p className="uppercase mb-1" style={{fontSize:'11px',fontWeight:700,letterSpacing:'0.03em',color:'#747780'}}>{label}</p>
+                  <p className="uppercase mb-1" style={{fontSize:'11px',fontWeight:700,letterSpacing:'0.03em',color:MUTED}}>{label}</p>
                   <p className={cap ? 'capitalize' : ''} style={{fontSize:'14px',fontWeight:600,color:'#191c1e'}}>
                     {value || '—'}
                   </p>
@@ -210,12 +211,12 @@ export default function MemberDetail() {
             <div style={{...cardBase, overflow:'hidden'}}>
               {/* Header */}
               <div className="flex items-center justify-between"
-                   style={{padding:'24px',borderBottom:'1px solid var(--color-surface-border)'}}>
+                   style={{padding:'24px',borderBottom:BORDER}}>
                 <div className="flex items-center gap-2">
-                  <svg className="w-6 h-6" style={{color:'var(--color-navy)'}} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <svg className="w-6 h-6" style={{color:NAVY}} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 12V7H5a2 2 0 010-4h14v4M3 5v14a2 2 0 002 2h16v-5M18 12a2 2 0 000 4h4v-4h-4z"/>
                   </svg>
-                  <h3 style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>Giving History</h3>
+                  <h3 style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:NAVY}}>Giving History</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   {giving?.available_years?.length > 0 && (
@@ -228,7 +229,7 @@ export default function MemberDetail() {
                     <button onClick={handleDownload} disabled={downloading}
                             className="flex items-center gap-1.5 transition-colors"
                             style={{padding:'6px 16px',borderRadius:'8px',fontSize:'14px',fontWeight:600,
-                                    border:'1px solid var(--color-navy)',color:'var(--color-navy)',backgroundColor:'white'}}>
+                                    border:'1px solid var(--color-navy)',color:NAVY,backgroundColor:'white'}}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -242,11 +243,11 @@ export default function MemberDetail() {
               {/* Body */}
               <div style={{padding:'24px'}}>
                 {givingLoad ? (
-                  <div className="text-center py-8" style={{color:'#9ca3af'}}>Loading giving...</div>
+                  <div className="text-center py-8" style={{color:PLACEHOLDER}}>Loading giving...</div>
                 ) : !giving || giving.total === 0 ? (
                   <div className="text-center py-10">
                     <div className="text-3xl mb-2">💝</div>
-                    <div className="text-sm font-semibold" style={{color:'var(--color-navy)'}}>
+                    <div className="text-sm font-semibold" style={{color:NAVY}}>
                       No giving recorded for {givingYear}
                     </div>
                   </div>
@@ -260,7 +261,7 @@ export default function MemberDetail() {
                       <span className="relative z-10 mb-2" style={{fontSize:'14px',fontWeight:600,color:'rgba(255,255,255,0.7)'}}>
                         Total Given in {givingYear}
                       </span>
-                      <h2 className="relative z-10" style={{fontFamily:'var(--font-display)',fontSize:'42px',fontWeight:700,color:'var(--color-gold-light)'}}>
+                      <h2 className="relative z-10" style={{fontFamily:FONT_DISPLAY,fontSize:'42px',fontWeight:700,color:'var(--color-gold-light)'}}>
                         {fmt(giving.total)}
                       </h2>
                       <div className="relative z-10 flex gap-3 mt-6 flex-wrap justify-center">
@@ -280,18 +281,18 @@ export default function MemberDetail() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr style={{backgroundColor:'#f8f9fc',borderBottom:'1px solid var(--color-surface-border)'}}>
-                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:'#747780'}}>Date</th>
-                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:'#747780'}}>Category</th>
-                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:'#747780'}}>Reference</th>
-                            <th className="uppercase text-right" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:'#747780'}}>Amount</th>
+                          <tr style={{backgroundColor:'#f8f9fc',borderBottom:BORDER}}>
+                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:MUTED}}>Date</th>
+                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:MUTED}}>Category</th>
+                            <th className="uppercase" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:MUTED}}>Reference</th>
+                            <th className="uppercase text-right" style={{padding:'12px 16px',fontSize:'11px',fontWeight:700,color:MUTED}}>Amount</th>
                           </tr>
                         </thead>
                         <tbody>
                           {giving.transactions.map((t, i) => {
                             const b = badgeFor(t.category)
                             return (
-                              <tr key={t.id} style={{borderBottom:'1px solid var(--color-surface-border)'}}>
+                              <tr key={t.id} style={{borderBottom:BORDER}}>
                                 <td style={{padding:'16px',fontSize:'14px',color:'#191c1e'}}>{t.date}</td>
                                 <td style={{padding:'16px'}}>
                                   <span className="uppercase" style={{padding:'4px 8px',borderRadius:'4px',fontSize:'11px',fontWeight:700,backgroundColor:b.bg,color:b.text}}>
@@ -313,10 +314,10 @@ export default function MemberDetail() {
           ) : (
             <div style={{...cardBase, padding:'40px'}} className="text-center">
               <div className="text-3xl mb-2">🔒</div>
-              <div className="text-sm font-semibold" style={{color:'var(--color-navy)'}}>
+              <div className="text-sm font-semibold" style={{color:NAVY}}>
                 Giving history is restricted
               </div>
-              <p className="text-xs mt-1" style={{color:'#9ca3af'}}>
+              <p className="text-xs mt-1" style={{color:PLACEHOLDER}}>
                 You don't have permission to view financial records.
               </p>
             </div>
@@ -395,7 +396,7 @@ function PromoteModal({ member, onClose, onSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(13,31,60,0.6)'}}>
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg" style={{boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
         <div className="flex justify-between items-start mb-4">
-          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>
+          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'22px',color:NAVY}}>
             {mode === 'temp-password' ? 'Leader Created' : `Promote ${member.full_name} to Leader`}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">×</button>
@@ -411,14 +412,14 @@ function PromoteModal({ member, onClose, onSuccess }) {
                 Share this password — it will not be shown again.
               </div>
             </div>
-            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
-              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'var(--color-navy)',wordBreak:'break-all'}}>{tempPassword}</code>
+            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:BORDER}}>
+              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:NAVY,wordBreak:'break-all'}}>{tempPassword}</code>
               <button onClick={copy} className="px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap"
-                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)', color:'white'}}>
+                      style={{backgroundColor: copied ? '#15803d' : NAVY, color:'white'}}>
                 {copied ? 'Copied ✓' : 'Copy'}
               </button>
             </div>
-            <p style={{fontSize:'12px',color:'#747780'}}>
+            <p style={{fontSize:'12px',color:MUTED}}>
               The new leader will be required to change this password on first login.
             </p>
             <div className="flex justify-end">
@@ -433,22 +434,22 @@ function PromoteModal({ member, onClose, onSuccess }) {
               </div>
             )}
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Leadership Type *</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>Leadership Type *</label>
               <div className="flex gap-3">
                 {[{ v:'cell', label:'Cell Leader' }, { v:'department', label:'Department Leader' }].map(opt => (
                   <label key={opt.v} className="flex-1 cursor-pointer">
                     <input type="radio" name="ltype" value={opt.v} checked={type === opt.v} onChange={() => setType(opt.v)} className="sr-only peer"/>
                     <div className="rounded-lg p-3 text-center text-sm font-semibold transition-all" style={{
-                      border: type === opt.v ? '2px solid var(--color-navy)' : '1px solid var(--color-surface-border)',
+                      border: type === opt.v ? '2px solid var(--color-navy)' : BORDER,
                       backgroundColor: type === opt.v ? '#eef2ff' : 'white',
-                      color: 'var(--color-navy)',
+                      color: NAVY,
                     }}>{opt.label}</div>
                   </label>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>{type === 'cell' ? 'Cell' : 'Department'} to Lead *</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>{type === 'cell' ? 'Cell' : 'Department'} to Lead *</label>
               <select className="input-field" value={targetId} onChange={e => setTargetId(e.target.value)}>
                 <option value="">{units.length === 0 ? 'No leaderless units available' : 'Choose…'}</option>
                 {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -456,17 +457,17 @@ function PromoteModal({ member, onClose, onSuccess }) {
               {errors.target_id && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.target_id[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Email *</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>Login Email *</label>
               <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)}/>
               {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Name (optional override)</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>Login Name (optional override)</label>
               <input type="text" className="input-field" placeholder={member.full_name} value={nameOverride} onChange={e => setNameOverride(e.target.value)}/>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
-                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Cancel</button>
               <button onClick={submit} disabled={mode === 'submitting' || !targetId || !email}
                       className="btn-primary px-6 py-2" style={{opacity: (!targetId || !email) ? 0.5 : 1}}>
                 {mode === 'submitting' ? 'Promoting…' : 'Promote & Generate Login'}
@@ -518,7 +519,7 @@ function LoginAccountModal({ member, onClose, onSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(13,31,60,0.6)'}}>
       <div className="bg-white rounded-2xl p-6 w-full max-w-md" style={{boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
         <div className="flex justify-between items-start mb-4">
-          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>
+          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'22px',color:NAVY}}>
             {mode === 'temp-password' ? 'Login Created' : `Add Login for ${member.full_name}`}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">×</button>
@@ -534,14 +535,14 @@ function LoginAccountModal({ member, onClose, onSuccess }) {
                 Share this password — it will not be shown again.
               </div>
             </div>
-            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
-              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:'var(--color-navy)',wordBreak:'break-all'}}>{tempPassword}</code>
+            <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{backgroundColor:'#f8f9fc',border:BORDER}}>
+              <code style={{fontFamily:'monospace',fontSize:'16px',fontWeight:600,color:NAVY,wordBreak:'break-all'}}>{tempPassword}</code>
               <button onClick={copy} className="px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap"
-                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)', color:'white'}}>
+                      style={{backgroundColor: copied ? '#15803d' : NAVY, color:'white'}}>
                 {copied ? 'Copied ✓' : 'Copy'}
               </button>
             </div>
-            <p style={{fontSize:'12px',color:'#747780'}}>
+            <p style={{fontSize:'12px',color:MUTED}}>
               They will be required to change this password on first login.
             </p>
             <div className="flex justify-end">
@@ -560,17 +561,17 @@ function LoginAccountModal({ member, onClose, onSuccess }) {
               and can view their giving, attendance, and profile.
             </p>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Email *</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>Login Email *</label>
               <input type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)}/>
               {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:'var(--color-navy)'}}>Login Name (optional)</label>
+              <label className="block mb-1.5" style={{fontSize:'13px',fontWeight:600,color:NAVY}}>Login Name (optional)</label>
               <input type="text" className="input-field" placeholder={member.full_name} value={nameOverride} onChange={e => setNameOverride(e.target.value)}/>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
-                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
+                      style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Cancel</button>
               <button onClick={submit} disabled={mode === 'submitting' || !email}
                       className="btn-primary px-6 py-2" style={{opacity: !email ? 0.5 : 1}}>
                 {mode === 'submitting' ? 'Creating…' : 'Create Login'}

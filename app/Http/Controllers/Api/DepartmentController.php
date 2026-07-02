@@ -154,7 +154,7 @@ class DepartmentController extends Controller
             'joined_at' => now()->toDateString(),
         ]);
 
-        $member = Member::find($request->member_id);
+        $member = Member::findOrFail($request->member_id);
 
         activity()->causedBy($request->user())
             ->log("Added {$member->full_name} to {$department->name}");
@@ -228,7 +228,8 @@ class DepartmentController extends Controller
             ], 422);
         }
 
-        $message = DB::transaction(function () use ($request, $department, $recipients) {
+        $recipientIds = [];
+        $message = DB::transaction(function () use ($request, $department, $recipients, &$recipientIds) {
             $msg = Message::create([
                 'branch_id' => $request->user()->branch_id,
                 'sender_id' => $request->user()->id,
@@ -249,13 +250,17 @@ class DepartmentController extends Controller
                     'email' => $member->email,
                     'delivery_status' => 'pending',
                 ]);
-                SendBroadcastMessageJob::dispatch($r->id);
+                $recipientIds[] = $r->id;
             }
 
             $msg->update(['status' => 'sent']);
 
             return $msg;
         });
+
+        foreach ($recipientIds as $rid) {
+            SendBroadcastMessageJob::dispatch($rid);
+        }
 
         activity()->causedBy($request->user())
             ->performedOn($message)
