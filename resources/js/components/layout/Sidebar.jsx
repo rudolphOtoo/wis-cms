@@ -221,13 +221,15 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
     : (isMobileOpen ? '0px' : '-100%')
 
   return (
-    // Outer wrapper: flex child with constant 256px allocation. overflow-hidden
-    // clips the rightmost 184px when collapsed so the visible portion is 72px.
-    // The inner aside uses transform: translateX() for a compositor-only
-    // animation — no layout repaint from animating width.
+    // Outer wrapper: flex child whose width transitions between 256 px
+    // (expanded) and 72 px (collapsed desktop) so content reclaims space.
+    // On mobile the wrapper stays at 256 px; the slide-over drawer is
+    // handled by the aside's translateX.
     <div
-      className="flex-shrink-0 overflow-hidden z-40"
-      style={{ width: '256px' }}
+      className="flex-shrink-0 z-40 overflow-hidden transition-all duration-300 ease-in-out"
+      style={{
+        width: isDesktop ? (isCollapsed ? '72px' : '256px') : '256px',
+      }}
     >
     <aside
       className={[
@@ -368,6 +370,15 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
             >
               {userInitial}
             </div>
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand sidebar"
+              className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/20 hover:text-white"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
+            >
+              <ChevronRight size={16} strokeWidth={2.5} />
+            </button>
             <button
               type="button"
               onClick={logout}
