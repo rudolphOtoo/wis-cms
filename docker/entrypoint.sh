@@ -14,7 +14,7 @@ wait_for_db() {
 wait_for_db
 
 if [ "$1" = "php-fpm" ]; then
-    php artisan app:data-migrate --import
+    php artisan migrate --seed --force --class=ProductionSeeder
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache
