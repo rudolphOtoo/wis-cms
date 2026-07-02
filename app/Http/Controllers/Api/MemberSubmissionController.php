@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\NotifyAdminOfApprovalJob;
+use App\Jobs\SendMemberWelcomeSmsJob;
 use App\Models\Cell;
 use App\Models\Member;
 use App\Models\MemberSubmission;

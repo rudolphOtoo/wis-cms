@@ -76,7 +76,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-    command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
+    command: php artisan schedule:work
     depends_on:
       app:
         condition: service_healthy
