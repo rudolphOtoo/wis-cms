@@ -21,10 +21,10 @@ class SuperAdminSeeder extends Seeder
      * 'admin@wis-cms.local' / 'Admin@12345' to keep the demo flow
      * working. The fallback ONLY engages when APP_ENV=local.
      *
-     * Idempotent: firstOrCreate matches by email. If the admin user
-     * already exists, attributes (including password) are NOT updated
-     * - that protects against accidentally resetting a production
-     * password by re-running seeders.
+     * Uses updateOrCreate: on a fresh deploy the admin is created
+     * from .env; on subsequent deploys the password is refreshed
+     * from .env so the env file remains the single source of truth
+     * for the admin credential. Non-admin users are not affected.
      */
     public function run(): void
     {
@@ -62,10 +62,9 @@ class SuperAdminSeeder extends Seeder
             $this->command->warn('  ⚠ super_admin role missing — run RolesAndPermissionsSeeder first. Skipping role assignment.');
         }
 
-        // 3. firstOrCreate makes this idempotent. The password is ONLY
-        //    set on initial creation — re-running the seeder will not
-        //    overwrite a password that was rotated in production.
-        $admin = User::firstOrCreate(
+        // 3. updateOrCreate so the env file is the single source of truth
+        //    for the admin password on every deploy.
+        $admin = User::updateOrCreate(
             ['email' => $email],
             [
                 'branch_id' => $branch->id,
