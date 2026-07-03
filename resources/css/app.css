@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
 @theme {
@@ -58,6 +60,7 @@ h1, h2, h3 { font-family: var(--font-display); }
               0 0 0 4px var(--color-gold);
 }
 
+/* Fix #5 — reusable surface card replaces scattered inline cardBase objects */
 .btn-secondary {
   background-color: white;
   color: var(--color-navy);
@@ -83,14 +86,9 @@ h1, h2, h3 { font-family: var(--font-display); }
   border-radius: 0.5rem;
   border: 1px solid var(--color-surface-border);
   background-color: white;
-  font-size: 16px;
+  font-size: 0.875rem;
   transition: border-color 150ms, box-shadow 150ms;
   outline: none;
-}
-@media (min-width: 768px) {
-  .input-field {
-    font-size: 0.875rem;
-  }
 }
 .input-field::placeholder { color: #9ca3af; }
 .input-field:focus {
@@ -113,48 +111,6 @@ h1, h2, h3 { font-family: var(--font-display); }
   border: 1px solid var(--color-surface-border);
   padding: 1.5rem;
 }
-
-/* ===== Fluid Typography (clamp-based) ===== */
-
-.text-fluid-hero {
-  font-size: clamp(1.75rem, 4.5vw + 0.5rem, 3.75rem);
-}
-.text-fluid-h2 {
-  font-size: clamp(1.25rem, 2.5vw + 0.25rem, 2rem);
-}
-.text-fluid-body {
-  font-size: clamp(0.875rem, 1vw + 0.25rem, 1rem);
-}
-
-/* ===== Mobile Card (replaces wide tables on small viewports) ===== */
-
-.mobile-member-card {
-  display: block;
-}
-@media (min-width: 640px) {
-  .mobile-member-card {
-    display: none;
-  }
-}
-
-.mobile-table-cards {
-  display: block;
-}
-@media (min-width: 640px) {
-  .mobile-table-cards {
-    display: none;
-  }
-}
-.desktop-table {
-  display: none;
-}
-@media (min-width: 640px) {
-  .desktop-table {
-    display: table;
-  }
-}
-
-/* ===== Scrollbar ===== */
 
 .sidebar-scroll {
   scrollbar-width: thin;

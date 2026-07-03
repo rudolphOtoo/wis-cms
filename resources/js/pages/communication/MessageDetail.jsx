@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getMessage } from '../../api/messages'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const STATUS_COLORS = {
   delivered: { bg: '#dcfce7', text: '#15803d', label: 'Delivered' },
   pending:   { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -24,7 +23,7 @@ export default function MessageDetail() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:NAVY}}
+      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
            fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor"
@@ -39,15 +38,15 @@ export default function MessageDetail() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/communication')}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
-                style={{backgroundColor:'white',border:BORDER}}>
+                className="p-2 rounded-lg"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
           <h2 className="text-xl font-bold"
-              style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
+              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
             Message Details
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -58,7 +57,7 @@ export default function MessageDetail() {
 
       <div className="grid grid-cols-3 gap-3">
         <div className="card py-3 text-center">
-          <div className="text-2xl font-bold" style={{color:NAVY}}>{msg.total_recipients}</div>
+          <div className="text-2xl font-bold" style={{color:'var(--color-navy)'}}>{msg.total_recipients}</div>
           <div className="text-xs" style={{color:'#6b7280'}}>Recipients</div>
         </div>
         <div className="card py-3 text-center">
@@ -73,9 +72,9 @@ export default function MessageDetail() {
 
       <div className="card">
         {msg.subject && (
-          <div className="pb-3 mb-3" style={{borderBottom:BORDER}}>
+          <div className="pb-3 mb-3" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
             <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{color:'#6b7280'}}>Subject</div>
-            <div className="text-lg font-bold" style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
+            <div className="text-lg font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
               {msg.subject}
             </div>
           </div>
@@ -86,8 +85,8 @@ export default function MessageDetail() {
 
       <div className="card p-0 overflow-hidden">
         <div className="px-5 py-3"
-             style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
-          <h3 className="font-bold text-sm" style={{color:NAVY}}>
+             style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
+          <h3 className="font-bold text-sm" style={{color:'var(--color-navy)'}}>
             Delivery Status — {msg.recipients.length} recipient{msg.recipients.length === 1 ? '' : 's'}
           </h3>
         </div>
@@ -98,12 +97,12 @@ export default function MessageDetail() {
               <div key={r.id} className="px-5 py-3 flex items-center gap-4">
                 <div className="w-9 h-9 rounded-full flex items-center justify-center
                                 flex-shrink-0 text-sm font-bold text-white"
-                     style={{backgroundColor:NAVY}}>
+                     style={{backgroundColor:'var(--color-navy)'}}>
                   {r.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold" style={{color:'#111827'}}>{r.name}</div>
-                  <div className="text-xs" style={{color:PLACEHOLDER}}>
+                  <div className="text-xs" style={{color:'#9ca3af'}}>
                     {r.email && <>📧 {r.email}</>}
                     {r.email && r.phone && ' · '}
                     {r.phone && <>📱 {r.phone}</>}

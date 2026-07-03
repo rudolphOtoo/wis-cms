@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { getMessages, getMessageStats } from '../../api/messages'
 import { usePermission } from '../../hooks/usePermission'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: BORDER,
+  border: '1px solid var(--color-surface-border)',
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -69,7 +68,7 @@ export default function CommunicationPage() {
       {/* Header */}
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
             Communications
           </h2>
           <p style={{color:'#44474f'}}>Review and manage sent messages to your congregation.</p>
@@ -88,12 +87,12 @@ export default function CommunicationPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {statCards.map(s => (
           <div key={s.label} style={{...cardBase, padding:'24px'}}>
-            <div className="flex items-center gap-2 mb-3" style={{color:NAVY}}>
+            <div className="flex items-center gap-2 mb-3" style={{color:'var(--color-navy)'}}>
               <Icon d={s.icon} size={20} />
               <span className="uppercase tracking-wider" style={{fontSize:'11px',fontWeight:700}}>{s.label}</span>
             </div>
-            <div style={{fontFamily:FONT_DISPLAY,fontSize:'40px',fontWeight:700,color:NAVY,lineHeight:1}}>{s.value}</div>
-            <div style={{fontSize:'12px',color:MUTED,marginTop:'4px'}}>{s.sub}</div>
+            <div style={{fontFamily:'var(--font-display)',fontSize:'40px',fontWeight:700,color:'var(--color-navy)',lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:'12px',color:'#747780',marginTop:'4px'}}>{s.sub}</div>
           </div>
         ))}
       </div>
@@ -105,18 +104,18 @@ export default function CommunicationPage() {
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
                 {[['Channel'],['Subject'],['Preview'],['Sender'],['Recipients','center'],['Delivery'],['','right']].map(([h, align], idx) => (
-                  <th key={idx} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'11px',fontWeight:700,color:MUTED,textAlign:align||'left'}}>{h}</th>
+                  <th key={idx} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'11px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:PLACEHOLDER}}>Loading...</td></tr>
+                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
               ) : messages.length === 0 ? (
                 <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">💌</div>
-                  <div className="font-semibold" style={{color:NAVY}}>No messages sent yet</div>
-                  <div className="text-sm mt-1" style={{color:PLACEHOLDER}}>Compose your first message to broadcast to members</div>
+                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No messages sent yet</div>
+                  <div className="text-sm mt-1" style={{color:'#9ca3af'}}>Compose your first message to broadcast to members</div>
                 </td></tr>
               ) : messages.map(msg => {
                 const ch = CHANNELS[msg.channel] ?? CHANNELS.email
@@ -125,29 +124,29 @@ export default function CommunicationPage() {
                 const failed = msg.failed_count || 0
                 const pct = total > 0 ? Math.round((delivered / total) * 100) : 0
                 return (
-                  <tr key={msg.id} className="transition-colors cursor-pointer" style={{borderTop:BORDER}}
+                  <tr key={msg.id} className="transition-colors cursor-pointer" style={{borderTop:'1px solid var(--color-surface-border)'}}
                       onClick={() => navigate(`/communication/${msg.id}`)}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex gap-1">
                         {ch.icons.map(ic => (
-                          <div key={ic} className="rounded flex items-center justify-center" style={{padding:'6px',backgroundColor:'rgba(199,215,253,0.4)',color:NAVY}} title={ic}>
+                          <div key={ic} className="rounded flex items-center justify-center" style={{padding:'6px',backgroundColor:'rgba(199,215,253,0.4)',color:'var(--color-navy)'}} title={ic}>
                             <Icon d={ICONS[ic]} size={16} />
                           </div>
                         ))}
                       </div>
                     </td>
                     <td style={{padding:'16px 24px'}}>
-                      <p style={{fontSize:'14px',fontWeight:600,color:NAVY}}>{msg.subject ?? <em style={{color:PLACEHOLDER}}>No subject</em>}</p>
-                      <p style={{fontSize:'11px',color:MUTED}}>{msg.sent_at ?? msg.created_at}</p>
+                      <p style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>{msg.subject ?? <em style={{color:'#9ca3af'}}>No subject</em>}</p>
+                      <p style={{fontSize:'11px',color:'#747780'}}>{msg.sent_at ?? msg.created_at}</p>
                     </td>
                     <td style={{padding:'16px 24px',maxWidth:'240px'}}>
                       <p className="truncate" style={{fontSize:'14px',color:'#44474f'}}>{msg.body_preview}</p>
                     </td>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{fontSize:'10px',fontWeight:700,backgroundColor:'var(--color-primary-fixed,#d7e2ff)',color:NAVY}}>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{fontSize:'10px',fontWeight:700,backgroundColor:'var(--color-primary-fixed,#d7e2ff)',color:'var(--color-navy)'}}>
                           {(msg.sender ?? '?').charAt(0)}
                         </div>
                         <span style={{fontSize:'14px',color:'#191c1e'}}>{msg.sender ?? '—'}</span>
@@ -163,12 +162,12 @@ export default function CommunicationPage() {
                           <span style={{color:'#2e7d32',fontWeight:700}}>{delivered} delivered</span>
                           {failed > 0
                             ? <span style={{color:'#ba1a1a',fontWeight:700}}>{failed} failed</span>
-                            : <span style={{color:MUTED}}>0 failed</span>}
+                            : <span style={{color:'#747780'}}>0 failed</span>}
                         </div>
                       </div>
                     </td>
                     <td style={{padding:'16px 24px',textAlign:'right'}}>
-                      <span className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>View Details</span>
+                      <span className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>View Details</span>
                     </td>
                   </tr>
                 )
@@ -178,13 +177,13 @@ export default function CommunicationPage() {
         </div>
 
         {meta && meta.last_page > 1 && (
-          <div className="flex items-center justify-between" style={{padding:'16px 24px',borderTop:BORDER}}>
-            <span style={{fontSize:'14px',color:MUTED}}>Page {meta.current_page} of {meta.last_page} · {meta.total} messages</span>
+          <div className="flex items-center justify-between" style={{padding:'16px 24px',borderTop:'1px solid var(--color-surface-border)'}}>
+            <span style={{fontSize:'14px',color:'#747780'}}>Page {meta.current_page} of {meta.last_page} · {meta.total} messages</span>
             <div className="flex gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="px-4 py-2 rounded-lg disabled:opacity-50" style={{border:BORDER,fontSize:'14px',color:NAVY}}>Previous</button>
+                      className="px-4 py-2 rounded-lg disabled:opacity-50" style={{border:'1px solid var(--color-surface-border)',fontSize:'14px',color:'var(--color-navy)'}}>Previous</button>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="px-4 py-2 rounded-lg text-white" style={{backgroundColor:NAVY,fontSize:'14px'}}>Next</button>
+                      className="px-4 py-2 rounded-lg text-white" style={{backgroundColor:'var(--color-navy)',fontSize:'14px'}}>Next</button>
             </div>
           </div>
         )}

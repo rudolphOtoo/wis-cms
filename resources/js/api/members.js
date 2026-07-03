@@ -1,7 +1,7 @@
 import api from './axios'
 
 export const getMembers     = (params, signal) => api.get('/members', { params, signal })
-export const getMember      = (id, signal)             => api.get(`/members/${id}`, { signal })
+export const getMember      = (id)             => api.get(`/members/${id}`)
 export const createMember   = (data)           => api.post('/members', data)
 export const updateMember   = (id, data)       => api.put(`/members/${id}`, data)
 export const deleteMember   = (id)             => api.delete(`/members/${id}`)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, cloneElement, isValidElement } from 'react'
+import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -6,17 +6,13 @@ import {
 } from '../../api/finance'
 import { getMembers } from '../../api/members'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
-const FIELD = ({ label, error, children, name }) => {
-  const fieldId = name ? `field-${name}` : undefined
-  return (
-    <div>
-      <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor={fieldId}>{label}</label>
-      {fieldId && isValidElement(children) ? cloneElement(children, { id: fieldId }) : children}
-      {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
-    </div>
-  )
-}
+const FIELD = ({ label, error, children }) => (
+  <div>
+    <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>{label}</label>
+    {children}
+    {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
+  </div>
+)
 
 export default function TransactionForm() {
   const navigate = useNavigate()
@@ -38,23 +34,18 @@ export default function TransactionForm() {
   const [fetching,   setFetching]  = useState(isEdit)
 
   useEffect(() => {
-    const controller = new AbortController()
-    let mounted = true
-
     Promise.all([
-      getFinanceCategories(null, controller.signal),
-      getMembers({ per_page: 500, status: 'active' }, controller.signal),
+      getFinanceCategories(),
+      getMembers({ per_page: 500, status: 'active' }),
     ]).then(([cRes, mRes]) => {
-      if (!mounted) return
       setCats(cRes.data.data)
       setMembers(mRes.data.data)
     })
 
     if (isEdit) {
       setFetching(true)
-      getTransaction(id, controller.signal)
+      getTransaction(id)
         .then(res => {
-          if (!mounted) return
           const t = res.data.data
           setForm({
             type:             t.type             ?? 'income',
@@ -66,11 +57,9 @@ export default function TransactionForm() {
             notes:            t.notes            ?? '',
           })
         })
-        .catch(() => { if (mounted) navigate('/finance') })
-        .finally(() => { if (mounted) setFetching(false) })
+        .catch(() => navigate('/finance'))
+        .finally(() => setFetching(false))
     }
-
-    return () => { mounted = false; controller.abort() }
   }, [id, isEdit])
 
   const set = (field) => (e) => {
@@ -103,7 +92,7 @@ export default function TransactionForm() {
 
   if (fetching) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:NAVY}}
+      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
            fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10"
                 stroke="currentColor" strokeWidth="4"/>
@@ -117,16 +106,15 @@ export default function TransactionForm() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/finance')}
-                 aria-label="Back to finance"
-                 className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
-                 style={{backgroundColor:'white',border:BORDER}}>
+                className="p-2 rounded-lg"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
           <h2 className="text-xl font-bold"
-              style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
+              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
             {isEdit ? 'Edit Transaction' : 'Record Transaction'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -173,11 +161,11 @@ export default function TransactionForm() {
         {/* Transaction details */}
         <div className="card space-y-4">
           <h3 className="font-semibold text-sm uppercase tracking-wider"
-              style={{color:NAVY}}>
+              style={{color:'var(--color-navy)'}}>
             Transaction Details
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FIELD label="Category *" error={errors.category_id?.[0]} name="category">
+            <FIELD label="Category *" error={errors.category_id?.[0]}>
               <select className="input-field" value={form.category_id}
                       onChange={set('category_id')} required>
                 <option value="">Select category</option>
@@ -186,18 +174,18 @@ export default function TransactionForm() {
                 ))}
               </select>
             </FIELD>
-            <FIELD label="Amount (GHS) *" error={errors.amount?.[0]} name="amount">
+            <FIELD label="Amount (GHS) *" error={errors.amount?.[0]}>
               <input type="number" step="0.01" min="0" className="input-field"
                      value={form.amount} onChange={set('amount')}
                      required placeholder="0.00"/>
             </FIELD>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FIELD label="Transaction Date *" error={errors.transaction_date?.[0]} name="transaction_date">
+            <FIELD label="Transaction Date *" error={errors.transaction_date?.[0]}>
               <input type="date" className="input-field" value={form.transaction_date}
                      onChange={set('transaction_date')} required/>
             </FIELD>
-            <FIELD label="Reference (optional)" error={errors.reference?.[0]} name="reference">
+            <FIELD label="Reference (optional)" error={errors.reference?.[0]}>
               <input type="text" className="input-field" value={form.reference}
                      onChange={set('reference')} placeholder="Receipt # / Invoice #"/>
             </FIELD>
@@ -219,10 +207,8 @@ export default function TransactionForm() {
                     {selected ? (
                       <div className="input-field flex items-center justify-between"
                            style={{cursor:'pointer'}}
-                           onClick={() => { setMemberOpen(true); setMemberSearch('') }}
-                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMemberOpen(true); setMemberSearch('') } }}
-                           role="button" tabIndex={0}>
-                        <span>{selected.full_name} <span style={{color:PLACEHOLDER}}>({selected.member_number})</span></span>
+                           onClick={() => { setMemberOpen(true); setMemberSearch('') }}>
+                        <span>{selected.full_name} <span style={{color:'#9ca3af'}}>({selected.member_number})</span></span>
                         <button type="button" aria-label="Clear selection"
                                 onClick={(e) => { e.stopPropagation(); setForm(f => ({...f, member_id:''})); setMemberSearch(''); setMemberOpen(false) }}
                                 style={{color:'#6b7280',padding:'0 8px',fontSize:'18px',lineHeight:1}}>×</button>
@@ -237,21 +223,19 @@ export default function TransactionForm() {
                     )}
                     {memberOpen && !selected && (
                       <div style={{position:'absolute',top:'100%',left:0,right:0,marginTop:'4px',
-                                   backgroundColor:'white',border:BORDER,
+                                   backgroundColor:'white',border:'1px solid var(--color-surface-border)',
                                    borderRadius:'8px',boxShadow:'0 4px 12px rgba(0,0,0,0.08)',
                                    maxHeight:'260px',overflowY:'auto',zIndex:20}}>
                         {filtered.length === 0 ? (
-                          <div style={{padding:'10px 12px',color:PLACEHOLDER,fontSize:'13px'}}>No members match that search.</div>
+                          <div style={{padding:'10px 12px',color:'#9ca3af',fontSize:'13px'}}>No members match that search.</div>
                         ) : filtered.map(m => (
                           <div key={m.id}
                                onMouseDown={(e) => { e.preventDefault(); setForm(f => ({...f, member_id: m.id})); setMemberOpen(false); setMemberSearch('') }}
-                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setForm(f => ({...f, member_id: m.id})); setMemberOpen(false); setMemberSearch('') } }}
                                style={{padding:'10px 12px',cursor:'pointer',fontSize:'14px',
                                        borderBottom:'1px solid #f3f4f6'}}
                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fc'}
-                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                               role="option" tabIndex={-1}>
-                            <div style={{fontWeight:600,color:NAVY}}>{m.full_name}</div>
+                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}>
+                            <div style={{fontWeight:600,color:'var(--color-navy)'}}>{m.full_name}</div>
                             <div style={{fontSize:'12px',color:'#6b7280'}}>{m.member_number}</div>
                           </div>
                         ))}
@@ -263,7 +247,7 @@ export default function TransactionForm() {
             </FIELD>
           )}
 
-          <FIELD label="Notes" error={errors.notes?.[0]} name="transaction_notes">
+          <FIELD label="Notes" error={errors.notes?.[0]}>
             <textarea className="input-field" value={form.notes}
                       onChange={set('notes')} rows={2}
                       placeholder="Additional details about this transaction..."/>
@@ -274,7 +258,7 @@ export default function TransactionForm() {
           <button type="button" onClick={() => navigate('/finance')}
                   className="px-6 py-2.5 rounded-lg text-sm font-semibold"
                   style={{backgroundColor:'white',
-                          border:BORDER,color:'#374151'}}>
+                          border:'1px solid var(--color-surface-border)',color:'#374151'}}>
             Cancel
           </button>
           <button type="submit" disabled={loading} className="btn-primary px-8 py-2.5">

@@ -3,12 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { getAttendance, getAttendanceStats } from '../../api/attendance'
 import { usePermission } from '../../hooks/usePermission'
-import { TableSkeleton } from '../../components/ui/Skeletons'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: BORDER,
+  border: '1px solid var(--color-surface-border)',
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -92,7 +90,7 @@ export default function AttendancePage() {
       {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-bold text-2xl md:text-4xl" style={{fontFamily:FONT_DISPLAY,lineHeight:'1.2',color:NAVY}}>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
             Attendance Overview
           </h2>
           <p style={{color:'#44474f'}}>Track Sunday and weekday service attendance</p>
@@ -112,19 +110,19 @@ export default function AttendancePage() {
         {statCards.map(s => (
           <div key={s.label} className="flex items-center gap-4" style={{...cardBase, padding:'24px'}}>
             <div className="flex items-center justify-center rounded-full flex-shrink-0"
-                 style={{width:'56px',height:'56px',backgroundColor:'rgba(0,36,82,0.05)',color:NAVY}}>
+                 style={{width:'56px',height:'56px',backgroundColor:'rgba(0,36,82,0.05)',color:'var(--color-navy)'}}>
               <Icon d={s.icon} />
             </div>
             <div>
               <p style={{fontSize:'14px',fontWeight:600,color:'#44474f'}}>{s.label}</p>
-              <h3 className="text-xl sm:text-2xl" style={{fontFamily:FONT_DISPLAY,fontWeight:600,color:NAVY}}>{s.value}</h3>
+              <h3 style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>{s.value}</h3>
               {s.badge !== null && s.badge !== undefined ? (
                 <div className="flex items-center gap-1" style={{fontSize:'12px',fontWeight:700,color: s.badge >= 0 ? '#15803d' : '#ba1a1a'}}>
                   <Icon d={s.badge >= 0 ? ICONS.trendUp : ICONS.trendDown} size={14} />
                   <span>{s.badge >= 0 ? '+' : ''}{s.badge}% vs last week</span>
                 </div>
               ) : s.sub ? (
-                <p style={{fontSize:'12px',color:MUTED}}>{s.sub}</p>
+                <p style={{fontSize:'12px',color:'#747780'}}>{s.sub}</p>
               ) : null}
             </div>
           </div>
@@ -134,37 +132,39 @@ export default function AttendancePage() {
       {/* Records table */}
       <div style={{...cardBase, overflow:'hidden'}}>
         <div className="flex justify-between items-center"
-             style={{padding:'16px 24px',borderBottom:BORDER,backgroundColor:'#f8f9fc'}}>
-          <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:NAVY}}>Historical Records</h4>
+             style={{padding:'16px 24px',borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fc'}}>
+          <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>Historical Records</h4>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
-                {[['Date'],['Service', 'hidden md:table-cell'],['Adults','hidden sm:table-cell'],['Children','hidden sm:table-cell'],['Total'],['Recorded By','hidden sm:table-cell'],['Action']].map(([h, extra]) => (
-                  <th key={h} className={`uppercase ${extra ?? ''}`} style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:MUTED}}>{h}</th>
+                {['Date','Service','Adults','Children','Total','Recorded By','Action'].map(h => (
+                  <th key={h} className="uppercase" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <TableSkeleton rows={8} cols={7} />
+                <tr><td colSpan={7} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
               ) : sessions.length === 0 ? (
                 <tr><td colSpan={7} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">📋</div>
-                  <div className="font-semibold" style={{color:NAVY}}>No attendance sessions yet</div>
-                  <div className="text-sm mt-1" style={{color:PLACEHOLDER}}>Click "Take Attendance" to record your first session</div>
+                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No attendance sessions yet</div>
+                  <div className="text-sm mt-1" style={{color:'#9ca3af'}}>Click "Take Attendance" to record your first session</div>
                 </td></tr>
               ) : sessions.map((session) => {
                 const t = tintFor(session.recorded_by)
                 return (
-                  <tr key={session.id} className="transition-colors hover:bg-slate-50" style={{borderTop:BORDER}}>
+                  <tr key={session.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
                     <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:600,color:'#191c1e'}}>{session.service_date}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden md:table-cell">{session.service_type?.name ?? '—'}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{session.adult_count}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{session.children_count}</td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:700,color:NAVY}}>{session.total_count}</td>
-                    <td style={{padding:'16px 24px'}} className="hidden sm:table-cell">
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.service_type?.name ?? '—'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.adult_count}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{session.children_count}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:700,color:'var(--color-navy)'}}>{session.total_count}</td>
+                    <td style={{padding:'16px 24px'}}>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                              style={{backgroundColor:t.bg,color:t.text}}>{initials(session.recorded_by)}</div>
@@ -173,7 +173,7 @@ export default function AttendancePage() {
                     </td>
                     <td style={{padding:'16px 24px'}}>
                       <button onClick={() => navigate(`/attendance/${session.id}`)}
-                              className="hover:underline flex items-center gap-1" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>
+                              className="hover:underline flex items-center gap-1" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -188,21 +188,21 @@ export default function AttendancePage() {
           </table>
         </div>
         {meta && meta.last_page > 1 && (
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4"
-               style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:BORDER}}>
+          <div className="flex justify-between items-center"
+               style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:'1px solid var(--color-surface-border)'}}>
             <p style={{fontSize:'14px',color:'#44474f'}}>
-              Page <span className="font-bold" style={{color:NAVY}}>{meta.current_page}</span> of <span className="font-bold" style={{color:NAVY}}>{meta.last_page}</span> · {meta.total} records
+              Page <span className="font-bold" style={{color:'var(--color-navy)'}}>{meta.current_page}</span> of <span className="font-bold" style={{color:'var(--color-navy)'}}>{meta.last_page}</span> · {meta.total} records
             </p>
             <div className="flex items-center gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50 transition-colors hover:bg-white"
-                      style={{border:BORDER,color:NAVY}}>
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
               </button>
-              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:NAVY}}>{meta.current_page}</span>
+              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-50 transition-colors hover:bg-white"
-                      style={{border:BORDER,color:NAVY}}>
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
               </button>
             </div>
@@ -216,7 +216,7 @@ export default function AttendancePage() {
         {/* Monthly Trend — REAL Recharts */}
         <div style={{...cardBase, padding:'24px'}}>
           <div className="flex justify-between items-center mb-6">
-            <h4 className="text-lg sm:text-2xl" style={{fontFamily:FONT_DISPLAY,fontWeight:600,color:NAVY}}>Monthly Trend</h4>
+            <h4 style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:'var(--color-navy)'}}>Monthly Trend</h4>
             {insights && (
               <span className="px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"
                     style={{backgroundColor: insights.trend_direction === 'up' ? '#dcfce7' : insights.trend_direction === 'down' ? '#ffdad6' : '#edeef1',
@@ -226,14 +226,14 @@ export default function AttendancePage() {
             )}
           </div>
           {trend.length === 0 ? (
-            <div className="text-center py-12 text-sm" style={{color:PLACEHOLDER}}>Not enough data yet</div>
+            <div className="text-center py-12 text-sm" style={{color:'#9ca3af'}}>Not enough data yet</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={trend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E9F2"/>
                 <XAxis dataKey="month" stroke="#9ca3af" style={{fontSize:'12px'}}/>
                 <YAxis stroke="#9ca3af" style={{fontSize:'12px'}}/>
-                <Tooltip contentStyle={{backgroundColor:'white',border:BORDER,borderRadius:'8px',fontSize:'12px'}}/>
+                <Tooltip contentStyle={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',borderRadius:'8px',fontSize:'12px'}}/>
                 <Bar dataKey="total" fill="var(--color-navy)" radius={[4,4,0,0]} name="Total attendance"/>
               </BarChart>
             </ResponsiveContainer>
@@ -245,7 +245,7 @@ export default function AttendancePage() {
              style={{borderRadius:'16px',padding:'24px',background:'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)',boxShadow:'0 4px 12px rgba(13,31,60,0.05)'}}>
           <div className="absolute rounded-full" style={{bottom:'-40px',right:'-40px',width:'192px',height:'192px',background:'rgba(255,255,255,0.05)'}}/>
           <div className="relative z-10">
-            <h4 className="text-lg sm:text-2xl mb-4" style={{fontFamily:FONT_DISPLAY,fontWeight:600}}>Attendance Insights</h4>
+            <h4 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600}}>Attendance Insights</h4>
             {insights ? (
               <div className="space-y-4">
                 <div>

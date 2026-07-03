@@ -1,13 +1,11 @@
-import React, { memo, useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getVisitors, deleteVisitor, getVisitorStats, convertVisitor } from '../../api/visitors'
 import { usePermission } from '../../hooks/usePermission'
 import { useConfirm } from '../../hooks/useConfirm'
 import { useDebounce } from '../../hooks/useDebounce'
-import { TableSkeleton } from '../../components/ui/Skeletons'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const STATUS_COLORS = {
   pending:        { bg: '#fef9c3', text: '#854d0e' },
   contacted:      { bg: '#dbeafe', text: '#1d4ed8' },
@@ -21,7 +19,7 @@ const STATUS_LABELS = {
 
 const cardBase = {
   backgroundColor: '#fff',
-  border: BORDER,
+  border: '1px solid var(--color-surface-border)',
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -87,8 +85,8 @@ export default function VisitorsPage() {
   }
 
   const statCards = [
-    { label:'Total Visitors', value: stats?.total      ?? '—', icon: ICONS.users,    color:NAVY },
-    { label:'This Month',     value: stats?.this_month ?? '—', icon: ICONS.calendar, color:NAVY },
+    { label:'Total Visitors', value: stats?.total      ?? '—', icon: ICONS.users,    color:'var(--color-navy)' },
+    { label:'This Month',     value: stats?.this_month ?? '—', icon: ICONS.calendar, color:'var(--color-navy)' },
     { label:'Pending',        value: stats?.pending    ?? '—', icon: ICONS.pending,  color:'#854d0e' },
     { label:'Contacted',      value: stats?.contacted  ?? '—', icon: ICONS.call,     color:'#1d4ed8' },
     { label:'Joined Church',  value: stats?.joined     ?? '—', icon: ICONS.verified, color:'#15803d' },
@@ -100,7 +98,7 @@ export default function VisitorsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
             Visitor Management
           </h2>
           <p style={{color:'#44474f'}}>Oversee stewardship of newcomers and first-time attendees.</p>
@@ -119,9 +117,9 @@ export default function VisitorsPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {statCards.map(s => (
           <div key={s.label} style={{...cardBase, padding:'24px'}}>
-            <p className="uppercase tracking-wider mb-1" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>{s.label}</p>
+            <p className="uppercase tracking-wider mb-1" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>{s.label}</p>
             <div className="flex items-center justify-between">
-              <span style={{fontFamily:FONT_DISPLAY,fontSize:'24px',fontWeight:600,color:s.color}}>{s.value}</span>
+              <span style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600,color:s.color}}>{s.value}</span>
               <span style={{color: s.color, opacity:0.6}}><Icon d={s.icon} size={20} /></span>
             </div>
           </div>
@@ -132,7 +130,7 @@ export default function VisitorsPage() {
       <div style={{...cardBase, padding:'16px 24px'}}>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:MUTED}}
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#747780'}}
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
@@ -157,55 +155,95 @@ export default function VisitorsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
-                {[
-                  ['Name'],
-                  ['Phone',   'left',   'hidden sm:table-cell'],
-                  ['Visit Date', 'left', 'hidden md:table-cell'],
-                  ['How They Heard', 'left', 'hidden sm:table-cell'],
-                  ['Status'],
-                  ['Actions', 'right'],
-                ].map(([h, align, extra]) => (
-                  <th key={h} className={`uppercase ${extra ?? ''}`} style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:MUTED,textAlign:align||'left'}}>{h}</th>
+                {[['Name'],['Phone'],['Visit Date'],['How They Heard'],['Status'],['Actions','right']].map(([h, align]) => (
+                  <th key={h} className="uppercase" style={{padding:'16px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <TableSkeleton rows={8} cols={6} />
+                <tr><td colSpan={6} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
               ) : visitors.length === 0 ? (
                 <tr><td colSpan={6} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">🙏</div>
-                  <div className="font-semibold" style={{color:NAVY}}>No visitors found</div>
-                  <div className="text-sm mt-1" style={{color:PLACEHOLDER}}>{search ? 'Try a different search' : 'Record your first visitor'}</div>
+                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No visitors found</div>
+                  <div className="text-sm mt-1" style={{color:'#9ca3af'}}>{search ? 'Try a different search' : 'Record your first visitor'}</div>
                 </td></tr>
-              ) : visitors.map((visitor) => (
-                <VisitorRow
-                  key={visitor.id}
-                  visitor={visitor}
-                  can={can}
-                  navigate={navigate}
-                  deleting={deleting}
-                  handleDelete={handleDelete}
-                  setConverting={setConverting}
-                />
-              ))}
+              ) : visitors.map((visitor) => {
+                const isConverted = Boolean(visitor.converted_member_id)
+                const sc = STATUS_COLORS[visitor.follow_up_status] ?? STATUS_COLORS.pending
+                return (
+                  <tr key={visitor.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                    <td style={{padding:'16px 24px'}}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
+                             style={{backgroundColor: isConverted ? '#15803d' : '#7c3aed'}}>
+                          {visitor.first_name.charAt(0)}{visitor.last_name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-bold flex items-center gap-2" style={{color:'var(--color-navy)'}}>
+                            {visitor.full_name}
+                            {isConverted && (
+                              <span className="uppercase flex items-center gap-0.5" style={{padding:'2px 6px',borderRadius:'4px',fontSize:'10px',fontWeight:700,backgroundColor:'#dcfce7',color:'#15803d'}}>
+                                ✓ Member
+                              </span>
+                            )}
+                          </div>
+                          {visitor.email && <div style={{fontSize:'12px',color:'#747780'}}>{visitor.email}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.phone ?? '—'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.visit_date}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{visitor.how_they_heard ?? '—'}</td>
+                    <td style={{padding:'16px 24px'}}>
+                      <span className="uppercase" style={{padding:'4px 12px',borderRadius:'9999px',fontSize:'11px',fontWeight:700,backgroundColor:sc.bg,color:sc.text}}>
+                        {STATUS_LABELS[visitor.follow_up_status]}
+                      </span>
+                    </td>
+                    <td style={{padding:'16px 24px'}}>
+                      <div className="flex justify-end items-center gap-2">
+                        {!isConverted && can('create members') && can('create visitors') && (
+                          <button onClick={() => setConverting(visitor)}
+                                  className="text-white rounded transition-all active:scale-95"
+                                  style={{padding:'6px 16px',fontSize:'12px',fontWeight:700,backgroundColor:'#16a34a'}}>
+                            Convert
+                          </button>
+                        )}
+                        {can('edit visitors') && (
+                          <button onClick={() => navigate(`/visitors/${visitor.id}/edit`)}
+                                  className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Edit</button>
+                        )}
+                        {can('delete visitors') && (
+                          <button onClick={() => handleDelete(visitor)} disabled={deleting === visitor.id}
+                                  className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'#ba1a1a'}}>
+                            {deleting === visitor.id ? '...' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         {meta && meta.last_page > 1 && (
-          <div className="flex items-center justify-between" style={{padding:'16px 24px',borderTop:BORDER}}>
-            <span style={{fontSize:'14px',color:MUTED}}>Page {meta.current_page} of {meta.last_page} · {meta.total} entries</span>
+          <div className="flex items-center justify-between" style={{padding:'16px 24px',borderTop:'1px solid var(--color-surface-border)'}}>
+            <span style={{fontSize:'14px',color:'#747780'}}>Page {meta.current_page} of {meta.last_page} · {meta.total} entries</span>
             <div className="flex items-center gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-40"
-                      style={{border:BORDER,color:NAVY}}>
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-40"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
               </button>
-              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:NAVY}}>{meta.current_page}</span>
+              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
-                      className="w-11 h-11 rounded-lg flex items-center justify-center disabled:opacity-40"
-                      style={{border:BORDER,color:NAVY}}>
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-40"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
               </button>
             </div>
@@ -262,9 +300,9 @@ function ConvertModal({ visitor, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{backgroundColor:'rgba(0,0,0,0.5)'}}>
       <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="px-6 py-4 flex items-center justify-between" style={{borderBottom:BORDER}}>
+        <div className="px-6 py-4 flex items-center justify-between" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
           <div>
-            <h3 className="text-lg font-bold" style={{fontFamily:FONT_DISPLAY,color:NAVY}}>Convert to Member</h3>
+            <h3 className="text-lg font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>Convert to Member</h3>
             <p className="text-xs mt-0.5" style={{color:'#6b7280'}}>{visitor.full_name} → New church member</p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
@@ -307,7 +345,7 @@ function ConvertModal({ visitor, onClose, onSuccess }) {
             <input type="text" className="input-field" value={form.occupation} onChange={set('occupation')} placeholder="e.g. Teacher, Engineer"/>
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <input type="checkbox" id="modal_is_baptised" checked={form.is_baptised} onChange={set('is_baptised')} className="w-4 h-4" style={{accentColor:NAVY}}/>
+            <input type="checkbox" id="modal_is_baptised" checked={form.is_baptised} onChange={set('is_baptised')} className="w-4 h-4" style={{accentColor:'var(--color-navy)'}}/>
             <label htmlFor="modal_is_baptised" className="text-sm font-medium" style={{color:'#374151'}}>Has been baptised</label>
           </div>
           {form.is_baptised && (
@@ -316,9 +354,9 @@ function ConvertModal({ visitor, onClose, onSuccess }) {
               <input type="date" className="input-field" value={form.baptism_date} onChange={set('baptism_date')}/>
             </div>
           )}
-          <div className="flex items-center justify-end gap-3 pt-4" style={{borderTop:BORDER}}>
+          <div className="flex items-center justify-end gap-3 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
             <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
-                    style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>Cancel</button>
+                    style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>Cancel</button>
             <button type="submit" disabled={loading} className="btn-primary px-6 py-2">
               {loading ? 'Converting...' : 'Convert to Member →'}
             </button>
@@ -328,60 +366,3 @@ function ConvertModal({ visitor, onClose, onSuccess }) {
     </div>
   )
 }
-
-const VisitorRow = memo(function VisitorRow({ visitor, can, navigate, deleting, handleDelete, setConverting }) {
-  const isConverted = Boolean(visitor.converted_member_id)
-  const sc = STATUS_COLORS[visitor.follow_up_status] ?? STATUS_COLORS.pending
-  return (
-    <tr className="transition-colors hover:bg-slate-50" style={{borderTop:BORDER}}>
-      <td style={{padding:'16px 24px'}}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
-               style={{backgroundColor: isConverted ? '#15803d' : '#7c3aed'}}>
-            {visitor.first_name.charAt(0)}{visitor.last_name.charAt(0)}
-          </div>
-          <div>
-            <div className="font-bold flex items-center gap-2" style={{color:NAVY}}>
-              {visitor.full_name}
-              {isConverted && (
-                <span className="uppercase flex items-center gap-0.5" style={{padding:'2px 6px',borderRadius:'4px',fontSize:'10px',fontWeight:700,backgroundColor:'#dcfce7',color:'#15803d'}}>
-                  ✓ Member
-                </span>
-              )}
-            </div>
-            {visitor.email && <div style={{fontSize:'12px',color:MUTED}}>{visitor.email}</div>}
-          </div>
-        </div>
-      </td>
-      <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{visitor.phone ?? '—'}</td>
-      <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden md:table-cell">{visitor.visit_date}</td>
-      <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}} className="hidden sm:table-cell">{visitor.how_they_heard ?? '—'}</td>
-      <td style={{padding:'16px 24px'}}>
-        <span className="uppercase" style={{padding:'4px 12px',borderRadius:'9999px',fontSize:'11px',fontWeight:700,backgroundColor:sc.bg,color:sc.text}}>
-          {STATUS_LABELS[visitor.follow_up_status]}
-        </span>
-      </td>
-      <td style={{padding:'16px 24px'}}>
-        <div className="flex justify-end items-center gap-2">
-          {!isConverted && can('create members') && can('create visitors') && (
-            <button onClick={() => setConverting(visitor)}
-                    className="text-white rounded transition-all active:scale-95"
-                    style={{padding:'6px 16px',fontSize:'12px',fontWeight:700,backgroundColor:'#16a34a'}}>
-              Convert
-            </button>
-          )}
-          {can('edit visitors') && (
-            <button onClick={() => navigate(`/visitors/${visitor.id}/edit`)}
-                    className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Edit</button>
-          )}
-          {can('delete visitors') && (
-            <button onClick={() => handleDelete(visitor)} disabled={deleting === visitor.id}
-                    className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'#ba1a1a'}}>
-              {deleting === visitor.id ? '...' : 'Delete'}
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
-  )
-})

@@ -1,7 +1,6 @@
-import { Component, createRef } from 'react'
+import { Component } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../constants/styles'
 const styles = {
   container: {
     display: 'flex',
@@ -19,10 +18,10 @@ const styles = {
     marginBottom: 20,
   },
   title: {
-    fontFamily: FONT_DISPLAY,
+    fontFamily: 'var(--font-display)',
     fontSize: 22,
     fontWeight: 700,
-    color: NAVY,
+    color: 'var(--color-navy)',
     marginBottom: 8,
   },
   message: {
@@ -34,7 +33,7 @@ const styles = {
   },
   detail: {
     fontSize: 12,
-    color: PLACEHOLDER,
+    color: '#9ca3af',
     maxWidth: 500,
     fontFamily: 'monospace',
     marginBottom: 24,
@@ -59,16 +58,8 @@ export default class ErrorBoundary extends Component {
     console.error('[ErrorBoundary] Caught error:', error, errorInfo)
   }
 
-  resetRef = createRef()
-
   handleReset = () => {
     this.setState({ hasError: false, error: null })
-  }
-
-  componentDidUpdate(_prevProps, prevState) {
-    if (!prevState.hasError && this.state.hasError) {
-      this.resetRef.current?.focus()
-    }
   }
 
   render() {
@@ -76,7 +67,7 @@ export default class ErrorBoundary extends Component {
       const errMsg = this.state.error?.message ?? 'An unexpected error occurred.'
 
       return (
-        <div role="alert" style={styles.container}>
+        <div style={styles.container}>
           <AlertTriangle style={styles.icon} strokeWidth={1.5} />
           <h2 style={styles.title}>Something went wrong</h2>
           <p style={styles.message}>
@@ -86,7 +77,6 @@ export default class ErrorBoundary extends Component {
           <p style={styles.detail}>{errMsg}</p>
           <button
             type="button"
-            ref={this.resetRef}
             onClick={this.handleReset}
             className="btn-primary inline-flex items-center gap-2 px-5 py-2.5"
           >

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   getSubmissions,
@@ -8,7 +8,6 @@ import {
 } from '../../api/submissions'
 import { useConfirm } from '../../hooks/useConfirm'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 function StatusBadge({ status }) {
   const colors = {
     pending: { bg: '#fef3c7', fg: '#92400e' },
@@ -39,9 +38,9 @@ function FilterTabs({ status, setStatus, pendingCount }) {
           onClick={() => setStatus(t.key)}
           className="px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2"
           style={{
-            border: BORDER,
-            backgroundColor: status === t.key ? NAVY : 'white',
-            color: status === t.key ? 'white' : NAVY,
+            border: '1px solid var(--color-surface-border)',
+            backgroundColor: status === t.key ? 'var(--color-navy)' : 'white',
+            color: status === t.key ? 'white' : 'var(--color-navy)',
           }}>
           {t.label}
           {t.count > 0 && t.key === 'pending' && status !== t.key && (
@@ -56,7 +55,7 @@ function FilterTabs({ status, setStatus, pendingCount }) {
   )
 }
 
-const SubmissionRow = memo(function SubmissionRow({ submission, onClick }) {
+function SubmissionRow({ submission, onClick }) {
   return (
     <button
       type="button"
@@ -64,7 +63,7 @@ const SubmissionRow = memo(function SubmissionRow({ submission, onClick }) {
       className="w-full text-left p-4 rounded-lg transition-colors"
       style={{
         backgroundColor: 'white',
-        border: BORDER,
+        border: '1px solid var(--color-surface-border)',
         marginBottom: '8px',
         cursor: 'pointer',
       }}
@@ -72,7 +71,7 @@ const SubmissionRow = memo(function SubmissionRow({ submission, onClick }) {
       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="font-bold" style={{ color: NAVY }}>
+          <div className="font-bold" style={{ color: 'var(--color-navy)' }}>
             {submission.full_name}
           </div>
           <div className="text-sm mt-1" style={{ color: '#6b7280' }}>
@@ -81,7 +80,7 @@ const SubmissionRow = memo(function SubmissionRow({ submission, onClick }) {
               <span> • requested {submission.cell_name_submitted}</span>
             )}
           </div>
-          <div className="text-xs mt-1" style={{ color: PLACEHOLDER }}>
+          <div className="text-xs mt-1" style={{ color: '#9ca3af' }}>
             Submitted {new Date(submission.submitted_at).toLocaleString()}
           </div>
           {submission.duplicate_member && (
@@ -95,7 +94,7 @@ const SubmissionRow = memo(function SubmissionRow({ submission, onClick }) {
       </div>
     </button>
   )
-})
+}
 
 function DetailDrawer({ submissionId, onClose, onActionComplete }) {
   const { confirm, dialog } = useConfirm()
@@ -106,19 +105,6 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
   const [notes, setNotes] = useState('')
   const [acting, setActing] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
-  const drawerRef = useRef(null)
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    if (submissionId) {
-      document.addEventListener('keydown', handler)
-      // Focus the drawer for screen reader announcement
-      setTimeout(() => drawerRef.current?.focus(), 50)
-    }
-    return () => document.removeEventListener('keydown', handler)
-  }, [submissionId, onClose])
 
   useEffect(() => {
     if (!submissionId) return
@@ -192,10 +178,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
         }} />
 
       {/* Drawer */}
-      <div ref={drawerRef}
-        role="dialog" aria-modal="true" aria-label="Submission detail"
-        tabIndex={-1}
-        style={{
+      <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: '480px', maxWidth: '90vw',
         backgroundColor: 'white',
@@ -205,7 +188,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
         padding: '24px',
       }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-xl" style={{ color: NAVY, fontFamily: FONT_DISPLAY }}>
+          <h2 className="font-bold text-xl" style={{ color: 'var(--color-navy)', fontFamily: 'var(--font-display)' }}>
             Submission Detail
           </h2>
           <button type="button" onClick={onClose}
@@ -230,7 +213,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
             </div>
 
             <div className="mb-4">
-              <h3 className="font-bold text-sm mb-2" style={{ color: NAVY }}>
+              <h3 className="font-bold text-sm mb-2" style={{ color: 'var(--color-navy)' }}>
                 Personal Info
               </h3>
               <div style={fieldStyle}><span style={{ color: '#6b7280' }}>Name</span><span>{detail.full_name}</span></div>
@@ -245,8 +228,8 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
             </div>
 
             {detail.status === 'pending' && (
-              <div className="mb-4 p-4 rounded-lg" style={{ backgroundColor: '#f8f9fa', border: BORDER }}>
-                <h3 className="font-bold text-sm mb-2" style={{ color: NAVY }}>
+              <div className="mb-4 p-4 rounded-lg" style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}>
+                <h3 className="font-bold text-sm mb-2" style={{ color: 'var(--color-navy)' }}>
                   Approve into Member
                 </h3>
 
@@ -255,7 +238,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
                 </label>
                 <select value={cellId} onChange={e => setCellId(e.target.value)}
                   className="w-full mt-1 mb-3 px-3 py-2 rounded-lg"
-                  style={{ border: BORDER }}>
+                  style={{ border: '1px solid var(--color-surface-border)' }}>
                   <option value="">— No cell assignment yet —</option>
                   {cells.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -267,7 +250,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
                   rows={2}
                   placeholder="e.g. 'Confirmed by Pastor John'"
                   className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                  style={{ border: BORDER }} />
+                  style={{ border: '1px solid var(--color-surface-border)' }} />
 
                 <div className="flex gap-2 mt-4">
                   <button type="button" onClick={handleApprove} disabled={acting}
@@ -288,7 +271,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
             )}
 
             {detail.status !== 'pending' && (
-              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#f8f9fa', border: BORDER }}>
+              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}>
                 <div className="text-sm" style={{ color: '#6b7280' }}>
                   {detail.status === 'approved' ? 'Approved' : 'Rejected'} on{' '}
                   {detail.reviewed_at && new Date(detail.reviewed_at).toLocaleString()}
@@ -300,7 +283,7 @@ function DetailDrawer({ submissionId, onClose, onActionComplete }) {
                   </div>
                 )}
                 {detail.approved_member && (
-                  <div className="text-sm mt-2" style={{ color: NAVY }}>
+                  <div className="text-sm mt-2" style={{ color: 'var(--color-navy)' }}>
                     → Member: <strong>{detail.approved_member.name}</strong>
                   </div>
                 )}
@@ -338,10 +321,10 @@ export default function Submissions() {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
 
-  const load = useCallback(async (signal) => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await getSubmissions({ status }, signal)
+      const res = await getSubmissions({ status })
       setSubmissions(res.data.data)
       setMeta(res.data.meta)
     } catch (err) {
@@ -351,16 +334,12 @@ export default function Submissions() {
     }
   }, [status])
 
-  useEffect(() => {
-    const controller = new AbortController()
-    load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-4">
-        <h1 className="font-bold" style={{ fontFamily: FONT_DISPLAY, fontSize: '32px', color: NAVY }}>
+        <h1 className="font-bold" style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-navy)' }}>
           Member Submissions
         </h1>
         <p className="mt-1" style={{ color: '#44474f' }}>
@@ -372,7 +351,7 @@ export default function Submissions() {
 
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <svg className="animate-spin w-8 h-8" style={{ color: NAVY }} fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin w-8 h-8" style={{ color: 'var(--color-navy)' }} fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
