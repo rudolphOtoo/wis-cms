@@ -5,10 +5,9 @@ import { sendMessage, previewRecipients } from '../../api/messages'
 import { getDepartments } from '../../api/departments'
 import { useConfirm } from '../../hooks/useConfirm'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: BORDER,
+  border: '1px solid var(--color-surface-border)',
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -91,14 +90,14 @@ export default function Compose() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/communication')}
-                className="w-11 h-11 flex items-center justify-center rounded-full"
-                style={{backgroundColor:'white',border:BORDER,color:NAVY}}>
+                className="w-10 h-10 flex items-center justify-center rounded-full"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'28px',color:NAVY}}>Broadcast Message</h2>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'28px',color:'var(--color-navy)'}}>Broadcast Message</h2>
           <p style={{color:'#44474f'}}>Reach out to your congregation via multi-channel communications.</p>
         </div>
       </div>
@@ -111,7 +110,7 @@ export default function Compose() {
 
             {/* Channel selector */}
             <div>
-              <h3 className="uppercase tracking-wider mb-4 flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:NAVY}}>
+              <h3 className="uppercase tracking-wider mb-4 flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
                 <Icon d={ICONS.groups} size={18} /> Select Communication Channel
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -122,14 +121,14 @@ export default function Compose() {
                             onClick={() => setForm(f => ({ ...f, channel: opt.v }))}
                             className="flex flex-col items-center text-center transition-all"
                             style={{...cardBase, padding:'24px',
-                                    border: active ? '2px solid var(--color-navy)' : BORDER,
+                                    border: active ? '2px solid var(--color-navy)' : '1px solid var(--color-surface-border)',
                                     backgroundColor: active ? '#f0f4f9' : '#fff'}}>
                       <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-                           style={{backgroundColor: active ? NAVY : '#edeef1', color: active ? '#fff' : '#44474f'}}>
+                           style={{backgroundColor: active ? 'var(--color-navy)' : '#edeef1', color: active ? '#fff' : '#44474f'}}>
                         <Icon d={ICONS[opt.icon]} size={22} />
                       </div>
-                      <span style={{fontFamily:FONT_DISPLAY,fontSize:'18px',fontWeight:600,color:NAVY}}>{opt.label}</span>
-                      <p style={{fontSize:'12px',color:MUTED,marginTop:'4px'}}>{opt.desc}</p>
+                      <span style={{fontFamily:'var(--font-display)',fontSize:'18px',fontWeight:600,color:'var(--color-navy)'}}>{opt.label}</span>
+                      <p style={{fontSize:'12px',color:'#747780',marginTop:'4px'}}>{opt.desc}</p>
                       {active && (
                         <svg className="w-5 h-5 mt-2" style={{color:'var(--color-gold)'}} fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -152,23 +151,23 @@ export default function Compose() {
             <div style={{...cardBase, padding:'24px'}} className="space-y-4">
               {showSubject && (
                 <div>
-                  <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Email Subject</label>
+                  <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Email Subject</label>
                   <input type="text" className="input-field" value={form.subject} onChange={set('subject')}
                          placeholder="e.g. Sunday Service Reminder"/>
                   {errors.subject && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.subject[0]}</p>}
                 </div>
               )}
               <div>
-                <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Message Content *</label>
+                <label className="block mb-2" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Message Content *</label>
                 <textarea className="input-field" value={form.body} onChange={set('body')} rows={8} required
                           placeholder="Type your message here..." style={{resize:'vertical',minHeight:'150px'}}/>
                 <div className="flex justify-between mt-1">
-                  <p className="text-xs" style={{color:PLACEHOLDER}}>
+                  <p className="text-xs" style={{color:'#9ca3af'}}>
                     {form.channel !== 'email' && form.body.length > 160 && (
                       <span style={{color:'#dc2626'}}>⚠️ SMS over 160 chars will split into multiple messages</span>
                     )}
                   </p>
-                  <p className="text-xs" style={{color:PLACEHOLDER}}>{form.body.length} chars</p>
+                  <p className="text-xs" style={{color:'#9ca3af'}}>{form.body.length} chars</p>
                 </div>
                 {errors.body && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.body[0]}</p>}
               </div>
@@ -178,12 +177,12 @@ export default function Compose() {
           {/* RIGHT: recipients + send (sticky) */}
           <div className="lg:col-span-1">
             <div style={{...cardBase, padding:'24px', position:'sticky', top:'24px'}} className="space-y-4">
-              <h3 className="uppercase tracking-wider flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:NAVY}}>
+              <h3 className="uppercase tracking-wider flex items-center gap-2" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
                 <Icon d={ICONS.groups} size={18} /> Recipients
               </h3>
 
               <div>
-                <label className="block mb-2 uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>Audience Target</label>
+                <label className="block mb-2 uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>Audience Target</label>
                 <select className="input-field" value={form.recipient_group} onChange={set('recipient_group')} required>
                   <option value="all">All active members</option>
                   <option value="department">A specific department</option>
@@ -214,24 +213,24 @@ export default function Compose() {
 
               {/* Live count */}
               <div className="rounded-xl p-4 flex items-center gap-3" style={{backgroundColor:'rgba(215,226,255,0.4)',border:'1px solid var(--color-primary-fixed-dim,#acc7ff)'}}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor:NAVY,color:'#fff'}}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor:'var(--color-navy)',color:'#fff'}}>
                   <Icon d={ICONS.groups} size={22} />
                 </div>
                 <div>
-                  <p style={{fontFamily:FONT_DISPLAY,fontSize:'20px',fontWeight:600,color:NAVY}}>
+                  <p style={{fontFamily:'var(--font-display)',fontSize:'20px',fontWeight:600,color:'var(--color-navy)'}}>
                     {count === 'loading' ? '...' : count === null ? '—' : count}
                     {typeof count === 'number' && <span style={{fontSize:'14px',fontWeight:400}}> recipient{count === 1 ? '' : 's'}</span>}
                   </p>
-                  <p style={{fontSize:'12px',color:MUTED}}>
+                  <p style={{fontSize:'12px',color:'#747780'}}>
                     {count === 'loading' ? 'Counting...'
                       : count === null ? 'Set recipient filters'
                       : count === 0 ? 'No recipients match' : 'will receive this message'}
                   </p>
                 </div>
               </div>
-              <p style={{fontSize:'11px',color:PLACEHOLDER}}>Only members with valid contact info for the chosen channel are counted.</p>
+              <p style={{fontSize:'11px',color:'#9ca3af'}}>Only members with valid contact info for the chosen channel are counted.</p>
 
-              <div className="pt-4 space-y-3" style={{borderTop:BORDER}}>
+              <div className="pt-4 space-y-3" style={{borderTop:'1px solid var(--color-surface-border)'}}>
                 <button type="submit" disabled={loading || !count || count === 'loading'}
                         className="btn-primary w-full gap-2" style={{padding:'14px',fontSize:'16px'}}>
                   {loading ? 'Sending...' : (
@@ -239,7 +238,7 @@ export default function Compose() {
                   )}
                 </button>
                 <button type="button" onClick={() => navigate('/communication')}
-                        className="w-full py-3 rounded-xl transition-colors" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>
+                        className="w-full py-3 rounded-xl transition-colors" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>
                   Cancel
                 </button>
               </div>

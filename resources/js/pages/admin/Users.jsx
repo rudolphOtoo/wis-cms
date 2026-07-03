@@ -6,10 +6,9 @@ import { useAuth } from '../../context/AuthContext'
 import { useDebounce } from '../../hooks/useDebounce'
 import { useConfirm } from '../../hooks/useConfirm'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const cardBase = {
   backgroundColor: '#fff',
-  border: BORDER,
+  border: '1px solid var(--color-surface-border)',
   borderRadius: '16px',
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
@@ -81,7 +80,7 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',lineHeight:'40px',color:NAVY}}>
+          <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
             User Management
           </h2>
           <p style={{color:'#44474f',marginTop:'4px'}}>
@@ -99,7 +98,7 @@ export default function UsersPage() {
       {/* Filters */}
       <div style={{...cardBase, padding:'16px 24px'}} className="flex flex-wrap items-center gap-4">
         <div className="flex-1 min-w-[200px] relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:MUTED}}
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'#747780'}}
                fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
@@ -108,7 +107,7 @@ export default function UsersPage() {
                  value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}/>
         </div>
         <div className="flex items-center gap-2">
-          <span className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:MUTED}}>Role</span>
+          <span className="uppercase tracking-wider" style={{fontSize:'12px',fontWeight:700,color:'#747780'}}>Role</span>
           <select className="input-field" style={{width:'auto'}}
                   value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1) }}>
             <option value="">All Roles</option>
@@ -124,17 +123,17 @@ export default function UsersPage() {
             <thead>
               <tr style={{backgroundColor:'#f2f3f6'}}>
                 {[['Name'],['Email'],['Role'],['Status'],['Last Login'],['Actions','right']].map(([h, align]) => (
-                  <th key={h} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:MUTED,textAlign:align||'left'}}>{h}</th>
+                  <th key={h} className="uppercase tracking-wider" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780',textAlign:align||'left'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="text-center" style={{padding:'48px',color:PLACEHOLDER}}>Loading...</td></tr>
+                <tr><td colSpan={6} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>Loading...</td></tr>
               ) : users.length === 0 ? (
                 <tr><td colSpan={6} className="text-center" style={{padding:'48px'}}>
                   <div className="text-4xl mb-3">👤</div>
-                  <div className="font-semibold" style={{color:NAVY}}>No users found</div>
+                  <div className="font-semibold" style={{color:'var(--color-navy)'}}>No users found</div>
                 </td></tr>
               ) : users.map((u, i) => {
                 const isMe = u.id === currentUser?.id
@@ -142,17 +141,17 @@ export default function UsersPage() {
                 const avBg = AVATAR_BG[i % AVATAR_BG.length]
                 const darkAv = avBg === '#1b3a6b'
                 return (
-                  <tr key={u.id} className="transition-colors" style={{borderTop:BORDER}}
+                  <tr key={u.id} className="transition-colors" style={{borderTop:'1px solid var(--color-surface-border)'}}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold"
-                             style={{backgroundColor:avBg, color: darkAv ? '#fff' : NAVY}}>
+                             style={{backgroundColor:avBg, color: darkAv ? '#fff' : 'var(--color-navy)'}}>
                           {initials(u.name)}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span style={{fontSize:'14px',fontWeight:600,color:NAVY}}>{u.name}</span>
+                          <span style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>{u.name}</span>
                           {isMe && (
                             <span className="uppercase" style={{padding:'1px 6px',borderRadius:'4px',fontSize:'10px',fontWeight:700,backgroundColor:'var(--color-gold)',color:'#fff'}}>You</span>
                           )}
@@ -171,10 +170,10 @@ export default function UsersPage() {
                         {u.is_active ? 'Active' : 'Disabled'}
                       </span>
                     </td>
-                    <td style={{padding:'16px 24px',fontSize:'15px',color:MUTED}}>{u.last_login_at ?? 'Never'}</td>
+                    <td style={{padding:'16px 24px',fontSize:'15px',color:'#747780'}}>{u.last_login_at ?? 'Never'}</td>
                     <td style={{padding:'16px 24px',textAlign:'right'}}>
                       <div className="flex justify-end items-center gap-3">
-                        <button onClick={() => setEditing(u)} className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Edit</button>
+                        <button onClick={() => setEditing(u)} className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Edit</button>
                         {!isMe && (
                           <button onClick={() => handleDelete(u)} disabled={deleting === u.id}
                                   className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'#ba1a1a'}}>
@@ -191,18 +190,18 @@ export default function UsersPage() {
         </div>
 
         {meta && meta.last_page > 1 && (
-          <div className="flex items-center justify-between" style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:BORDER}}>
-            <span style={{fontSize:'14px',color:MUTED}}>Showing page {meta.current_page} of {meta.last_page} · {meta.total} members</span>
+          <div className="flex items-center justify-between" style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:'1px solid var(--color-surface-border)'}}>
+            <span style={{fontSize:'14px',color:'#747780'}}>Showing page {meta.current_page} of {meta.last_page} · {meta.total} members</span>
             <div className="flex items-center gap-2">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
                       className="w-8 h-8 rounded flex items-center justify-center disabled:opacity-40"
-                      style={{border:BORDER,color:NAVY}}>
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
               </button>
-              <span className="w-8 h-8 rounded flex items-center justify-center font-bold text-white" style={{backgroundColor:NAVY,fontSize:'14px'}}>{meta.current_page}</span>
+              <span className="w-8 h-8 rounded flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)',fontSize:'14px'}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
                       className="w-8 h-8 rounded flex items-center justify-center disabled:opacity-40"
-                      style={{border:BORDER,color:NAVY}}>
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
               </button>
             </div>
@@ -303,19 +302,19 @@ function UserModal({ user, roles, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{backgroundColor:'rgba(13,31,60,0.4)',backdropFilter:'blur(4px)'}}>
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="px-6 pt-6 pb-4 flex justify-between items-start" style={{borderBottom:BORDER}}>
+        <div className="px-6 pt-6 pb-4 flex justify-between items-start" style={{borderBottom:'1px solid var(--color-surface-border)'}}>
           <div>
-            <h2 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'24px',color:NAVY}}>
+            <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'24px',color:'var(--color-navy)'}}>
               {mode === 'temp-password' ? 'User Created' : (isEdit ? 'Edit User' : 'New User')}
             </h2>
-            <p style={{fontSize:'14px',color:MUTED,marginTop:'4px'}}>
+            <p style={{fontSize:'14px',color:'#747780',marginTop:'4px'}}>
               {mode === 'temp-password'
                 ? 'Share the temporary password with the new user.'
                 : 'Update administrative profile and permissions.'}
             </p>
           </div>
           <button onClick={mode === 'temp-password' ? finishAndClose : onClose}
-                  className="p-1 rounded hover:bg-gray-100" style={{color:MUTED}}>
+                  className="p-1 rounded hover:bg-gray-100" style={{color:'#747780'}}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
@@ -334,7 +333,7 @@ function UserModal({ user, roles, onClose, onSuccess }) {
               </div>
             </div>
 
-            <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Temporary Password</label>
+            <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Temporary Password</label>
             <div className="flex items-center gap-2 mb-2">
               <input type="text" readOnly value={tempPassword ?? ''}
                      className="input-field"
@@ -342,15 +341,15 @@ function UserModal({ user, roles, onClose, onSuccess }) {
                      onFocus={(e) => e.target.select()}/>
               <button type="button" onClick={handleCopy}
                       className="px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap"
-                      style={{backgroundColor: copied ? '#15803d' : NAVY,color:'white'}}>
+                      style={{backgroundColor: copied ? '#15803d' : 'var(--color-navy)',color:'white'}}>
                 {copied ? '✓ Copied' : 'Copy'}
               </button>
             </div>
-            <p style={{fontSize:'12px',color:MUTED,fontStyle:'italic'}}>
+            <p style={{fontSize:'12px',color:'#747780',fontStyle:'italic'}}>
               This password is shown only once. It cannot be retrieved later — if lost, delete the user and recreate them.
             </p>
 
-            <div className="flex justify-end mt-6 pt-4" style={{borderTop:BORDER}}>
+            <div className="flex justify-end mt-6 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
               <button type="button" onClick={finishAndClose} className="btn-primary px-8 py-2">
                 I've shared it — Done
               </button>
@@ -360,38 +359,38 @@ function UserModal({ user, roles, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Full Name *</label>
+              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Full Name *</label>
               <input type="text" className="input-field" value={form.name} onChange={set('name')} required/>
               {errors.name && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.name[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Email Address *</label>
+              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Email Address *</label>
               <input type="email" className="input-field" value={form.email} onChange={set('email')} required/>
               {errors.email && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.email[0]}</p>}
             </div>
 
             {isEdit ? (
               <div className="md:col-span-2">
-                <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Password</label>
+                <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Password</label>
                 <input type="password" className="input-field" value={form.password} onChange={set('password')}
                        minLength={8} placeholder="••••••••"/>
-                <p className="italic mt-1" style={{fontSize:'12px',color:MUTED}}>Leave blank to keep current password. If you set one, the user will be required to change it on next login.</p>
+                <p className="italic mt-1" style={{fontSize:'12px',color:'#747780'}}>Leave blank to keep current password. If you set one, the user will be required to change it on next login.</p>
                 {errors.password && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.password[0]}</p>}
               </div>
             ) : (
-              <div className="md:col-span-2 rounded-lg p-3 flex items-start gap-3" style={{backgroundColor:'#f8f9fc',border:BORDER}}>
-                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" style={{color:NAVY}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="md:col-span-2 rounded-lg p-3 flex items-start gap-3" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0" style={{color:'var(--color-navy)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                 </svg>
                 <div>
-                  <div style={{fontSize:'13px',fontWeight:700,color:NAVY}}>A temporary password will be generated</div>
-                  <p style={{fontSize:'12px',color:MUTED,marginTop:'2px'}}>You will see it once after creation. Share it with the user — they will be required to change it on first login.</p>
+                  <div style={{fontSize:'13px',fontWeight:700,color:'var(--color-navy)'}}>A temporary password will be generated</div>
+                  <p style={{fontSize:'12px',color:'#747780',marginTop:'2px'}}>You will see it once after creation. Share it with the user — they will be required to change it on first login.</p>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Role Selection *</label>
+              <label className="block mb-1.5" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Role Selection *</label>
               <select className="input-field" value={form.role} onChange={set('role')} required>
                 <option value="">Select a role</option>
                 {roles.map(r => <option key={r.name} value={r.name}>{r.label}</option>)}
@@ -400,14 +399,14 @@ function UserModal({ user, roles, onClose, onSuccess }) {
             </div>
             <div className="flex items-center justify-between rounded-lg p-3" style={{backgroundColor:'#f8f9fc'}}>
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" style={{color:NAVY}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" style={{color:'var(--color-navy)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <span style={{fontSize:'14px',fontWeight:600,color:NAVY}}>Active Account</span>
+                <span style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Active Account</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={form.is_active} onChange={set('is_active')}/>
-                <div className="rounded-full" style={{width:'44px',height:'24px',backgroundColor: form.is_active ? NAVY : '#c4c6d0',transition:'background-color 0.2s'}}>
+                <div className="rounded-full" style={{width:'44px',height:'24px',backgroundColor: form.is_active ? 'var(--color-navy)' : '#c4c6d0',transition:'background-color 0.2s'}}>
                   <div className="rounded-full bg-white" style={{width:'20px',height:'20px',marginTop:'2px',marginLeft: form.is_active ? '22px' : '2px',transition:'margin-left 0.2s',boxShadow:'0 1px 2px rgba(0,0,0,0.2)'}}/>
                 </div>
               </label>
@@ -418,9 +417,9 @@ function UserModal({ user, roles, onClose, onSuccess }) {
               </div>
             )}
           </div>
-          <div className="flex justify-end gap-3 mt-6 pt-4" style={{borderTop:BORDER}}>
+          <div className="flex justify-end gap-3 mt-6 pt-4" style={{borderTop:'1px solid var(--color-surface-border)'}}>
             <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-semibold"
-                    style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Cancel</button>
+                    style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
             <button type="submit" disabled={loading} className="btn-primary px-8 py-2">
               {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create User'}
             </button>
@@ -504,11 +503,11 @@ function MemberLinkPanel({ user, onChanged }) {
   )
 
   return (
-    <div className="rounded-lg p-4" style={{backgroundColor:'#f8f9fc',border:BORDER}}>
+    <div className="rounded-lg p-4" style={{backgroundColor:'#f8f9fc',border:'1px solid var(--color-surface-border)'}}>
       <div className="flex justify-between items-start mb-3">
         <div>
-          <div style={{fontSize:'13px',fontWeight:700,color:NAVY}}>Member Link</div>
-          <p style={{fontSize:'12px',color:MUTED,marginTop:'2px'}}>Connect this login to a church member record.</p>
+          <div style={{fontSize:'13px',fontWeight:700,color:'var(--color-navy)'}}>Member Link</div>
+          <p style={{fontSize:'12px',color:'#747780',marginTop:'2px'}}>Connect this login to a church member record.</p>
         </div>
       </div>
 
@@ -520,14 +519,14 @@ function MemberLinkPanel({ user, onChanged }) {
 
       {/* LINKED state */}
       {linked && mode === 'view' && (
-        <div className="bg-white rounded-lg p-3 flex items-start justify-between gap-3" style={{border:BORDER}}>
+        <div className="bg-white rounded-lg p-3 flex items-start justify-between gap-3" style={{border:'1px solid var(--color-surface-border)'}}>
           <div>
-            <div style={{fontWeight:600,color:NAVY}}>{linked.first_name} {linked.last_name}</div>
-            <div className="font-mono" style={{fontSize:'12px',color:MUTED}}>{linked.member_number}</div>
-            {linked.phone && <div style={{fontSize:'12px',color:MUTED}}>{linked.phone}</div>}
+            <div style={{fontWeight:600,color:'var(--color-navy)'}}>{linked.first_name} {linked.last_name}</div>
+            <div className="font-mono" style={{fontSize:'12px',color:'#747780'}}>{linked.member_number}</div>
+            {linked.phone && <div style={{fontSize:'12px',color:'#747780'}}>{linked.phone}</div>}
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={openPicker} className="px-3 py-1.5 rounded text-xs font-semibold" style={{backgroundColor:'#edeef1',color:NAVY}}>Change</button>
+            <button type="button" onClick={openPicker} className="px-3 py-1.5 rounded text-xs font-semibold" style={{backgroundColor:'#edeef1',color:'var(--color-navy)'}}>Change</button>
             <button type="button" onClick={doUnlink} className="px-3 py-1.5 rounded text-xs font-semibold" style={{backgroundColor:'#fef2f2',color:'#b91c1c'}}>Unlink</button>
           </div>
         </div>
@@ -536,8 +535,8 @@ function MemberLinkPanel({ user, onChanged }) {
       {/* NOT LINKED state */}
       {!linked && mode === 'view' && (
         <div className="flex gap-2">
-          <button type="button" onClick={openPicker} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:NAVY,color:'white'}}>Link to existing member</button>
-          <button type="button" onClick={() => { setMode('create'); setNotice(null) }} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Create new member</button>
+          <button type="button" onClick={openPicker} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:'var(--color-navy)',color:'white'}}>Link to existing member</button>
+          <button type="button" onClick={() => { setMode('create'); setNotice(null) }} className="px-3 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Create new member</button>
         </div>
       )}
 
@@ -553,7 +552,7 @@ function MemberLinkPanel({ user, onChanged }) {
           </select>
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={doLink} disabled={!selectedId} className="btn-primary text-sm px-4 py-2" style={{opacity: selectedId ? 1 : 0.5}}>Link</button>
-            <button type="button" onClick={() => setMode('view')} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Cancel</button>
+            <button type="button" onClick={() => setMode('view')} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
           </div>
         </div>
       )}
@@ -563,17 +562,17 @@ function MemberLinkPanel({ user, onChanged }) {
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>First Name *</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>First Name *</label>
               <input type="text" className="input-field" value={createForm.first_name} onChange={e => setCreateForm(f => ({...f, first_name: e.target.value}))}/>
               {errors.first_name && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.first_name[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>Last Name *</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Last Name *</label>
               <input type="text" className="input-field" value={createForm.last_name} onChange={e => setCreateForm(f => ({...f, last_name: e.target.value}))}/>
               {errors.last_name && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.last_name[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>Gender *</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Gender *</label>
               <select className="input-field" value={createForm.gender} onChange={e => setCreateForm(f => ({...f, gender: e.target.value}))}>
                 <option value="">—</option>
                 <option value="male">Male</option>
@@ -582,27 +581,27 @@ function MemberLinkPanel({ user, onChanged }) {
               {errors.gender && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.gender[0]}</p>}
             </div>
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>Date of Birth</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Date of Birth</label>
               <input type="date" className="input-field" value={createForm.date_of_birth} onChange={e => setCreateForm(f => ({...f, date_of_birth: e.target.value}))}/>
             </div>
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>Phone</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Phone</label>
               <input type="text" className="input-field" value={createForm.phone} onChange={e => setCreateForm(f => ({...f, phone: e.target.value}))}/>
             </div>
             <div>
-              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:NAVY}}>Email</label>
+              <label className="block mb-1" style={{fontSize:'12px',fontWeight:600,color:'var(--color-navy)'}}>Email</label>
               <input type="email" className="input-field" value={createForm.email} onChange={e => setCreateForm(f => ({...f, email: e.target.value}))}/>
             </div>
           </div>
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={doCreate} className="btn-primary text-sm px-4 py-2">Create &amp; Link</button>
-            <button type="button" onClick={() => { setMode('view'); setErrors({}) }} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:NAVY}}>Cancel</button>
+            <button type="button" onClick={() => { setMode('view'); setErrors({}) }} className="px-4 py-2 rounded text-sm font-semibold" style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
           </div>
         </div>
       )}
 
       {mode === 'busy' && (
-        <div className="text-sm" style={{color:MUTED}}>Working…</div>
+        <div className="text-sm" style={{color:'#747780'}}>Working…</div>
       )}
       {dialogUnlink}
     </div>

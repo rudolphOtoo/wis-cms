@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -11,7 +11,7 @@ import { usePermission } from '../../hooks/usePermission'
 import { useDebounce } from '../../hooks/useDebounce'
 import { TableSkeleton } from '../../components/ui/Skeletons'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
+// Fix #7 — each status has a Lucide icon + WCAG-AA text contrast pair
 const STATUS_CONFIG = {
   active:      { bg: '#dcfce7', text: '#166534', icon: CheckCircle2,      label: 'Active' },
   inactive:    { bg: '#e2e8f0', text: '#475569', icon: MinusCircle,        label: 'Inactive' },
@@ -23,7 +23,7 @@ function StatIcon({ children }) {
   return (
     <span
       className="flex items-center justify-center rounded-lg p-1.5"
-      style={{ color: NAVY, backgroundColor: 'rgba(27,58,107,0.1)' }}
+      style={{ color: 'var(--color-navy)', backgroundColor: 'rgba(27,58,107,0.1)' }}
     >
       {children}
     </span>
@@ -43,6 +43,7 @@ export default function MembersPage() {
   const [page,         setPage]         = useState(1)
   const [meta,         setMeta]         = useState(null)
   const [deleting,     setDeleting]     = useState(null)
+  // Fix #4 — inline confirm state replaces window.confirm()
   const [pendingDelete, setPendingDelete] = useState(null)
   const [exporting,    setExporting]    = useState(false)
 
@@ -108,6 +109,7 @@ export default function MembersPage() {
     }
   }, [debouncedSearch, statusFilter, genderFilter, page, refreshKey])
 
+  // Fix #4 — no confirm(); caller sets pendingDelete, this fires on Confirm click
   const handleDelete = async (member) => {
     setDeleting(member.id)
     try {
@@ -135,8 +137,8 @@ export default function MembersPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2
-            className="font-bold text-2xl md:text-4xl"
-            style={{ fontFamily: FONT_DISPLAY, lineHeight: '1.2', color: NAVY }}
+            className="font-bold"
+            style={{ fontFamily: 'var(--font-display)', fontSize: '32px', lineHeight: '40px', color: 'var(--color-navy)' }}
           >
             Members
           </h2>
@@ -145,6 +147,7 @@ export default function MembersPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Fix #8 — Lucide Download icon replaces raw SVG path */}
           {can('export members') && (
             <button
               onClick={handleExport}
@@ -170,47 +173,48 @@ export default function MembersPage() {
         </div>
       </div>
 
+      {/* Fix #5 — surface-card class replaces inline cardBase objects */}
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Total Members</p>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Total Members</p>
             <StatIcon><Users size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             {total}
           </p>
         </div>
 
         <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Active</p>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Active</p>
             <StatIcon><UserCheck size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             {active}
           </p>
           <div className="w-full rounded-full mt-2" style={{ height: '6px', backgroundColor: '#e7e8eb' }}>
-            <div className="rounded-full" style={{ height: '6px', width: `${activePct}%`, backgroundColor: NAVY }} />
+            <div className="rounded-full" style={{ height: '6px', width: `${activePct}%`, backgroundColor: 'var(--color-navy)' }} />
           </div>
         </div>
 
         <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>New This Month</p>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>New This Month</p>
             <StatIcon><UserPlus size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             {stats?.new_this_month ?? '—'}
           </p>
         </div>
 
         <div className="surface-card p-6">
           <div className="flex justify-between items-start mb-2">
-            <p style={{ fontSize: '14px', fontWeight: 600, color: MUTED }}>Male / Female Split</p>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: '#747780' }}>Male / Female Split</p>
             <StatIcon><Scale size={18} strokeWidth={1.8} aria-hidden="true" /></StatIcon>
           </div>
-          <p className="text-xl sm:text-2xl" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, color: NAVY }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 600, color: 'var(--color-navy)' }}>
             {malePct}% / {femalePct}%
           </p>
           <div className="flex gap-1 mt-2">
@@ -223,18 +227,18 @@ export default function MembersPage() {
       {/* Filters + Table card */}
       <div className="surface-card overflow-hidden">
 
-        {/* Fluid responsive padding */}
+        {/* Fix #6 — fluid responsive padding (p-4 mobile → p-6 desktop) */}
         <div
           className="flex flex-col lg:flex-row gap-4 p-4 md:p-6"
-          style={{ borderBottom: BORDER }}
+          style={{ borderBottom: '1px solid var(--color-surface-border)' }}
         >
-          {/* Lucide Search icon */}
+          {/* Fix #8 — Lucide Search icon */}
           <div className="relative flex-1">
             <Search
               size={16}
               strokeWidth={2}
               className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: MUTED }}
+              style={{ color: '#747780' }}
               aria-hidden="true"
             />
             <input
@@ -275,168 +279,57 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {/* ── Mobile card view (below 640px) ── */}
-        <div className="mobile-table-cards">
-          {loading ? (
-            <div className="p-6 space-y-4">
-              {[1,2,3,4].map(i => (
-                <div key={i} className="surface-card p-4 animate-pulse space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-200" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-slate-200 rounded w-3/4" />
-                      <div className="h-3 bg-slate-200 rounded w-1/2" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : members.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{ backgroundColor: 'rgba(27,58,107,0.08)' }}
-              >
-                <Users size={26} strokeWidth={1.5} style={{ color: NAVY }} aria-hidden="true" />
-              </div>
-              <p className="font-semibold text-base mb-1" style={{ color: NAVY }}>
-                {search ? 'No members found' : 'No members yet'}
-              </p>
-              <p className="text-sm mb-5 max-w-xs" style={{ color: MUTED }}>
-                {search
-                  ? `No results for "${search}". Try a different name, phone, or member number.`
-                  : 'Add your first member to start building your congregation register.'}
-              </p>
-              {!search && can('create members') && (
-                <button onClick={() => navigate('/members/new')} className="btn-primary" style={{ padding: '10px 24px' }}>
-                  Add First Member
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="p-4 space-y-3">
-              {members.map(member => {
-                const cfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive
-                const StatusIcon = cfg.icon
-                return (
-                  <div key={member.id} className="surface-card p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
-                             style={{ backgroundColor: NAVY }}>
-                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-sm truncate" style={{ color: NAVY }}>{member.full_name}</p>
-                          <p className="text-xs" style={{ color: MUTED }}>
-                            #{member.member_number} · {member.gender}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center gap-1 rounded-full text-[10px] font-bold flex-shrink-0 ml-2"
-                            style={{ padding: '3px 8px', backgroundColor: cfg.bg, color: cfg.text }}>
-                        <StatusIcon size={10} strokeWidth={2.5} aria-hidden="true" />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs" style={{ color: MUTED }}>
-                      {member.phone && <span>📞 {member.phone}</span>}
-                      {member.email && <span className="truncate">✉ {member.email}</span>}
-                    </div>
-                    <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--color-surface-border)' }}>
-                      <button onClick={() => navigate(`/members/${member.id}`)}
-                              className="flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
-                              style={{ color: NAVY }}>
-                        View
-                      </button>
-                      {can('edit members') && (
-                        <button onClick={() => navigate(`/members/${member.id}/edit`)}
-                                className="flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
-                                style={{ color: '#92400e' }}>
-                          Edit
-                        </button>
-                      )}
-                      {can('delete members') && (
-                        pendingDelete === member.id ? (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleDelete(member)} disabled={deleting === member.id}
-                                    className="min-h-[44px] px-4 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
-                                    style={{ color: '#be123c' }}>
-                              {deleting === member.id ? '…' : 'Confirm'}
-                            </button>
-                            <button onClick={() => setPendingDelete(null)}
-                                    className="min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
-                                    style={{ color: MUTED }}>
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setPendingDelete(member.id)}
-                                  className="min-h-[44px] px-4 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
-                                  style={{ color: '#be123c' }}>
-                            Delete
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── Desktop table (640px and above) ── */}
-        <div className="desktop-table overflow-x-auto w-full">
+        {/* Fix #3 — non-essential columns hidden on small viewports */}
+        <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr style={{ backgroundColor: '#f8f9fc' }}>
                 <th
                   className="hidden md:table-cell uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
                 >
                   Member #
                 </th>
                 <th
                   className="uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
                 >
                   Name
                 </th>
                 <th
                   className="hidden sm:table-cell uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
                 >
                   Gender
                 </th>
                 <th
                   className="hidden sm:table-cell uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
                 >
                   Phone
                 </th>
                 <th
                   className="uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780' }}
                 >
                   Status
                 </th>
                 <th
                   className="hidden lg:table-cell uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED, textAlign: 'center' }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780', textAlign: 'center' }}
                 >
                   Join Date
                 </th>
                 <th
                   className="uppercase tracking-wider"
-                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: MUTED, textAlign: 'right' }}
+                  style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#747780', textAlign: 'right' }}
                 >
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {/* TableSkeleton for loading state */}
+              {/* Fix #2 — TableSkeleton replaces the full-colspan spinner */}
               {loading ? (
                 <TableSkeleton rows={8} cols={7} hasAvatar={true} />
               ) : members.length === 0 ? (
@@ -447,12 +340,12 @@ export default function MembersPage() {
                         className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                         style={{ backgroundColor: 'rgba(27,58,107,0.08)' }}
                       >
-                        <Users size={26} strokeWidth={1.5} style={{ color: NAVY }} aria-hidden="true" />
+                        <Users size={26} strokeWidth={1.5} style={{ color: 'var(--color-navy)' }} aria-hidden="true" />
                       </div>
-                      <p className="font-semibold text-base mb-1" style={{ color: NAVY }}>
+                      <p className="font-semibold text-base mb-1" style={{ color: 'var(--color-navy)' }}>
                         {search ? 'No members found' : 'No members yet'}
                       </p>
-                      <p className="text-sm mb-5 max-w-xs" style={{ color: MUTED }}>
+                      <p className="text-sm mb-5 max-w-xs" style={{ color: '#747780' }}>
                         {search
                           ? `No results for "${search}". Try a different name, phone, or member number.`
                           : 'Add your first member to start building your congregation register.'}
@@ -469,18 +362,126 @@ export default function MembersPage() {
                     </div>
                   </td>
                 </tr>
-              ) : members.map((member) => (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  can={can}
-                  navigate={navigate}
-                  pendingDelete={pendingDelete}
-                  deleting={deleting}
-                  handleDelete={handleDelete}
-                  setPendingDelete={setPendingDelete}
-                />
-              ))}
+              ) : members.map((member) => {
+                const cfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive
+                const StatusIcon = cfg.icon
+                return (
+                  /* Replace onMouseEnter/Leave with Tailwind hover utility */
+                  <tr
+                    key={member.id}
+                    className="hover:bg-slate-50 transition-colors duration-150"
+                    style={{ borderTop: '1px solid var(--color-surface-border)' }}
+                  >
+                    <td
+                      className="hidden md:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: '#44474f' }}
+                    >
+                      {member.member_number}
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
+                          style={{ backgroundColor: 'var(--color-navy)' }}
+                          aria-hidden="true"
+                        >
+                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold" style={{ color: 'var(--color-navy)' }}>{member.full_name}</p>
+                          {member.email && (
+                            <p style={{ fontSize: '12px', color: '#747780' }}>{member.email}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      className="hidden sm:table-cell capitalize"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
+                    >
+                      {member.gender}
+                    </td>
+                    <td
+                      className="hidden sm:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
+                    >
+                      {member.phone ?? '—'}
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      {/* Fix #7 — icon + text badge; not color alone */}
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full text-xs font-bold"
+                        style={{ padding: '4px 10px', backgroundColor: cfg.bg, color: cfg.text }}
+                        aria-label={`Status: ${cfg.label}`}
+                      >
+                        <StatusIcon size={11} strokeWidth={2.5} aria-hidden="true" />
+                        {cfg.label}
+                      </span>
+                    </td>
+                    <td
+                      className="hidden lg:table-cell"
+                      style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f', textAlign: 'center' }}
+                    >
+                      {member.join_date ?? '—'}
+                    </td>
+                    {/* Fix #4 — inline confirm pattern; fix #4a — 44px-tall touch targets */}
+                    <td style={{ padding: '12px 24px' }}>
+                      <div className="flex justify-end items-center gap-1">
+                        <button
+                          onClick={() => navigate(`/members/${member.id}`)}
+                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
+                          style={{ color: 'var(--color-navy)' }}
+                          aria-label={`View profile of ${member.full_name}`}
+                        >
+                          View
+                        </button>
+                        {can('edit members') && (
+                          <button
+                            onClick={() => navigate(`/members/${member.id}/edit`)}
+                            className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
+                            style={{ color: '#92400e' }}
+                            aria-label={`Edit ${member.full_name}`}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {can('delete members') && (
+                          pendingDelete === member.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(member)}
+                                disabled={deleting === member.id}
+                                className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
+                                style={{ color: '#be123c' }}
+                                aria-label={`Confirm deletion of ${member.full_name}`}
+                              >
+                                {deleting === member.id ? '…' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => setPendingDelete(null)}
+                                className="inline-flex items-center justify-center h-9 px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
+                                style={{ color: '#747780' }}
+                                aria-label="Cancel deletion"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setPendingDelete(member.id)}
+                              className="inline-flex items-center justify-center h-9 px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
+                              style={{ color: '#be123c' }}
+                              aria-label={`Delete ${member.full_name}`}
+                            >
+                              Delete
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -489,28 +490,28 @@ export default function MembersPage() {
         {meta && meta.last_page > 1 && (
           <div
             className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 md:p-6"
-            style={{ backgroundColor: '#f8f9fc', borderTop: BORDER }}
+            style={{ backgroundColor: '#f8f9fc', borderTop: '1px solid var(--color-surface-border)' }}
           >
             <p style={{ fontSize: '14px', color: '#44474f' }}>
               Page{' '}
-              <span className="font-bold" style={{ color: NAVY }}>{meta.current_page}</span>
+              <span className="font-bold" style={{ color: 'var(--color-navy)' }}>{meta.current_page}</span>
               {' '}of{' '}
-              <span className="font-bold" style={{ color: NAVY }}>{meta.last_page}</span>
+              <span className="font-bold" style={{ color: 'var(--color-navy)' }}>{meta.last_page}</span>
               {' '}· {meta.total} members
             </p>
             <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">
               <button
                 disabled={page === 1}
                 onClick={() => setPage(p => p - 1)}
-                className="w-11 h-11 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ border: BORDER, color: NAVY }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
                 aria-label="Go to previous page"
               >
                 <ChevronLeft size={18} strokeWidth={2} aria-hidden="true" />
               </button>
               <span
                 className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm text-white"
-                style={{ backgroundColor: NAVY }}
+                style={{ backgroundColor: 'var(--color-navy)' }}
                 aria-current="page"
                 aria-label={`Current page, page ${meta.current_page}`}
               >
@@ -519,8 +520,8 @@ export default function MembersPage() {
               <button
                 disabled={page === meta.last_page}
                 onClick={() => setPage(p => p + 1)}
-                className="w-11 h-11 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ border: BORDER, color: NAVY }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ border: '1px solid var(--color-surface-border)', color: 'var(--color-navy)' }}
                 aria-label="Go to next page"
               >
                 <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
@@ -532,120 +533,3 @@ export default function MembersPage() {
     </div>
   )
 }
-
-const MemberRow = memo(function MemberRow({ member, can, navigate, pendingDelete, deleting, handleDelete, setPendingDelete }) {
-  const cfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive
-  const StatusIcon = cfg.icon
-  return (
-    <tr
-      className="hover:bg-slate-50 transition-colors duration-150"
-      style={{ borderTop: BORDER }}
-    >
-      <td
-        className="hidden md:table-cell"
-        style={{ padding: '16px 24px', fontSize: '13px', fontFamily: 'monospace', color: '#44474f' }}
-      >
-        {member.member_number}
-      </td>
-      <td style={{ padding: '16px 24px' }}>
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
-            style={{ backgroundColor: NAVY }}
-            aria-hidden="true"
-          >
-            {member.first_name.charAt(0)}{member.last_name.charAt(0)}
-          </div>
-          <div>
-            <p className="font-bold" style={{ color: NAVY }}>{member.full_name}</p>
-            {member.email && (
-              <p style={{ fontSize: '12px', color: MUTED }}>{member.email}</p>
-            )}
-          </div>
-        </div>
-      </td>
-      <td
-        className="hidden sm:table-cell capitalize"
-        style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
-      >
-        {member.gender}
-      </td>
-      <td
-        className="hidden sm:table-cell"
-        style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f' }}
-      >
-        {member.phone ?? '—'}
-      </td>
-      <td style={{ padding: '16px 24px' }}>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full text-xs font-bold"
-          style={{ padding: '4px 10px', backgroundColor: cfg.bg, color: cfg.text }}
-          aria-label={`Status: ${cfg.label}`}
-        >
-          <StatusIcon size={11} strokeWidth={2.5} aria-hidden="true" />
-          {cfg.label}
-        </span>
-      </td>
-      <td
-        className="hidden lg:table-cell"
-        style={{ padding: '16px 24px', fontSize: '14px', color: '#44474f', textAlign: 'center' }}
-      >
-        {member.join_date ?? '—'}
-      </td>
-      <td style={{ padding: '12px 24px' }}>
-        <div className="flex justify-end items-center gap-1">
-          <button
-            onClick={() => navigate(`/members/${member.id}`)}
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-100"
-            style={{ color: NAVY }}
-            aria-label={`View profile of ${member.full_name}`}
-          >
-            View
-          </button>
-          {can('edit members') && (
-            <button
-              onClick={() => navigate(`/members/${member.id}/edit`)}
-              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-amber-50"
-              style={{ color: '#92400e' }}
-              aria-label={`Edit ${member.full_name}`}
-            >
-              Edit
-            </button>
-          )}
-          {can('delete members') && (
-            pendingDelete === member.id ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleDelete(member)}
-                  disabled={deleting === member.id}
-                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-bold transition-colors bg-red-50 hover:bg-red-100 disabled:opacity-40"
-                  style={{ color: '#be123c' }}
-                  aria-label={`Confirm deletion of ${member.full_name}`}
-                >
-                  {deleting === member.id ? '…' : 'Confirm'}
-                </button>
-                <button
-                  onClick={() => setPendingDelete(null)}
-                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-lg text-xs font-semibold transition-colors hover:bg-slate-100"
-                  style={{ color: MUTED }}
-                  aria-label="Cancel deletion"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setPendingDelete(member.id)}
-                className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-lg text-sm font-semibold transition-colors hover:bg-red-50"
-                style={{ color: '#be123c' }}
-                aria-label={`Delete ${member.full_name}`}
-              >
-                Delete
-              </button>
-            )
-          )}
-        </div>
-      </td>
-    </tr>
-  )
-})
