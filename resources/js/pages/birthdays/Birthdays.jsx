@@ -8,7 +8,6 @@ import {
 } from '../../api/birthdays'
 import { usePermission } from '../../hooks/usePermission'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 // Status badge colors — match Cell Comparison's gentle palette
 const STATUS_META = {
   sent:     { label: 'Sent',     color: '#2e7d32', bg: '#2e7d3215' },
@@ -65,7 +64,6 @@ export default function Birthdays() {
       setPreviewData(res.data.data)
       setPreviewError(null)
     } catch (err) {
-      console.error('[Birthdays] preview failed:', err?.response?.status, err?.response?.data || err)
       setPreviewError(err?.response?.data?.message || 'Preview failed')
       setPreviewData(null)
     }
@@ -79,7 +77,6 @@ export default function Birthdays() {
       setEditedActive(res.data.data.is_active)
       await refreshPreview(res.data.data.template)
     } catch (err) {
-      console.error('[Birthdays] loadSettings failed:', err?.response?.status, err?.response?.data || err)
       setSettingsError(err?.response?.data?.message || 'Failed to load settings')
     }
   }
@@ -89,8 +86,7 @@ export default function Birthdays() {
     try {
       const res = await getUpcomingBirthdays(days)
       setUpcoming(res.data)
-    } catch (err) {
-      console.error('[Birthdays] loadUpcoming failed:', err?.response?.status, err?.response?.data || err)
+    } catch {
       setUpcoming({ data: [], meta: { scope: '', count: 0 } })
     } finally {
       setLoadingUpcoming(false)
@@ -102,8 +98,7 @@ export default function Birthdays() {
     try {
       const res = await getBirthdayLog(status ? { days: 30, status } : { days: 30 })
       setLog(res.data)
-    } catch (err) {
-      console.error('[Birthdays] loadLog failed:', err?.response?.status, err?.response?.data || err)
+    } catch {
       setLog({ data: [], meta: { summary: {}, total_in_window: 0 } })
     } finally {
       setLoadingLog(false)
@@ -154,7 +149,7 @@ const onTemplateChange = (value) => {
 
   if (!canView && !canManage) {
     return (
-      <div className="bg-white rounded-xl p-6 text-center" style={{border:BORDER,color:PLACEHOLDER}}>
+      <div className="bg-white rounded-xl p-6 text-center" style={{border:'1px solid var(--color-surface-border)',color:'#9ca3af'}}>
         You don't have permission to view this page.
       </div>
     )
@@ -163,7 +158,7 @@ const onTemplateChange = (value) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'32px',color:NAVY}}>
+        <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',color:'var(--color-navy)'}}>
           Birthday Messages
         </h1>
         <p style={{color:'#44474f',marginTop:'4px'}}>
@@ -176,11 +171,11 @@ const onTemplateChange = (value) => {
       {/* SETTINGS — admin only */}
       {canManage && (
         <div className="bg-white rounded-xl overflow-hidden"
-             style={{border:BORDER}}>
+             style={{border:'1px solid var(--color-surface-border)'}}>
           <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-               style={{borderBottom:BORDER}}>
+               style={{borderBottom:'1px solid var(--color-surface-border)'}}>
             <h2 className="font-bold"
-                style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
+                style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
               Template & Settings
             </h2>
             <label className="inline-flex items-center gap-2 text-sm">
@@ -202,8 +197,8 @@ const onTemplateChange = (value) => {
                         rows={6}
                         maxLength={500}
                         className="w-full px-3 py-2 rounded-lg font-mono text-sm"
-                        style={{border:BORDER}} />
-              <div className="flex justify-between text-xs mt-1" style={{color:PLACEHOLDER}}>
+                        style={{border:'1px solid var(--color-surface-border)'}} />
+              <div className="flex justify-between text-xs mt-1" style={{color:'#9ca3af'}}>
                 <span>{editedTemplate.length} / 500 characters</span>
                 {previewData && (
                   <span>{previewData.sms_segments} SMS segment{previewData.sms_segments === 1 ? '' : 's'}</span>
@@ -227,19 +222,19 @@ const onTemplateChange = (value) => {
                 Live Preview
               </label>
               <div className="rounded-lg p-4 min-h-[140px]"
-                   style={{backgroundColor:'#f8f9fa',border:BORDER}}>
+                   style={{backgroundColor:'#f8f9fa',border:'1px solid var(--color-surface-border)'}}>
                 {previewError ? (
                   <span style={{color:'#991b1b'}}>{previewError}</span>
                 ) : previewData ? (
-                  <p style={{color:NAVY,lineHeight:'1.5'}}>
+                  <p style={{color:'var(--color-navy)',lineHeight:'1.5'}}>
                     {previewData.rendered_message}
                   </p>
                 ) : (
-                  <span style={{color:PLACEHOLDER}}>Type to preview…</span>
+                  <span style={{color:'#9ca3af'}}>Type to preview…</span>
                 )}
               </div>
               {previewData && (
-                <div className="text-xs mt-2" style={{color:PLACEHOLDER}}>
+                <div className="text-xs mt-2" style={{color:'#9ca3af'}}>
                   Sample: {previewData.sample_source === 'real_member' ? 'real branch member' : 'placeholder'}
                 </div>
               )}
@@ -247,7 +242,7 @@ const onTemplateChange = (value) => {
           </div>
 
           <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-               style={{borderTop:BORDER,backgroundColor:'#f8f9fa'}}>
+               style={{borderTop:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fa'}}>
             {settingsSavedMsg && (
               <span style={{color:'#2e7d32',fontWeight:600,fontSize:'14px'}}>✓ {settingsSavedMsg}</span>
             )}
@@ -266,15 +261,15 @@ const onTemplateChange = (value) => {
       {/* UPCOMING — everyone with view */}
       {canView && (
         <div className="bg-white rounded-xl overflow-hidden"
-             style={{border:BORDER}}>
+             style={{border:'1px solid var(--color-surface-border)'}}>
           <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-               style={{borderBottom:BORDER}}>
+               style={{borderBottom:'1px solid var(--color-surface-border)'}}>
             <div>
               <h2 className="font-bold"
-                  style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
+                  style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
                 Upcoming Birthdays
               </h2>
-              <p className="text-xs mt-1" style={{color:PLACEHOLDER}}>
+              <p className="text-xs mt-1" style={{color:'#9ca3af'}}>
                 {upcoming.meta.scope === 'cell_leader_only' ? 'Your cell members' : 'All branch members'}
                 {' '}— {upcoming.meta.count} in next {upcomingDays} day{upcomingDays === 1 ? '' : 's'}
               </p>
@@ -282,7 +277,7 @@ const onTemplateChange = (value) => {
             <select value={upcomingDays}
                     onChange={e => { const d = parseInt(e.target.value, 10); setUpcomingDays(d); loadUpcoming(d); }}
                     className="px-3 py-2 rounded-lg text-sm"
-                    style={{border:BORDER}}>
+                    style={{border:'1px solid var(--color-surface-border)'}}>
               <option value={7}>Next 7 days</option>
               <option value={14}>Next 14 days</option>
               <option value={30}>Next 30 days</option>
@@ -290,9 +285,9 @@ const onTemplateChange = (value) => {
           </div>
 
           {loadingUpcoming ? (
-            <div className="p-6 text-center" style={{color:PLACEHOLDER}}>Loading…</div>
+            <div className="p-6 text-center" style={{color:'#9ca3af'}}>Loading…</div>
           ) : upcoming.data.length === 0 ? (
-            <div className="p-6 text-center" style={{color:PLACEHOLDER}}>
+            <div className="p-6 text-center" style={{color:'#9ca3af'}}>
               No birthdays in the next {upcomingDays} days.
             </div>
           ) : (
@@ -310,8 +305,8 @@ const onTemplateChange = (value) => {
                 </thead>
                 <tbody>
                   {upcoming.data.map(m => (
-                    <tr key={m.id} style={{borderTop:BORDER}}>
-                      <td className="px-6 py-3 font-medium" style={{color:NAVY}}>{m.full_name}</td>
+                    <tr key={m.id} style={{borderTop:'1px solid var(--color-surface-border)'}}>
+                      <td className="px-6 py-3 font-medium" style={{color:'var(--color-navy)'}}>{m.full_name}</td>
                       <td className="px-6 py-3" style={{color:'#44474f'}}>{m.cell?.name ?? '—'}</td>
                       <td className="px-6 py-3" style={{color:'#44474f'}}>{formatDate(m.birthday_this_year)}</td>
                       <td className="px-6 py-3 text-right font-mono">
@@ -337,15 +332,15 @@ const onTemplateChange = (value) => {
       {/* SEND LOG — admin only */}
       {canManage && (
         <div className="bg-white rounded-xl overflow-hidden"
-             style={{border:BORDER}}>
+             style={{border:'1px solid var(--color-surface-border)'}}>
           <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-               style={{borderBottom:BORDER}}>
+               style={{borderBottom:'1px solid var(--color-surface-border)'}}>
             <div>
               <h2 className="font-bold"
-                  style={{fontFamily:FONT_DISPLAY,fontSize:'20px',color:NAVY}}>
+                  style={{fontFamily:'var(--font-display)',fontSize:'20px',color:'var(--color-navy)'}}>
                 Send Log
               </h2>
-              <p className="text-xs mt-1" style={{color:PLACEHOLDER}}>
+              <p className="text-xs mt-1" style={{color:'#9ca3af'}}>
                 Last 30 days — sent: {log.meta.summary?.sent ?? 0},
                 no_phone: {log.meta.summary?.no_phone ?? 0},
                 failed: {log.meta.summary?.failed ?? 0}
@@ -353,7 +348,7 @@ const onTemplateChange = (value) => {
             </div>
             <select value={logFilter} onChange={e => onLogFilterChange(e.target.value)}
                     className="px-3 py-2 rounded-lg text-sm"
-                    style={{border:BORDER}}>
+                    style={{border:'1px solid var(--color-surface-border)'}}>
               <option value="">All statuses</option>
               <option value="sent">Sent</option>
               <option value="no_phone">No phone</option>
@@ -362,9 +357,9 @@ const onTemplateChange = (value) => {
           </div>
 
           {loadingLog ? (
-            <div className="p-6 text-center" style={{color:PLACEHOLDER}}>Loading…</div>
+            <div className="p-6 text-center" style={{color:'#9ca3af'}}>Loading…</div>
           ) : log.data.length === 0 ? (
-            <div className="p-6 text-center" style={{color:PLACEHOLDER}}>
+            <div className="p-6 text-center" style={{color:'#9ca3af'}}>
               No send activity in the last 30 days.
             </div>
           ) : (
@@ -383,9 +378,9 @@ const onTemplateChange = (value) => {
                   {log.data.map(entry => {
                     const meta = STATUS_META[entry.status] ?? { label: entry.status, color: '#44474f', bg: '#f8f9fa' }
                     return (
-                      <tr key={entry.id} style={{borderTop:BORDER}}>
+                      <tr key={entry.id} style={{borderTop:'1px solid var(--color-surface-border)'}}>
                         <td className="px-6 py-3" style={{color:'#44474f'}}>{formatDateTime(entry.sent_at)}</td>
-                        <td className="px-6 py-3 font-medium" style={{color:NAVY}}>
+                        <td className="px-6 py-3 font-medium" style={{color:'var(--color-navy)'}}>
                           {entry.member?.name ?? '(deleted)'}
                         </td>
                         <td className="px-6 py-3">
@@ -398,7 +393,7 @@ const onTemplateChange = (value) => {
                         <td className="px-6 py-3 font-mono text-xs" style={{color:'#44474f'}}>
                           {entry.phone_used ?? '—'}
                         </td>
-                        <td className="px-6 py-3 text-xs" style={{color:PLACEHOLDER,maxWidth:'400px'}}>
+                        <td className="px-6 py-3 text-xs" style={{color:'#9ca3af',maxWidth:'400px'}}>
                           {entry.error_message
                             ? <span style={{color:'#991b1b'}}>{entry.error_message}</span>
                             : (entry.message_body ? entry.message_body.slice(0, 80) + (entry.message_body.length > 80 ? '…' : '') : '—')}

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { changePassword, getMe } from '../../api/auth'
 import { useAuth } from '../../context/AuthContext'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 export default function ChangePassword() {
   const navigate = useNavigate()
   const { user, updateUser, hasRole } = useAuth()
@@ -48,12 +47,12 @@ export default function ChangePassword() {
     <main className="min-h-screen flex items-center justify-center px-4" style={{backgroundColor:'var(--color-surface)'}}>
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{backgroundColor:NAVY}}>
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{backgroundColor:'var(--color-navy)'}}>
             <svg className="w-7 h-7" style={{color:'var(--color-gold)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
             </svg>
           </div>
-          <h1 className="font-bold" style={{fontFamily:FONT_DISPLAY,fontSize:'28px',color:NAVY}}>
+          <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'28px',color:'var(--color-navy)'}}>
             {forced ? 'Set a New Password' : 'Change Password'}
           </h1>
           <p className="text-sm mt-1" style={{color:'#6b7280'}}>
@@ -63,25 +62,25 @@ export default function ChangePassword() {
           </p>
         </div>
 
-        <div style={{backgroundColor:'#fff',border:BORDER,borderRadius:'16px',boxShadow:'0 4px 12px rgba(13,31,60,0.05)',padding:'24px'}}>
+        <div style={{backgroundColor:'#fff',border:'1px solid var(--color-surface-border)',borderRadius:'16px',boxShadow:'0 4px 12px rgba(13,31,60,0.05)',padding:'24px'}}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor="change-current-password">
+              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
                 {forced ? 'Current (temporary) Password *' : 'Current Password *'}
               </label>
-              <input id="change-current-password" type="password" className="input-field" value={form.current_password}
+              <input type="password" className="input-field" value={form.current_password}
                      onChange={set('current_password')} required autoFocus/>
               {errors.current_password && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.current_password[0]}</p>}
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor="change-new-password">New Password *</label>
-              <input id="change-new-password" type="password" className="input-field" value={form.new_password}
+              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>New Password *</label>
+              <input type="password" className="input-field" value={form.new_password}
                      onChange={set('new_password')} required minLength={8} placeholder="Minimum 8 characters"/>
               {errors.new_password && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.new_password[0]}</p>}
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor="change-new-password-confirm">Confirm New Password *</label>
-              <input id="change-new-password-confirm" type="password" className="input-field" value={form.new_password_confirmation}
+              <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>Confirm New Password *</label>
+              <input type="password" className="input-field" value={form.new_password_confirmation}
                      onChange={set('new_password_confirmation')} required minLength={8}/>
               {errors.new_password_confirmation && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{errors.new_password_confirmation[0]}</p>}
             </div>
@@ -93,7 +92,7 @@ export default function ChangePassword() {
             {!forced && (
               <button type="button" onClick={() => navigate(-1)}
                       className="w-full py-2 rounded-lg text-sm font-semibold"
-                      style={{backgroundColor:'white',border:BORDER,color:'#374151'}}>
+                      style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
                 Cancel
               </button>
             )}

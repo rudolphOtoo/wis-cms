@@ -2,7 +2,6 @@ import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Menu } from 'lucide-react'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 const titles = {
   '/dashboard':     'Dashboard',
   '/members':       'Member Management',
@@ -29,18 +28,20 @@ export default function TopBar({ onMenuClick }) {
   const { pathname } = useLocation()
   const { user }     = useAuth()
 
+  // Fix #10 — global regex replaces every underscore (e.g. finance_department_head → finance department head)
   const roleDisplay = user?.roles?.[0]?.replace(/_/g, ' ')
 
   return (
     <header
       className="bg-white px-4 md:px-6 py-3 md:py-4 flex items-center justify-between flex-shrink-0 gap-3"
-      style={{ borderBottom: BORDER }}
+      style={{ borderBottom: '1px solid var(--color-surface-border)' }}
     >
+      {/* Fix #9 — strict 44×44px touch target for the mobile hamburger */}
       <button
         onClick={onMenuClick}
         type="button"
         className="md:hidden w-11 h-11 -ml-2 flex items-center justify-center rounded-xl transition-colors hover:bg-slate-100"
-        style={{ color: NAVY }}
+        style={{ color: 'var(--color-navy)' }}
         aria-label="Open navigation menu"
       >
         <Menu size={20} strokeWidth={2} aria-hidden="true" />
@@ -49,11 +50,11 @@ export default function TopBar({ onMenuClick }) {
       <div className="flex-1 min-w-0">
         <h1
           className="text-lg md:text-xl font-semibold truncate"
-          style={{ fontFamily: FONT_DISPLAY, color: NAVY }}
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--color-navy)' }}
         >
           {titles[pathname] ?? 'WIS-CMS'}
         </h1>
-        <p className="text-xs mt-0.5 hidden sm:block" style={{ color: PLACEHOLDER }}>
+        <p className="text-xs mt-0.5 hidden sm:block" style={{ color: '#9ca3af' }}>
           {new Date().toLocaleDateString('en-GH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -63,17 +64,19 @@ export default function TopBar({ onMenuClick }) {
           <div className="text-sm font-semibold truncate max-w-[140px]" style={{ color: '#374151' }}>
             {user?.name}
           </div>
-          <div className="text-xs capitalize" style={{ color: PLACEHOLDER }}>
+          {/* Fix #10 — global underscore replace + proper casing */}
+          <div className="text-xs capitalize" style={{ color: '#9ca3af' }}>
             {roleDisplay}
           </div>
         </div>
+        {/* Fix #10 — aria-label names the avatar for screen readers */}
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: 'rgba(27,58,107,0.1)' }}
           aria-label={`Signed in as ${user?.name ?? 'user'}`}
           role="img"
         >
-          <span className="text-sm font-bold select-none" style={{ color: NAVY }}>
+          <span className="text-sm font-bold select-none" style={{ color: 'var(--color-navy)' }}>
             {user?.name?.charAt(0)}
           </span>
         </div>

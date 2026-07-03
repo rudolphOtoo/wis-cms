@@ -6,7 +6,6 @@ import { getMembers } from '../../api/members'
 import MemberSearchPicker from '../../components/MemberSearchPicker'
 import { useConfirm } from '../../hooks/useConfirm'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
 export default function DepartmentDetail() {
   const navigate    = useNavigate()
   const { id }      = useParams()
@@ -74,7 +73,7 @@ export default function DepartmentDetail() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:NAVY}}
+      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
            fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10"
                 stroke="currentColor" strokeWidth="4"/>
@@ -89,15 +88,15 @@ export default function DepartmentDetail() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/departments')}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg"
-                style={{backgroundColor:'white',border:BORDER}}>
+                className="p-2 rounded-lg"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div className="flex-1">
           <h2 className="text-xl font-bold"
-              style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
+              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
             {dept?.name}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -106,7 +105,7 @@ export default function DepartmentDetail() {
         </div>
         <button onClick={() => navigate(`/departments/${id}/edit`)}
                 className="px-4 py-2 rounded-lg text-sm font-semibold"
-                style={{backgroundColor:'white',border:BORDER,
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',
                         color:'#374151'}}>
           Edit Department
         </button>
@@ -122,8 +121,8 @@ export default function DepartmentDetail() {
       {/* Members */}
       <div className="card p-0 overflow-hidden">
         <div className="px-6 py-4 flex items-center justify-between"
-             style={{borderBottom:BORDER}}>
-          <h3 className="font-semibold" style={{color:NAVY}}>
+             style={{borderBottom:'1px solid var(--color-surface-border)'}}>
+          <h3 className="font-semibold" style={{color:'var(--color-navy)'}}>
             Department Members
           </h3>
           <button onClick={() => setShowAdd(!showAdd)}
@@ -138,7 +137,7 @@ export default function DepartmentDetail() {
         {/* Add member panel */}
         {showAdd && (
           <div className="px-6 py-4"
-               style={{backgroundColor:'#f9fafb',borderBottom:BORDER}}>
+               style={{backgroundColor:'#f9fafb',borderBottom:'1px solid var(--color-surface-border)'}}>
             <div className="flex items-center gap-3">
               <MemberSearchPicker
                 members={availableMembers}
@@ -153,7 +152,7 @@ export default function DepartmentDetail() {
               </button>
               <button onClick={() => { setShowAdd(false); setSelected('') }}
                       className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-                      style={{backgroundColor:'white',border:BORDER,
+                      style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',
                               color:'#374151'}}>
                 Cancel
               </button>
@@ -164,8 +163,8 @@ export default function DepartmentDetail() {
         {members.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">👥</div>
-            <p className="font-semibold" style={{color:NAVY}}>No members yet</p>
-            <p className="text-sm mt-1" style={{color:PLACEHOLDER}}>
+            <p className="font-semibold" style={{color:'var(--color-navy)'}}>No members yet</p>
+            <p className="text-sm mt-1" style={{color:'#9ca3af'}}>
               Click "Add Member" to assign members to this department
             </p>
           </div>
@@ -173,7 +172,7 @@ export default function DepartmentDetail() {
           <table className="w-full">
             <thead>
               <tr style={{backgroundColor:'#f9fafb',
-                          borderBottom:BORDER}}>
+                          borderBottom:'1px solid var(--color-surface-border)'}}>
                 {['Member', 'Member #', 'Role', 'Joined', 'Action'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
                       style={{color:'#6b7280'}}>
@@ -185,13 +184,13 @@ export default function DepartmentDetail() {
             <tbody>
               {members.map((member, i) => (
                 <tr key={member.id}
-                    style={{borderBottom:BORDER,
+                    style={{borderBottom:'1px solid var(--color-surface-border)',
                             backgroundColor: i % 2 === 0 ? 'white' : '#fafafa'}}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center
                                       text-sm font-bold text-white"
-                           style={{backgroundColor:NAVY}}>
+                           style={{backgroundColor:'var(--color-navy)'}}>
                         {member.full_name.charAt(0)}
                       </div>
                       <span className="text-sm font-semibold" style={{color:'#111827'}}>

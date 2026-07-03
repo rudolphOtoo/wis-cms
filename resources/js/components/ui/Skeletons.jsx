@@ -1,5 +1,3 @@
-import { BORDER } from '../../constants/styles'
-
 const COL_WIDTHS = ['45%', '62%', '55%', '40%', '68%', '50%', '72%', '48%']
 
 export function StatCardSkeleton() {
@@ -18,7 +16,7 @@ export function TableSkeleton({ rows = 8, cols = 6, hasAvatar = false }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, rowIdx) => (
-        <tr key={rowIdx} style={{ borderTop: BORDER }}>
+        <tr key={rowIdx} style={{ borderTop: '1px solid var(--color-surface-border)' }}>
           {hasAvatar ? (
             <td style={{ padding: '16px 24px' }}>
               <div className="flex items-center gap-3 animate-pulse">

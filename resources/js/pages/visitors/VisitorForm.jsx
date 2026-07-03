@@ -1,19 +1,15 @@
-import React, { useState, useEffect, cloneElement, isValidElement } from 'react'
+import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createVisitor, updateVisitor, getVisitor } from '../../api/visitors'
 
-import { NAVY, MUTED, PLACEHOLDER, BORDER, FONT_DISPLAY } from '../../constants/styles'
-const FIELD = ({ label, error, children, name }) => {
-  const fieldId = name ? `field-${name}` : undefined
-  return (
-    <div>
-      <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}} htmlFor={fieldId}>{label}</label>
-      {fieldId && isValidElement(children) ? cloneElement(children, { id: fieldId }) : children}
-      {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
-    </div>
-  )
-}
+const FIELD = ({ label, error, children }) => (
+  <div>
+    <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>{label}</label>
+    {children}
+    {error && <p className="text-xs mt-1" style={{color:'#dc2626'}}>{error}</p>}
+  </div>
+)
 
 const HOW_HEARD = [
   'Friend or Family', 'Social Media', 'Flyer/Poster', 'Radio',
@@ -36,12 +32,9 @@ export default function VisitorForm() {
 
   useEffect(() => {
     if (!isEdit) return
-    const controller = new AbortController()
-    let mounted = true
     setFetching(true)
-    getVisitor(id, controller.signal)
+    getVisitor(id)
       .then(res => {
-        if (!mounted) return
         const v = res.data.data
         setForm({
           first_name:       v.first_name       ?? '',
@@ -55,9 +48,8 @@ export default function VisitorForm() {
           notes:            v.notes            ?? '',
         })
       })
-      .catch(() => { if (mounted) navigate('/visitors') })
-      .finally(() => { if (mounted) setFetching(false) })
-    return () => { mounted = false; controller.abort() }
+      .catch(() => navigate('/visitors'))
+      .finally(() => setFetching(false))
   }, [id, isEdit])
 
   const set = (field) => (e) => {
@@ -86,7 +78,7 @@ export default function VisitorForm() {
 
   if (fetching) return (
     <div className="flex items-center justify-center py-24">
-      <svg className="animate-spin w-8 h-8" style={{color:NAVY}}
+      <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}}
            fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10"
                 stroke="currentColor" strokeWidth="4"/>
@@ -100,16 +92,15 @@ export default function VisitorForm() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/visitors')}
-                 aria-label="Back to visitors"
-                 className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg transition-colors"
-                 style={{backgroundColor:'white',border:BORDER}}>
+                className="p-2 rounded-lg transition-colors"
+                style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)'}}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div>
           <h2 className="text-xl font-bold"
-              style={{fontFamily:FONT_DISPLAY,color:NAVY}}>
+              style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
             {isEdit ? 'Edit Visitor' : 'Record New Visitor'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
@@ -123,30 +114,30 @@ export default function VisitorForm() {
         {/* Personal Info */}
         <div className="card space-y-4">
           <h3 className="font-semibold text-sm uppercase tracking-wider"
-              style={{color:NAVY}}>
+              style={{color:'var(--color-navy)'}}>
             Visitor Information
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FIELD label="First Name *" error={errors.first_name?.[0]} name="visitor_first_name">
+            <FIELD label="First Name *" error={errors.first_name?.[0]}>
               <input type="text" className="input-field" value={form.first_name}
                      onChange={set('first_name')} required placeholder="e.g. Ama"/>
             </FIELD>
-            <FIELD label="Last Name *" error={errors.last_name?.[0]} name="visitor_last_name">
+            <FIELD label="Last Name *" error={errors.last_name?.[0]}>
               <input type="text" className="input-field" value={form.last_name}
                      onChange={set('last_name')} required placeholder="e.g. Asante"/>
             </FIELD>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FIELD label="Phone Number" error={errors.phone?.[0]} name="visitor_phone">
+            <FIELD label="Phone Number" error={errors.phone?.[0]}>
               <input type="tel" className="input-field" value={form.phone}
                      onChange={set('phone')} placeholder="e.g. 0244000000"/>
             </FIELD>
-            <FIELD label="Email Address" error={errors.email?.[0]} name="visitor_email">
+            <FIELD label="Email Address" error={errors.email?.[0]}>
               <input type="email" className="input-field" value={form.email}
                      onChange={set('email')} placeholder="e.g. ama@email.com"/>
             </FIELD>
           </div>
-          <FIELD label="Home Address" error={errors.address?.[0]} name="visitor_address">
+          <FIELD label="Home Address" error={errors.address?.[0]}>
             <input type="text" className="input-field" value={form.address}
                    onChange={set('address')} placeholder="Area, city"/>
           </FIELD>
@@ -155,15 +146,15 @@ export default function VisitorForm() {
         {/* Visit Details */}
         <div className="card space-y-4">
           <h3 className="font-semibold text-sm uppercase tracking-wider"
-              style={{color:NAVY}}>
+              style={{color:'var(--color-navy)'}}>
             Visit Details
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FIELD label="Date of Visit *" error={errors.visit_date?.[0]} name="visit_date">
+            <FIELD label="Date of Visit *" error={errors.visit_date?.[0]}>
               <input type="date" className="input-field" value={form.visit_date}
                      onChange={set('visit_date')} required/>
             </FIELD>
-            <FIELD label="How Did They Hear About Us?" error={errors.how_they_heard?.[0]} name="how_they_heard">
+            <FIELD label="How Did They Hear About Us?" error={errors.how_they_heard?.[0]}>
               <select className="input-field" value={form.how_they_heard}
                       onChange={set('how_they_heard')}>
                 <option value="">Select option</option>
@@ -173,7 +164,7 @@ export default function VisitorForm() {
               </select>
             </FIELD>
           </div>
-          <FIELD label="Follow-up Status" error={errors.follow_up_status?.[0]} name="follow_up_status">
+          <FIELD label="Follow-up Status" error={errors.follow_up_status?.[0]}>
             <select className="input-field" value={form.follow_up_status}
                     onChange={set('follow_up_status')}>
               <option value="pending">Pending — not yet contacted</option>
@@ -182,7 +173,7 @@ export default function VisitorForm() {
               <option value="joined">Joined — became a member</option>
             </select>
           </FIELD>
-          <FIELD label="Notes" error={errors.notes?.[0]} name="visitor_notes">
+          <FIELD label="Notes" error={errors.notes?.[0]}>
             <textarea className="input-field" value={form.notes} onChange={set('notes')}
                       rows={3} placeholder="Any additional notes about this visitor..."/>
           </FIELD>
@@ -191,7 +182,7 @@ export default function VisitorForm() {
         <div className="flex items-center justify-end gap-3">
           <button type="button" onClick={() => navigate('/visitors')}
                   className="px-6 py-2.5 rounded-lg text-sm font-semibold"
-                  style={{backgroundColor:'white',border:BORDER,
+                  style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',
                           color:'#374151'}}>
             Cancel
           </button>
