@@ -48,12 +48,12 @@ class AttendanceStatsService
      */
     public function getStats(string $branchId): array
     {
-        // ─── Q1: Aggregated adult counts for all adult sessions ────────────────
+        // ─── Q1a: Aggregated adult counts for all adult sessions ──────────────
         // LEFT JOIN so sessions with zero marked attendance still appear.
         // We filter is_present AND member_id IS NOT NULL in SQL to keep the
         // result set small. deleted_at filter respects the SoftDeletes added
         // in migration PERF-07.
-        $sessionAggregates = DB::table('attendance_sessions as s')
+        $adultAggregates = DB::table('attendance_sessions as s')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
             ->leftJoin('attendance_records as ar', function ($join) {
                 $join->on('ar.session_id', '=', 's.id')
@@ -69,25 +69,53 @@ class AttendanceStatsService
                 's.cell_id',
                 'st.name AS service_type_name',
                 DB::raw("COALESCE(c.name, 'Unassigned') AS cell_name"),
-                DB::raw('COUNT(ar.id) AS adult_count'),
+                DB::raw('COUNT(ar.id) AS count'),
             ])
             ->groupBy('s.service_date', 's.cell_id', 'st.name', 'c.name')
             ->orderByDesc('s.service_date')
             ->get();
+
+        // ─── Q1b: Aggregated children counts for all children sessions ────────
+        // Mirrors the adult query but uses child_id for counting. Children
+        // sessions are linked to the Children Ministry cell so the cell name
+        // comes from the cells table via the LEFT JOIN.
+        $childrenAggregates = DB::table('attendance_sessions as s')
+            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
+            ->leftJoin('attendance_records as ar', function ($join) {
+                $join->on('ar.session_id', '=', 's.id')
+                    ->whereNull('ar.deleted_at')
+                    ->whereNotNull('ar.child_id')
+                    ->where('ar.is_present', '=', true);
+            })
+            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
+            ->where('s.branch_id', $branchId)
+            ->where('st.type', 'children')
+            ->select([
+                's.service_date',
+                's.cell_id',
+                'st.name AS service_type_name',
+                DB::raw("COALESCE(c.name, 'Children Ministry') AS cell_name"),
+                DB::raw('COUNT(ar.id) AS count'),
+            ])
+            ->groupBy('s.service_date', 's.cell_id', 'st.name', 'c.name')
+            ->get();
+
+        // ─── Merge adult + children into a single collection ──────────────────
+        $sessionAggregates = $adultAggregates->concat($childrenAggregates);
 
         // ─── Group by date for O(1) slicing ──────────────────────────────────
         /** @var Collection<string, Collection> $byDate */
         $byDate = $sessionAggregates->groupBy('service_date');
         $allDates = $byDate->keys()->sortDesc()->values();
 
-        // ─── Last Sunday (most recent adult service date) ─────────────────────
+        // ─── Last Sunday (most recent service date) ──────────────────────────
         $lastSundayDate = $allDates->first();
         $lastSundayTotal = 0;
         $lastSundayByCell = [];
 
         if ($lastSundayDate) {
             foreach ($byDate->get($lastSundayDate) as $row) {
-                $count = (int) $row->adult_count;
+                $count = (int) $row->count;
                 $lastSundayTotal += $count;
                 $cellName = $row->cell_name;
                 $lastSundayByCell[$cellName] = ($lastSundayByCell[$cellName] ?? 0) + $count;
@@ -97,10 +125,10 @@ class AttendanceStatsService
         // ─── Q2: Total sessions (lightweight count) ───────────────────────────
         $totalSessions = AttendanceSession::where('branch_id', $branchId)->count();
 
-        // ─── Average (last 4 distinct adult-service dates) ───────────────────
+        // ─── Average (last 4 distinct service dates) ─────────────────────────
         $last4Totals = $allDates->take(4)->map(fn (string $date) => [
             'date' => $date,
-            'total' => (int) $byDate->get($date)->sum('adult_count'),
+            'total' => (int) $byDate->get($date)->sum('count'),
         ]);
 
         $avgAttendance = $last4Totals->count() > 0
@@ -121,7 +149,7 @@ class AttendanceStatsService
         $chartDates = $allDates->take(8)->reverse()->values();
         $chartData = $chartDates->map(fn (string $date) => [
             'date' => Carbon::parse($date)->format('d M'),
-            'count' => (int) $byDate->get($date)->sum('adult_count'),
+            'count' => (int) $byDate->get($date)->sum('count'),
         ])->values();
 
         // ─── Monthly trend (last 6 calendar months) ────────────────────────────
@@ -131,7 +159,7 @@ class AttendanceStatsService
             ->groupBy(fn ($r) => Carbon::parse($r->service_date)->format('Y-m'))
             ->map(fn (Collection $group, string $key) => [
                 'month' => Carbon::createFromFormat('Y-m', $key)->format('M'),
-                'total' => (int) $group->sum('adult_count'),
+                'total' => (int) $group->sum('count'),
             ])
             ->sortKeys()
             ->values();
@@ -148,16 +176,21 @@ class AttendanceStatsService
             };
         }
 
-        // ─── Insights: service type with highest average adult count ──────────
+        // ─── Insights: service type with highest average count ───────────────
         $topService = $sessionAggregates
             ->groupBy('service_type_name')
-            ->map(fn (Collection $g) => $g->avg('adult_count'))
+            ->map(fn (Collection $g) => $g->avg('count'))
             ->sortDesc()
             ->keys()
             ->first();
 
-        $avgAdults = $sessionAggregates->count() > 0
-            ? (int) round($sessionAggregates->avg('adult_count'))
+        // ─── Separate averages for adults and children ───────────────────────
+        $avgAdults = $adultAggregates->count() > 0
+            ? (int) round($adultAggregates->avg('count'))
+            : 0;
+
+        $avgChildren = $childrenAggregates->count() > 0
+            ? (int) round($childrenAggregates->avg('count'))
             : 0;
 
         return [
@@ -174,7 +207,7 @@ class AttendanceStatsService
             'insights' => [
                 'top_service' => $topService ?? 'N/A',
                 'avg_adults' => $avgAdults,
-                'avg_children' => 0,
+                'avg_children' => $avgChildren,
                 'trend_direction' => $trendDirection,
             ],
         ];

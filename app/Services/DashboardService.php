@@ -51,10 +51,9 @@ class DashboardService
             ")
             ->first();
 
-        // ─── Q2: Last adult session with records pre-loaded ───────────────────
-        // adult_count uses the in-memory records collection (PERF-01 fixed).
+        // ─── Q2: Last session with records pre-loaded (adult + children) ────
+        // total_count uses the in-memory records collection (PERF-01 fixed).
         $lastSession = AttendanceSession::query()
-            ->whereHas('serviceType', fn ($q) => $q->where('type', '!=', 'children'))
             ->with('records')
             ->latest('service_date')
             ->first();
@@ -122,17 +121,17 @@ class DashboardService
             ];
         }
 
-        // ─── Q6: Attendance chart — last 8 adult sessions, records eager-loaded
+        // ─── Q6: Attendance chart — last 8 distinct dates, total per date
         $attendanceChart = AttendanceSession::query()
-            ->whereHas('serviceType', fn ($q) => $q->where('type', 'adult'))
-            ->with('records')  // adult_count uses this collection (PERF-01 fixed)
+            ->with('records')
             ->latest('service_date')
-            ->take(8)
             ->get()
+            ->groupBy(fn ($s) => $s->service_date->toDateString())
+            ->take(8)
             ->reverse()
-            ->map(fn ($s) => [
-                'date' => $s->service_date->format('d M'),
-                'count' => $s->adult_count,
+            ->map(fn ($sessionsOnDate, string $date) => [
+                'date' => Carbon::parse($date)->format('d M'),
+                'count' => $sessionsOnDate->sum(fn ($s) => $s->total_count),
             ])
             ->values();
 
@@ -184,7 +183,7 @@ class DashboardService
         return [
             'hero' => [
                 'total_members' => (int) ($memberStats->total_active ?? 0),
-                'last_attendance' => $lastSession?->adult_count ?? 0,
+                'last_attendance' => $lastSession?->total_count ?? 0,
                 'month_income' => $monthIncome,
                 'month_visitors' => $monthVisitors,
                 'income_growth' => $incomeGrowth,
