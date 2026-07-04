@@ -127,6 +127,7 @@ class MemberSubmissionController extends Controller
         $cells = Cell::query()
             ->where('branch_id', $request->user()->branch_id)
             ->where('is_active', true)
+            ->where('name', '!=', 'Children Ministry')  // adult members cannot join this cell
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -188,7 +189,14 @@ class MemberSubmissionController extends Controller
     public function approve(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
-            'cell_id' => ['nullable', 'uuid', 'exists:cells,id'],
+            'cell_id' => [
+                'nullable', 'uuid', 'exists:cells,id',
+                function (string $attr, mixed $value, \Closure $fail): void {
+                    if ($value && Cell::where('id', $value)->where('name', 'Children Ministry')->exists()) {
+                        $fail('The Children Ministry cell is for children only. Adult members cannot be assigned here.');
+                    }
+                },
+            ],
             'notes' => ['nullable', 'string', 'max:500'],
             'force_overwrite' => ['nullable', 'boolean'],
         ]);

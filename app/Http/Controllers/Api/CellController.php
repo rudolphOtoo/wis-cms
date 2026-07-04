@@ -119,6 +119,11 @@ class CellController extends Controller
     public function assignMember(Request $request, string $id, string $memberId): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
+
+        // The Children Ministry cell tracks children, not adult members.
+        abort_if($cell->name === 'Children Ministry', 422,
+            'The Children Ministry cell is for children only. Adult members cannot be assigned here.');
+
         $member = Member::findOrFail($memberId);
 
         $member->update(['cell_id' => $cell->id]);

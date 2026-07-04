@@ -84,6 +84,13 @@ class AttendanceController extends Controller
             ], 422);
         }
 
+        if ($serviceType && $serviceType->type === 'children' && ! $request->cell_id) {
+            return response()->json([
+                'message' => 'Children service attendance must be recorded per cell. Please select the Children Ministry cell.',
+                'errors' => ['cell_id' => ['Children service attendance must be recorded per cell.']],
+            ], 422);
+        }
+
         $departmentId = $request->department_id;
         if ($departmentId) {
             $user = $request->user();
@@ -144,18 +151,22 @@ class AttendanceController extends Controller
         $serviceType = $session->serviceType;
 
         if ($serviceType->type === 'children') {
-            $people = Children::query()
-                ->where('is_active', true)
-                ->orderBy('first_name')
-                ->limit(500)
-                ->get()
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'name' => $c->full_name,
-                    'type' => 'child',
-                    'class' => $c->class_group,
-                    'is_present' => $session->records->where('child_id', $c->id)->first()?->is_present ?? false,
-                ]);
+            // Load from the cell's children roster when linked to the
+            // Children Ministry cell, otherwise fall back to all active children.
+            $children = $session->cell_id
+                ? (Cell::with('children')->find($session->cell_id)?->children
+                    ->where('is_active', true)
+                    ->sortBy('first_name')
+                    ->values() ?? collect())
+                : Children::where('is_active', true)->orderBy('first_name')->limit(500)->get();
+
+            $people = $children->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->full_name,
+                'type' => 'child',
+                'class' => $c->class_group,
+                'is_present' => $session->records->where('child_id', $c->id)->first()?->is_present ?? false,
+            ]);
         } elseif ($session->department_id) {
             $dept = Department::with('members')->find($session->department_id);
             $people = ($dept?->members ?? collect())

@@ -36,6 +36,13 @@ class Cell extends Model
         return $this->hasMany(Member::class);
     }
 
+    // Children linked to this cell (used by the Children Ministry cell).
+    // The inverse of Children::cell().
+    public function children()
+    {
+        return $this->hasMany(Children::class);
+    }
+
     public function getMembersCountAttribute(): int
     {
         // If withCount() or loadCount() has been used by the caller,

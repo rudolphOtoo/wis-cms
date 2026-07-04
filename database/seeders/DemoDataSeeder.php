@@ -59,25 +59,6 @@ class DemoDataSeeder extends Seeder
             $allMembers[] = $member;
         }
 
-        // ===== CELL ASSIGNMENT =====
-        // CellSeeder runs before this seeder, so cells exist but were unable
-        // to assign members (members didn't exist yet). Distribute now using
-        // the same realistic uneven sizing.
-        $cells = Cell::all();
-        if ($cells->isNotEmpty()) {
-            $distribution = [11, 9, 8, 7, 6, 4]; // sums to 45 of ~47 active → ~2 unassigned
-            $activeMembers = collect($allMembers)->where('status', 'active')->values();
-            $cursor = 0;
-            foreach ($cells as $i => $cell) {
-                $take = $distribution[$i] ?? 0;
-                $slice = $activeMembers->slice($cursor, $take);
-                foreach ($slice as $member) {
-                    $member->update(['cell_id' => $cell->id]);
-                }
-                $cursor += $take;
-            }
-        }
-
         // ===== DEPARTMENTS =====
         $depts = [
             ['name' => 'Youth Ministry',       'desc' => 'Spiritual growth and discipleship for youth aged 13-30'],
@@ -231,6 +212,7 @@ class DemoDataSeeder extends Seeder
         $this->seedUpcomingBirthdays($branchId);
         $this->seedChildren($branchId);
         $this->seedBirthdayLogHistory($branchId);
+        $this->seedChildrenAttendance($branchId, $admin);
 
         $this->command->info('   ✓ 60 members created');
         $this->command->info('   ✓ 8 departments with assigned members');
@@ -238,22 +220,19 @@ class DemoDataSeeder extends Seeder
         $this->command->info('   ✓ 10 weeks of Sunday Adult Service attendance');
         $this->command->info('   ✓ 6 months of transactions');
         $this->command->info('   ✓ 12 weeks of cell-meeting attendance (varied health)');
+        $this->command->info('   ✓ Children linked to Children Ministry cell');
         $this->command->info('   ✓ Birthdays seeded for today + this week');
         $this->command->info('   ✓ 12 children records');
         $this->command->info('   ✓ Historic birthday SMS log entries');
+        $this->command->info('   ✓ 10 weeks of children service attendance');
     }
 
     /**
-     * Twelve weeks of cell-meeting attendance per cell.
+     * Eight weeks of cell-meeting attendance per cell.
      *
      * Each cell follows a "health profile" so the Cell Comparison
      * report tells a real story:
-     *   - Bethel:     meets EVERY Sunday, 85-95% attendance (HEALTHY)
-     *   - Spintex:    meets 6 of 12 Sundays, 65-80% (DECLINING)
-     *   - Dansoman:   no recent meetings (FLAGGED no_recent_attendance)
-     *   - Tema:       no recent meetings (FLAGGED no_recent_attendance)
-     *   - Young:      no recent meetings (FLAGGED no_recent_attendance)
-     *   - Seniors:    no recent meetings (FLAGGED + small + no leader)
+     *   - All 6 adult cells have similar healthy attendance.
      *
      * The Sunday cell-meeting service type is used so the new
      * aggregation rule (Item 1) rolls these into Sunday Adult Service.
@@ -269,15 +248,20 @@ class DemoDataSeeder extends Seeder
 
         // Health profile per cell — tunes attendance density.
         $profiles = [
-            'Bethel Fellowship' => ['weeks' => 12, 'rate_min' => 85, 'rate_max' => 95],
-            'Spintex Cell' => ['weeks' => 6,  'rate_min' => 65, 'rate_max' => 80],
-            'Dansoman Cell' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
-            'Tema Community Cell' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
-            'Young Adults (18–35)' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
-            'Senior Saints (60+)' => ['weeks' => 0,  'rate_min' => 0,  'rate_max' => 0],
+            'Peace' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
+            'Faithfulness' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
+            'Patience 1' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
+            'Patience 2' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
+            'Joy' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
+            'Love' => ['weeks' => 8, 'rate_min' => 70, 'rate_max' => 90],
         ];
 
         foreach ($cells as $cell) {
+            // Skip Children Ministry — it tracks children, not adult members.
+            if ($cell->name === 'Children Ministry') {
+                continue;
+            }
+
             $profile = $profiles[$cell->name] ?? ['weeks' => 0, 'rate_min' => 0, 'rate_max' => 0];
             if ($profile['weeks'] === 0 || $cell->members->isEmpty()) {
                 continue;
@@ -288,9 +272,6 @@ class DemoDataSeeder extends Seeder
                 continue;
             }
 
-            // Pick the N most recent Sundays. Start from the most-recent
-            // past Sunday and walk backwards 7 days at a time to guarantee
-            // unique dates (avoids unique-constraint violations).
             $lastSunday = now()->copy()->startOfDay();
             while ($lastSunday->dayOfWeek !== Carbon::SUNDAY || $lastSunday->isFuture()) {
                 $lastSunday->subDay();
@@ -379,6 +360,8 @@ class DemoDataSeeder extends Seeder
             return;
         }
 
+        $childrenCell = Cell::where('branch_id', $branchId)->where('name', 'Children Ministry')->first();
+
         $childFirstNames = ['Kwame', 'Adwoa', 'Yaw', 'Akua', 'Kofi', 'Abena', 'Kwesi', 'Esi', 'Nana', 'Yaa', 'Kojo', 'Afua'];
         $classGroups = ['Nursery', 'Beginners', 'Primary', 'Juniors'];
 
@@ -386,6 +369,7 @@ class DemoDataSeeder extends Seeder
             $parent = $parents->random();
             Children::create([
                 'branch_id' => $branchId,
+                'cell_id' => $childrenCell?->id,
                 'guardian_member_id' => $parent->id,
                 'first_name' => $childFirstNames[array_rand($childFirstNames)],
                 'last_name' => $parent->last_name,
@@ -427,6 +411,54 @@ class DemoDataSeeder extends Seeder
                 'phone_used' => $member->phone,
                 'message_body' => $body,
             ]);
+        }
+    }
+
+    /**
+     * 10 weeks of children service attendance tied to the Children Ministry cell.
+     * Mirrors the adult Sunday attendance pattern so children's attendance
+     * aggregates into the same service dates for total-church reporting.
+     */
+    protected function seedChildrenAttendance(string $branchId, $admin): void
+    {
+        $childrenService = ServiceType::where('slug', 'sunday_children')->first();
+        $childrenCell = Cell::where('branch_id', $branchId)->where('name', 'Children Ministry')->first();
+
+        if (! $childrenService || ! $childrenCell) {
+            return;
+        }
+
+        $allChildren = Children::where('branch_id', $branchId)->where('is_active', true)->get();
+
+        if ($allChildren->isEmpty()) {
+            return;
+        }
+
+        for ($week = 0; $week < 10; $week++) {
+            $sunday = now()->startOfWeek()->subWeeks($week)->next(Carbon::SUNDAY);
+            if ($sunday->isFuture()) {
+                continue;
+            }
+
+            $session = AttendanceSession::create([
+                'branch_id' => $branchId,
+                'service_type_id' => $childrenService->id,
+                'cell_id' => $childrenCell->id,
+                'service_date' => $sunday,
+                'recorded_by' => $admin->id,
+            ]);
+
+            // 60-85% turnout
+            $attendingCount = (int) ($allChildren->count() * (rand(60, 85) / 100));
+            $attending = $allChildren->random($attendingCount);
+
+            foreach ($allChildren as $child) {
+                AttendanceRecord::create([
+                    'session_id' => $session->id,
+                    'child_id' => $child->id,
+                    'is_present' => $attending->contains('id', $child->id),
+                ]);
+            }
         }
     }
 }

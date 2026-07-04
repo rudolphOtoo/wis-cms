@@ -19,7 +19,7 @@ class Children extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'branch_id', 'guardian_member_id', 'first_name', 'last_name',
+        'branch_id', 'cell_id', 'guardian_member_id', 'first_name', 'last_name',
         'gender', 'date_of_birth', 'class_group', 'is_active', 'notes',
     ];
 
@@ -34,6 +34,11 @@ class Children extends Model
     public function guardian()
     {
         return $this->belongsTo(Member::class, 'guardian_member_id');
+    }
+
+    public function cell()
+    {
+        return $this->belongsTo(Cell::class);
     }
 
     public function getFullNameAttribute(): string
