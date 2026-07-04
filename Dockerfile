@@ -33,6 +33,8 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 
 WORKDIR /var/www/html
 COPY --from=vendor /app/vendor ./vendor
+
+ARG CACHEBUST
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
 

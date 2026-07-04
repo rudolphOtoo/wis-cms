@@ -193,7 +193,7 @@ class ImportCsv extends Command
                         // on (branch_id, phone) is respected. updateOrCreate
                         // will find an existing member by those columns and
                         // update (no-op if same data), or create a new row.
-                        $member = Member::updateOrCreate(
+                        $member = Member::withTrashed()->updateOrCreate(
                             ['branch_id' => $branch->id, 'phone' => $phone],
                             [
                                 'first_name' => $entry['first_name'],
@@ -203,6 +203,10 @@ class ImportCsv extends Command
                                 'status' => 'active',
                             ],
                         );
+
+                        if ($member->trashed()) {
+                            $member->restore();
+                        }
 
                         $phoneToMemberIds[$phone][] = $member->id;
                         $stats['adults_imported']++;
@@ -316,33 +320,20 @@ class ImportCsv extends Command
             return self::FAILURE;
         }
 
-        // ── Create cells & assign members ────────────────────────────
+        // ── Create cells (members assigned later by cell leaders) ────
         $this->line('');
         $this->info(' ── Setting up cells ...');
 
         $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
-        $cells = [];
 
         foreach ($cellNames as $name) {
-            $cells[] = Cell::firstOrCreate(
+            Cell::firstOrCreate(
                 ['branch_id' => $branch->id, 'name' => $name],
                 ['description' => null, 'is_active' => true],
             );
         }
 
-        $this->line(' ✓ Created / found '.count($cells).' cells');
-
-        // Distribute unassigned members across cells in round-robin
-        $unassigned = Member::where('branch_id', $branch->id)
-            ->whereNull('cell_id')
-            ->get();
-
-        if ($unassigned->isNotEmpty()) {
-            foreach ($unassigned as $i => $member) {
-                $member->update(['cell_id' => $cells[$i % count($cells)]->id]);
-            }
-            $this->line(" ✓ Assigned {$unassigned->count()} members to cells");
-        }
+        $this->line(' ✓ Created / found '.count($cellNames).' cells');
 
         $this->showSummary($stats);
 
