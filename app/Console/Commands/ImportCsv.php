@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Branch;
+use App\Models\Cell;
 use App\Models\Children;
 use App\Models\Member;
 use Carbon\Carbon;
@@ -313,6 +314,34 @@ class ImportCsv extends Command
             $this->error("Fatal transaction error: {$e->getMessage()}");
 
             return self::FAILURE;
+        }
+
+        // ── Create cells & assign members ────────────────────────────
+        $this->line('');
+        $this->info(' ── Setting up cells ...');
+
+        $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
+        $cells = [];
+
+        foreach ($cellNames as $name) {
+            $cells[] = Cell::firstOrCreate(
+                ['branch_id' => $branch->id, 'name' => $name],
+                ['description' => null, 'is_active' => true],
+            );
+        }
+
+        $this->line(' ✓ Created / found '.count($cells).' cells');
+
+        // Distribute unassigned members across cells in round-robin
+        $unassigned = Member::where('branch_id', $branch->id)
+            ->whereNull('cell_id')
+            ->get();
+
+        if ($unassigned->isNotEmpty()) {
+            foreach ($unassigned as $i => $member) {
+                $member->update(['cell_id' => $cells[$i % count($cells)]->id]);
+            }
+            $this->line(" ✓ Assigned {$unassigned->count()} members to cells");
         }
 
         $this->showSummary($stats);
