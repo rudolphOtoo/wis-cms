@@ -34,6 +34,11 @@ class ChildrenController extends Controller
             $query->where('is_active', $request->boolean('is_active'));
         }
 
+        if ($request->has('cell_id')) {
+            $cellId = $request->get('cell_id');
+            $cellId === 'null' ? $query->whereNull('cell_id') : $query->where('cell_id', $cellId);
+        }
+
         $children = $query
             ->orderBy('first_name')
             ->orderBy('last_name')

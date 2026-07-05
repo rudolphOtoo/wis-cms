@@ -10,6 +10,7 @@ use App\Http\Requests\Cell\StoreCellRequest;
 use App\Http\Requests\Cell\UpdateCellRequest;
 use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Cell;
+use App\Models\Children;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
@@ -75,7 +76,11 @@ class CellController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $cell = $this->scopedQuery($request)
-            ->with(['leader', 'members' => fn ($q) => $q->orderBy('first_name')])
+            ->with([
+                'leader',
+                'members' => fn ($q) => $q->orderBy('first_name'),
+                'children' => fn ($q) => $q->with('guardian')->orderBy('first_name'),
+            ])
             ->withCount('members')
             ->findOrFail($id);
 
@@ -155,6 +160,46 @@ class CellController extends Controller
     }
 
     /**
+     * Assign a child to this cell. Only works for the Children Ministry cell.
+     */
+    public function assignChild(Request $request, string $id, string $childId): JsonResponse
+    {
+        $cell = $this->scopedQuery($request)->findOrFail($id);
+
+        abort_if($cell->name !== 'Children Ministry', 422,
+            'Only the Children Ministry cell can have children assigned.');
+
+        $child = Children::findOrFail($childId);
+
+        $child->update(['cell_id' => $cell->id]);
+
+        activity()->causedBy($request->user())
+            ->performedOn($cell)
+            ->log("Assigned child {$child->full_name} to {$cell->name}");
+
+        return response()->json([
+            'message' => "{$child->full_name} assigned to {$cell->name}.",
+            'data' => $this->shape($cell->loadCount('members')),
+        ]);
+    }
+
+    public function unassignChild(Request $request, string $id, string $childId): JsonResponse
+    {
+        $cell = $this->scopedQuery($request)->findOrFail($id);
+        $child = Children::where('cell_id', $cell->id)->findOrFail($childId);
+
+        $child->update(['cell_id' => null]);
+
+        activity()->causedBy($request->user())
+            ->performedOn($cell)
+            ->log("Removed child {$child->full_name} from cell {$cell->name}");
+
+        return response()->json([
+            'message' => "{$child->full_name} removed from {$cell->name}.",
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function shape(Cell $cell, bool $withMembers = false): array
@@ -180,6 +225,19 @@ class CellController extends Controller
                 'last_name' => $m->last_name,
                 'phone' => $m->phone,
                 'status' => $m->status,
+            ])->all();
+
+            $out['children'] = $cell->children->map(fn ($c) => [
+                'id' => $c->id,
+                'first_name' => $c->first_name,
+                'last_name' => $c->last_name,
+                'full_name' => $c->full_name,
+                'class_group' => $c->class_group,
+                'is_active' => $c->is_active,
+                'guardian' => $c->guardian ? [
+                    'id' => $c->guardian->id,
+                    'name' => $c->guardian->full_name,
+                ] : null,
             ])->all();
         }
 
