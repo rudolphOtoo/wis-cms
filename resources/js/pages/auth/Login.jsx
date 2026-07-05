@@ -99,7 +99,7 @@ export default function Login() {
           </h1>
           <p className="italic"
              style={{fontFamily:'var(--font-display)',fontSize:'24px',lineHeight:'32px',color:'rgba(255,255,255,0.8)'}}>
-            Serving the body of Christ
+            With God all things are possible
           </p>
           <div className="mt-10 rounded-full"
                style={{width:'64px',height:'4px',backgroundColor:'rgba(201,168,76,0.40)'}} />
