@@ -48,6 +48,7 @@ return [
             'timeout' => 15,
             'connect_timeout' => 10,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
         ],
 
         'ses' => [
