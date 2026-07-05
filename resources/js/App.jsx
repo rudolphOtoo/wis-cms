@@ -1,4 +1,3 @@
-import React from 'react'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './context/AuthContext'
 import AppRouter from './routes/AppRouter'

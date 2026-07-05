@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { getDepartments, deleteDepartment, getDepartmentStats } from '../../api/departments'
