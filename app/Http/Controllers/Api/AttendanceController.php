@@ -23,10 +23,37 @@ class AttendanceController extends Controller
 {
     public function __construct(private readonly AttendanceStatsService $statsService) {}
 
+    /**
+     * Resolve the attendance data scope based on the authenticated user's role.
+     *
+     * @return array{type: 'all'|'scoped', cell_ids: list<string>, department_ids: list<string>}
+     */
+    private function resolveScope(Request $request): array
+    {
+        $user = $request->user();
+
+        // Admins see church-wide data
+        if ($user->hasAnyRole(['super_admin', 'pastor', 'secretary', 'finance_officer'])) {
+            return ['type' => 'all', 'cell_ids' => [], 'department_ids' => []];
+        }
+
+        $cellIds = $user->hasRole('cell_leader')
+            ? Cell::where('leader_user_id', $user->id)->pluck('id')->toArray()
+            : [];
+
+        $deptIds = $user->hasRole('department_leader')
+            ? Department::where('leader_user_id', $user->id)->pluck('id')->toArray()
+            : [];
+
+        return ['type' => 'scoped', 'cell_ids' => $cellIds, 'department_ids' => $deptIds];
+    }
+
     // GET /api/attendance
     public function index(Request $request): JsonResponse
     {
-        $sessions = AttendanceSession::query()
+        $scope = $this->resolveScope($request);
+
+        $query = AttendanceSession::query()
             // PERF FIX: 'records' must be eager-loaded here so that
             // AttendanceSession::getAdultCountAttribute() and
             // getChildrenCountAttribute() use the in-memory collection
@@ -37,8 +64,23 @@ class AttendanceController extends Controller
                 'records as children_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('child_id'),
             ])
             ->with(['serviceType', 'recorder', 'branch'])
-            ->orderByDesc('service_date')
-            ->paginate($request->integer('per_page', 20));
+            ->orderByDesc('service_date');
+
+        if ($scope['type'] === 'scoped') {
+            $query->where(function ($q) use ($scope) {
+                if (! empty($scope['cell_ids'])) {
+                    $q->whereIn('cell_id', $scope['cell_ids']);
+                }
+                if (! empty($scope['department_ids'])) {
+                    $q->orWhereIn('department_id', $scope['department_ids']);
+                }
+                if (empty($scope['cell_ids']) && empty($scope['department_ids'])) {
+                    $q->whereRaw('0 = 1');
+                }
+            });
+        }
+
+        $sessions = $query->paginate($request->integer('per_page', 20));
 
         return response()->json([
             'data' => AttendanceSessionResource::collection($sessions->items()),
@@ -326,10 +368,21 @@ class AttendanceController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
+        $scope = $this->resolveScope($request);
         $branchId = $request->user()->branch_id;
 
         return response()->json([
-            'data' => $this->statsService->getStats($branchId),
+            'data' => $this->statsService->getStats(
+                $branchId,
+                $scope['cell_ids'],
+                $scope['department_ids'],
+            ),
+            'role_context' => [
+                'type' => $scope['type'],
+                'cells' => $scope['type'] === 'scoped'
+                    ? Cell::whereIn('id', $scope['cell_ids'])->get(['id', 'name'])
+                    : [],
+            ],
         ]);
     }
 
@@ -343,6 +396,7 @@ class AttendanceController extends Controller
      */
     public function sundays(Request $request): JsonResponse
     {
+        $scope = $this->resolveScope($request);
         $branchId = $request->user()->branch_id;
         $perPage = $request->integer('per_page', 20);
 
@@ -357,6 +411,17 @@ class AttendanceController extends Controller
             ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
             ->where('s.branch_id', $branchId)
             ->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
+            ->when($scope['type'] === 'scoped', fn ($q) => $q->where(function ($q) use ($scope) {
+                if (! empty($scope['cell_ids'])) {
+                    $q->whereIn('s.cell_id', $scope['cell_ids']);
+                }
+                if (! empty($scope['department_ids'])) {
+                    $q->orWhereIn('s.department_id', $scope['department_ids']);
+                }
+                if (empty($scope['cell_ids']) && empty($scope['department_ids'])) {
+                    $q->whereRaw('0 = 1');
+                }
+            }))
             ->select([
                 's.service_date',
                 DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),

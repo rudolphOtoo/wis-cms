@@ -34,13 +34,14 @@ export default function AttendancePage() {
   const navigate  = useNavigate()
   const { can }   = usePermission()
   const [sessions, setSessions] = useState([])
-  const [stats,    setStats]    = useState(null)
-  const [sundays,  setSundays]  = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [page,     setPage]     = useState(1)
-  const [meta,     setMeta]     = useState(null)
-  const [sunPage,  setSunPage]  = useState(1)
-  const [sunMeta,  setSunMeta]  = useState(null)
+  const [stats,     setStats]    = useState(null)
+  const [sundays,   setSundays]  = useState([])
+  const [loading,   setLoading]  = useState(true)
+  const [page,      setPage]     = useState(1)
+  const [meta,      setMeta]     = useState(null)
+  const [sunPage,   setSunPage]  = useState(1)
+  const [sunMeta,   setSunMeta]  = useState(null)
+  const [roleCtx,   setRoleCtx]  = useState(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -58,6 +59,7 @@ export default function AttendancePage() {
         setSessions(aRes.data.data)
         setMeta(aRes.data.meta)
         setStats(sRes.data.data)
+        setRoleCtx(sRes.data.role_context ?? null)
         setSundays(sunRes.data.data)
         setSunMeta(sunRes.data)
       } catch (err) {
@@ -102,8 +104,16 @@ export default function AttendancePage() {
         <div>
           <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'32px',lineHeight:'40px',color:'var(--color-navy)'}}>
             Attendance Overview
+            {roleCtx?.type === 'scoped' && (
+              <span className="ml-3 align-middle text-sm font-semibold px-2.5 py-1 rounded-full"
+                    style={{backgroundColor:'rgba(0,36,82,0.08)',color:'var(--color-navy)',fontFamily:'system-ui',verticalAlign:'middle'}}>
+                My Cell
+              </span>
+            )}
           </h2>
-          <p style={{color:'#44474f'}}>Track Sunday and weekday service attendance</p>
+          <p style={{color:'#44474f'}}>
+            {roleCtx?.type === 'scoped' ? 'Track your cell\'s meeting attendance' : 'Track Sunday and weekday service attendance'}
+          </p>
         </div>
         {can('create attendance') && (
           <button onClick={() => navigate('/attendance/new')} className="btn-primary gap-2" style={{padding:'12px 24px'}}>
@@ -114,6 +124,33 @@ export default function AttendancePage() {
           </button>
         )}
       </div>
+
+      {/* Role context badge */}
+      {roleCtx?.type === 'scoped' && roleCtx?.cells?.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 rounded-lg"
+             style={{backgroundColor:'#eef2ff',border:'1px solid #c7d2fe',color:'var(--color-navy)'}}>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span className="text-sm font-semibold">Viewing your cell{roleCtx.cells.length > 1 ? 's' : ''}:</span>
+          {roleCtx.cells.map((c, i) => (
+            <span key={c.id}>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold"
+                    style={{backgroundColor:'var(--color-navy)',color:'white'}}>{c.name}</span>
+              {i < roleCtx.cells.length - 1 && <span className="ml-1 text-xs text-slate-500">,</span>}
+            </span>
+          ))}
+        </div>
+      )}
+      {roleCtx?.type === 'all' && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg"
+             style={{backgroundColor:'#f0fdf4',border:'1px solid #bbf7d0',color:'#15803d'}}>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          <span className="text-sm font-semibold">Viewing church-wide attendance data</span>
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -143,7 +180,9 @@ export default function AttendancePage() {
       <div style={{...cardBase, overflow:'hidden'}}>
         <div className="flex justify-between items-center"
              style={{padding:'16px 24px',borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fc'}}>
-          <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>Historical Records</h4>
+          <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
+            {roleCtx?.type === 'scoped' ? 'Session Records' : 'Historical Records'}
+          </h4>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -225,7 +264,7 @@ export default function AttendancePage() {
         <div className="flex justify-between items-center"
              style={{padding:'16px 24px',borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fc'}}>
           <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
-            Sunday Summary · Adults + Children
+            Sunday Summary {roleCtx?.type === 'scoped' ? '· Your Cell' : '· Adults + Children'}
           </h4>
         </div>
         <div className="overflow-x-auto">
@@ -312,7 +351,9 @@ export default function AttendancePage() {
              style={{borderRadius:'16px',padding:'24px',background:'linear-gradient(135deg,#002452 0%,#1b3a6b 100%)',boxShadow:'0 4px 12px rgba(13,31,60,0.05)'}}>
           <div className="absolute rounded-full" style={{bottom:'-40px',right:'-40px',width:'192px',height:'192px',background:'rgba(255,255,255,0.05)'}}/>
           <div className="relative z-10">
-            <h4 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600}}>Attendance Insights</h4>
+            <h4 className="mb-4" style={{fontFamily:'var(--font-display)',fontSize:'24px',fontWeight:600}}>
+              {roleCtx?.type === 'scoped' ? 'Your Cell\'s Attendance Insights' : 'Attendance Insights'}
+            </h4>
             {insights ? (
               <div className="space-y-4">
                 <div>
