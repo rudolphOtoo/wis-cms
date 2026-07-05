@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getAuditLog } from '../../api/audit'
 import { useDebounce } from '../../hooks/useDebounce'
 
