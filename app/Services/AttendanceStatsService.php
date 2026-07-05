@@ -36,6 +36,9 @@ class AttendanceStatsService
     /**
      * Build all attendance statistics for a given branch.
      *
+     * @param  string  $branchId  Branch to scope data to.
+     * @param  list<string>  $cellIds  When non-empty, only sessions for these cells are considered.
+     * @param  list<string>  $departmentIds  When non-empty, only sessions for these departments are considered.
      * @return array{
      *   last_sunday: array{total: int, by_cell: array<string, int>, date: string|null},
      *   average: int,
@@ -46,7 +49,7 @@ class AttendanceStatsService
      *   insights: array{top_service: string, avg_adults: int, avg_children: int, trend_direction: string},
      * }
      */
-    public function getStats(string $branchId): array
+    public function getStats(string $branchId, array $cellIds = [], array $departmentIds = []): array
     {
         // ─── Q1: Unified aggregation — one query, two FILTER columns ──────────
         // Single LEFT JOIN on attendance_records with FILTER clauses for adult
@@ -63,6 +66,14 @@ class AttendanceStatsService
             ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
             ->where('s.branch_id', $branchId)
             ->whereIn('st.type', ['adult', 'children'])
+            ->when($cellIds || $departmentIds, fn ($q) => $q->where(function ($q) use ($cellIds, $departmentIds) {
+                if ($cellIds) {
+                    $q->whereIn('s.cell_id', $cellIds);
+                }
+                if ($departmentIds) {
+                    $q->orWhereIn('s.department_id', $departmentIds);
+                }
+            }))
             ->select([
                 's.service_date',
                 's.cell_id',
@@ -118,7 +129,16 @@ class AttendanceStatsService
         }
 
         // ─── Q2: Total sessions (lightweight count) ───────────────────────────
-        $totalSessions = AttendanceSession::where('branch_id', $branchId)->count();
+        $totalSessions = AttendanceSession::where('branch_id', $branchId)
+            ->when($cellIds || $departmentIds, fn ($q) => $q->where(function ($q) use ($cellIds, $departmentIds) {
+                if ($cellIds) {
+                    $q->whereIn('cell_id', $cellIds);
+                }
+                if ($departmentIds) {
+                    $q->orWhereIn('department_id', $departmentIds);
+                }
+            }))
+            ->count();
 
         // ─── Average (last 4 distinct service dates) ─────────────────────────
         $last4Totals = $allDates->take(4)->map(fn (string $date) => [

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBranch;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,6 +30,46 @@ class AttendanceSession extends Model
             'service_date' => 'date',
             'follow_up_sent_at' => 'datetime',
         ];
+    }
+
+    // ─── Scopes ─────────────────────────────────────────────────────────────
+
+    /**
+     * Scope the query to only include sessions the given user is allowed to see.
+     *
+     * Admin roles (super_admin, pastor, secretary, finance_officer) see all
+     * sessions. Cell leaders see only their own cells' sessions. Department
+     * leaders see only their own departments' sessions.
+     */
+    public function scopeForUser(Builder $query, User $user): void
+    {
+        if ($user->hasAnyRole(['super_admin', 'pastor', 'secretary', 'finance_officer'])) {
+            return;
+        }
+
+        $query->where(function (Builder $q) use ($user) {
+            $hasConditions = false;
+
+            if ($user->hasRole('cell_leader')) {
+                $cellIds = Cell::where('leader_user_id', $user->id)->pluck('id');
+                if ($cellIds->isNotEmpty()) {
+                    $q->whereIn('cell_id', $cellIds);
+                    $hasConditions = true;
+                }
+            }
+
+            if ($user->hasRole('department_leader')) {
+                $deptIds = Department::where('leader_user_id', $user->id)->pluck('id');
+                if ($deptIds->isNotEmpty()) {
+                    $q->orWhereIn('department_id', $deptIds);
+                    $hasConditions = true;
+                }
+            }
+
+            if (! $hasConditions) {
+                $q->whereRaw('0 = 1');
+            }
+        });
     }
 
     // ─── Relationships ─────────────────────────────────────────────────────
