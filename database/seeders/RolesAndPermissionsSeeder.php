@@ -89,6 +89,16 @@ class RolesAndPermissionsSeeder extends Seeder
             'view service reminders',
         ]);
 
+        $childrenMinistryLeader = Role::firstOrCreate(['name' => 'children_ministry_leader']);
+        $childrenMinistryLeader->syncPermissions([
+            'view members', 'create members', 'edit members', 'view cells', 'manage cell members',
+            'view attendance', 'create attendance', 'view reports',
+            'message own cell',
+            'view birthday messages',
+            'view service reminders',
+            'view children', 'create children', 'edit children',
+        ]);
+
         $usher = Role::firstOrCreate(['name' => 'usher']);
         $usher->syncPermissions([
             'view members', 'view children', 'create attendance', 'view attendance',

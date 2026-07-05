@@ -350,7 +350,14 @@ class MemberController extends Controller
         }
 
         $tempPassword = Str::password(12);
-        $roleName = $data['leadership_type'] === 'cell' ? 'cell_leader' : 'department_leader';
+
+        if ($data['leadership_type'] === 'cell') {
+            $roleName = $unit->name === 'Children Ministry'
+                ? 'children_ministry_leader'
+                : 'cell_leader';
+        } else {
+            $roleName = 'department_leader';
+        }
 
         $user = DB::transaction(function () use ($member, $unit, $data, $tempPassword, $roleName, $branchId) {
             $newUser = User::create([
