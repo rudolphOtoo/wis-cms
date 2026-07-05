@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getAttendance, getAttendanceStats } from '../../api/attendance'
+import { getAttendance, getAttendanceStats, getSundayAttendance } from '../../api/attendance'
 import { usePermission } from '../../hooks/usePermission'
 
 const cardBase = {
@@ -35,9 +35,12 @@ export default function AttendancePage() {
   const { can }   = usePermission()
   const [sessions, setSessions] = useState([])
   const [stats,    setStats]    = useState(null)
+  const [sundays,  setSundays]  = useState([])
   const [loading,  setLoading]  = useState(true)
   const [page,     setPage]     = useState(1)
   const [meta,     setMeta]     = useState(null)
+  const [sunPage,  setSunPage]  = useState(1)
+  const [sunMeta,  setSunMeta]  = useState(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -46,14 +49,17 @@ export default function AttendancePage() {
     const load = async () => {
       setLoading(true)
       try {
-        const [aRes, sRes] = await Promise.all([
+        const [aRes, sRes, sunRes] = await Promise.all([
           getAttendance({ page, per_page: 15 }, controller.signal),
           getAttendanceStats(controller.signal),
+          getSundayAttendance({ page: sunPage, per_page: 10 }, controller.signal),
         ])
         if (!mounted) return
         setSessions(aRes.data.data)
         setMeta(aRes.data.meta)
         setStats(sRes.data.data)
+        setSundays(sunRes.data.data)
+        setSunMeta(sunRes.data)
       } catch (err) {
         if (!mounted || err?.code === 'ERR_CANCELED') return
         console.error(err)
@@ -68,17 +74,21 @@ export default function AttendancePage() {
       mounted = false
       controller.abort()
     }
-  }, [page])
+  }, [page, sunPage])
 
   const wow = stats?.week_over_week_pct
   const insights = stats?.insights
   const trend = stats?.monthly_trend ?? []
 
+  const lastSun = stats?.last_sunday
+
   const statCards = [
     {
-      label:'Last Sunday Attendance', value: stats?.last_sunday?.total ?? '—', icon: ICONS.groups,
+      label:'Last Sunday Attendance', value: lastSun?.total ?? '—', icon: ICONS.groups,
       badge: wow !== null && wow !== undefined ? wow : null,
-      sub: stats?.last_sunday?.date ? new Date(stats.last_sunday.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : null,
+      sub: lastSun?.date
+        ? `${new Date(lastSun.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' })} · ${lastSun.adults ?? 0} adults, ${lastSun.children ?? 0} children`
+        : null,
     },
     { label:'Average Attendance',      value: stats?.average ?? '—', icon: ICONS.equalizer, sub:'Recent services' },
     { label:'Total Sessions',          value: stats?.total_sessions ?? '—', icon: ICONS.calendar, sub:'All time' },
@@ -201,6 +211,63 @@ export default function AttendancePage() {
               </button>
               <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{meta.current_page}</span>
               <button disabled={page === meta.last_page} onClick={() => setPage(p => p + 1)}
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sunday Summary — combined adult + children per Sunday */}
+      <div style={{...cardBase, overflow:'hidden'}}>
+        <div className="flex justify-between items-center"
+             style={{padding:'16px 24px',borderBottom:'1px solid var(--color-surface-border)',backgroundColor:'#f8f9fc'}}>
+          <h4 className="uppercase tracking-wider" style={{fontSize:'14px',fontWeight:700,color:'var(--color-navy)'}}>
+            Sunday Summary · Adults + Children
+          </h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr style={{backgroundColor:'#f2f3f6'}}>
+                {['Date','Adults','Children','Total'].map(h => (
+                  <th key={h} className="uppercase" style={{padding:'12px 24px',fontSize:'12px',fontWeight:700,color:'#747780'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sundays.length === 0 ? (
+                <tr><td colSpan={4} className="text-center" style={{padding:'48px',color:'#9ca3af'}}>No Sunday data yet</td></tr>
+              ) : sundays.map((row) => (
+                <tr key={row.service_date} className="transition-colors"
+                    style={{borderTop:'1px solid var(--color-surface-border)'}}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor='#f8f9fc'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>
+                  <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:600,color:'#191c1e'}}>{row.service_date}</td>
+                  <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{row.adult_count}</td>
+                  <td style={{padding:'16px 24px',fontSize:'15px',color:'#44474f'}}>{row.children_count}</td>
+                  <td style={{padding:'16px 24px',fontSize:'15px',fontWeight:700,color:'var(--color-navy)'}}>{row.total_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {sunMeta && sunMeta.last_page > 1 && (
+          <div className="flex justify-between items-center"
+               style={{padding:'16px 24px',backgroundColor:'#f8f9fc',borderTop:'1px solid var(--color-surface-border)'}}>
+            <p style={{fontSize:'14px',color:'#44474f'}}>
+              Page <span className="font-bold" style={{color:'var(--color-navy)'}}>{sunMeta.current_page}</span> of <span className="font-bold" style={{color:'var(--color-navy)'}}>{sunMeta.last_page}</span> · {sunMeta.total} Sundays
+            </p>
+            <div className="flex items-center gap-2">
+              <button disabled={sunPage === 1} onClick={() => setSunPage(p => p - 1)}
+                      className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
+                      style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+              </button>
+              <span className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style={{backgroundColor:'var(--color-navy)'}}>{sunMeta.current_page}</span>
+              <button disabled={sunPage === sunMeta.last_page} onClick={() => setSunPage(p => p + 1)}
                       className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-50"
                       style={{border:'1px solid var(--color-surface-border)',color:'var(--color-navy)'}}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>

@@ -62,6 +62,8 @@
                 <x-sidebar-link href="#" label="Cells" />
                 <x-sidebar-link href="#" label="Visitors" />
                 <x-sidebar-link href="#" label="Messages" />
+                <x-sidebar-link href="#" label="Birthdays" />
+                <x-sidebar-link href="#" label="Reminders" />
             </nav>
 
             {{-- User footer --}}

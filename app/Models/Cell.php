@@ -59,4 +59,13 @@ class Cell extends Model
 
         return $this->members()->count();
     }
+
+    public function getChildrenCountAttribute(): int
+    {
+        if (array_key_exists('children_count', $this->attributes)) {
+            return (int) $this->attributes['children_count'];
+        }
+
+        return $this->children()->count();
+    }
 }

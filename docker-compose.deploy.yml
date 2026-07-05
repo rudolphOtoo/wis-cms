@@ -26,6 +26,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      QUEUE_CONNECTION: database
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +55,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      QUEUE_CONNECTION: database
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     depends_on:
       app:
@@ -68,6 +70,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      QUEUE_CONNECTION: database
     command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
       app:

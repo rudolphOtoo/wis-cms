@@ -39,6 +39,13 @@ class ChildrenController extends Controller
             $cellId === 'null' ? $query->whereNull('cell_id') : $query->where('cell_id', $cellId);
         }
 
+        if ($request->has('exclude_cell_id')) {
+            $excludeCellId = $request->get('exclude_cell_id');
+            $query->where(function ($q) use ($excludeCellId) {
+                $q->whereNull('cell_id')->orWhere('cell_id', '!=', $excludeCellId);
+            });
+        }
+
         $children = $query
             ->orderBy('first_name')
             ->orderBy('last_name')

@@ -59,13 +59,15 @@ export default function CellsPage() {
 
   const total    = cells.length
   const active   = cells.filter(c => c.is_active).length
-  const assigned = cells.reduce((sum, c) => sum + (c.members_count || 0), 0)
+  const assigned = cells.reduce((sum, c) => sum + (
+    c.name === 'Children Ministry' ? (c.children_count || 0) : (c.members_count || 0)
+  ), 0)
   const activePct = total > 0 ? (active / total) * 100 : 0
 
   const statCards = [
     { label:'Total Cells',      value: total,    icon: ICONS.home,     barPct: 100,       barColor:'var(--color-navy)' },
     { label:'Active',           value: active,   icon: ICONS.verified, barPct: activePct, barColor:'var(--color-gold)' },
-    { label:'Members Assigned', value: assigned, icon: ICONS.groups,   barPct: 75,        barColor:'var(--color-navy)' },
+    { label:'Total Assigned', value: assigned, icon: ICONS.groups,   barPct: 75,        barColor:'var(--color-navy)' },
   ]
 
   return (
@@ -155,7 +157,12 @@ export default function CellsPage() {
               <div className="flex items-center justify-between mt-6 pt-6" style={{borderTop:'1px solid var(--color-surface-border)'}}>
                 <div className="flex items-center gap-1.5" style={{color:'#747780'}}>
                   <Icon d={ICONS.groups} size={18} />
-                  <span style={{fontSize:'14px'}}><span className="font-semibold" style={{color:'var(--color-navy)'}}>{cell.members_count}</span> Members</span>
+                  <span style={{fontSize:'14px'}}>
+                    <span className="font-semibold" style={{color:'var(--color-navy)'}}>
+                      {cell.name === 'Children Ministry' ? cell.children_count : cell.members_count}
+                    </span>
+                    {' '}{cell.name === 'Children Ministry' ? 'Children' : 'Members'}
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => navigate(`/cells/${cell.id}`)}

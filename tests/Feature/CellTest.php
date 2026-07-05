@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Cell;
+use App\Models\Children;
 use App\Models\Member;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -104,6 +105,63 @@ class CellTest extends TestCase
         $this->asAdmin()->deleteJson("/api/cells/{$cell->id}")->assertOk();
 
         $this->assertNull($m->fresh()->cell_id);
+    }
+
+    // ── Child Assignment ─────────────────────────────────────────────────
+
+    public function test_assign_child_to_children_ministry_succeeds(): void
+    {
+        $cell = Cell::create(['branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true]);
+        $child = Children::create([
+            'branch_id' => $this->branch->id, 'first_name' => 'Kwesi', 'last_name' => 'A.',
+            'gender' => 'male', 'guardian_member_id' => $this->member()->id,
+        ]);
+
+        $this->asAdmin()->postJson("/api/cells/{$cell->id}/children/{$child->id}")->assertOk();
+
+        $this->assertSame($cell->id, $child->fresh()->cell_id);
+    }
+
+    public function test_assign_child_rejects_if_already_in_this_cell(): void
+    {
+        $cell = Cell::create(['branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true]);
+        $child = Children::create([
+            'branch_id' => $this->branch->id, 'first_name' => 'Kwesi', 'last_name' => 'A.',
+            'gender' => 'male', 'guardian_member_id' => $this->member()->id, 'cell_id' => $cell->id,
+        ]);
+
+        $this->asAdmin()->postJson("/api/cells/{$cell->id}/children/{$child->id}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', "{$child->full_name} is already assigned to {$cell->name}.");
+
+        // cell_id should remain unchanged
+        $this->assertSame($cell->id, $child->fresh()->cell_id);
+    }
+
+    public function test_assign_child_rejects_non_children_ministry_cell(): void
+    {
+        $cell = Cell::create(['branch_id' => $this->branch->id, 'name' => 'Adult Cell', 'is_active' => true]);
+        $child = Children::create([
+            'branch_id' => $this->branch->id, 'first_name' => 'Kwesi', 'last_name' => 'A.',
+            'gender' => 'male', 'guardian_member_id' => $this->member()->id,
+        ]);
+
+        $this->asAdmin()->postJson("/api/cells/{$cell->id}/children/{$child->id}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Only the Children Ministry cell can have children assigned.');
+    }
+
+    public function test_unassigning_a_child_clears_cell_id(): void
+    {
+        $cell = Cell::create(['branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true]);
+        $child = Children::create([
+            'branch_id' => $this->branch->id, 'first_name' => 'Kwesi', 'last_name' => 'A.',
+            'gender' => 'male', 'guardian_member_id' => $this->member()->id, 'cell_id' => $cell->id,
+        ]);
+
+        $this->asAdmin()->deleteJson("/api/cells/{$cell->id}/children/{$child->id}")->assertOk();
+
+        $this->assertNull($child->fresh()->cell_id);
     }
 
     public function test_member_role_cannot_manage_cells(): void

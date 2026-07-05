@@ -42,6 +42,8 @@ const MAIN_NAV = [
   { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells',      hideForRoles: ['cell_leader'] },
   { to: '/visitors',          label: 'Visitors',    icon: UserPlus,        permission: 'view visitors' },
   { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
+  { to: '/birthdays',         label: 'Birthdays',   icon: Gift,            permission: 'view birthday messages' },
+  { to: '/reminders',         label: 'Reminders',   icon: Bell,            permission: 'view service reminders' },
   { to: '/admin/submissions', label: 'Submissions', icon: FileText,        permission: 'view member submissions' },
 ]
 

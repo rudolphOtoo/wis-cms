@@ -45,7 +45,7 @@ class CellController extends Controller
         $perPage = $request->integer('per_page', 50);
         $cells = $this->scopedQuery($request)
             ->with('leader')
-            ->withCount('members')
+            ->withCount(['members', 'children'])
             ->orderBy('name')
             ->paginate($perPage)
             ->through(fn ($c) => $this->shape($c));
@@ -69,7 +69,7 @@ class CellController extends Controller
 
         return response()->json([
             'message' => 'Cell created successfully.',
-            'data' => $this->shape($cell->load('leader')->loadCount('members')),
+            'data' => $this->shape($cell->load('leader')->loadCount(['members', 'children'])),
         ], 201);
     }
 
@@ -81,7 +81,7 @@ class CellController extends Controller
                 'members' => fn ($q) => $q->orderBy('first_name'),
                 'children' => fn ($q) => $q->with('guardian')->orderBy('first_name'),
             ])
-            ->withCount('members')
+            ->withCount(['members', 'children'])
             ->findOrFail($id);
 
         return response()->json(['data' => $this->shape($cell, withMembers: true)]);
@@ -171,6 +171,9 @@ class CellController extends Controller
 
         $child = Children::findOrFail($childId);
 
+        abort_if($child->cell_id === $cell->id, 422,
+            "{$child->full_name} is already assigned to {$cell->name}.");
+
         $child->update(['cell_id' => $cell->id]);
 
         activity()->causedBy($request->user())
@@ -216,6 +219,8 @@ class CellController extends Controller
             ] : null,
             'members_count' => $cell->members_count
                 ?? ($cell->relationLoaded('members') ? $cell->members->count() : 0),
+            'children_count' => $cell->children_count
+                ?? ($cell->relationLoaded('children') ? $cell->children->count() : 0),
         ];
 
         if ($withMembers) {

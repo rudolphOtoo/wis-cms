@@ -332,4 +332,41 @@ class AttendanceController extends Controller
             'data' => $this->statsService->getStats($branchId),
         ]);
     }
+
+    /**
+     * GET /api/attendance/sundays
+     *
+     * Returns combined adult + children attendance per Sunday, using a
+     * single performant query. Each row shows the Sunday date, adult count,
+     * children count, and grand total — so the Children Ministry numbers
+     * are seamlessly aggregated into the master church attendance.
+     */
+    public function sundays(Request $request): JsonResponse
+    {
+        $branchId = $request->user()->branch_id;
+        $perPage = $request->integer('per_page', 20);
+
+        // Single query — no N+1. Uses FILTER clauses for adult/children split.
+        $rows = DB::table('attendance_sessions as s')
+            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
+            ->leftJoin('attendance_records as ar', function ($join) {
+                $join->on('ar.session_id', '=', 's.id')
+                    ->whereNull('ar.deleted_at')
+                    ->where('ar.is_present', '=', true);
+            })
+            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
+            ->where('s.branch_id', $branchId)
+            ->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
+            ->select([
+                's.service_date',
+                DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),
+                DB::raw('COUNT(*) FILTER (WHERE ar.child_id  IS NOT NULL) AS children_count'),
+                DB::raw('COUNT(*) FILTER (WHERE ar.id IS NOT NULL) AS total_count'),
+            ])
+            ->groupBy('s.service_date')
+            ->orderByDesc('s.service_date')
+            ->paginate($perPage);
+
+        return response()->json($rows);
+    }
 }

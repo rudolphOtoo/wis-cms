@@ -48,60 +48,52 @@ class AttendanceStatsService
      */
     public function getStats(string $branchId): array
     {
-        // ─── Q1a: Aggregated adult counts for all adult sessions ──────────────
-        // LEFT JOIN so sessions with zero marked attendance still appear.
-        // We filter is_present AND member_id IS NOT NULL in SQL to keep the
-        // result set small. deleted_at filter respects the SoftDeletes added
-        // in migration PERF-07.
-        $adultAggregates = DB::table('attendance_sessions as s')
+        // ─── Q1: Unified aggregation — one query, two FILTER columns ──────────
+        // Single LEFT JOIN on attendance_records with FILTER clauses for adult
+        // vs children counts. This replaces the previous two-query approach
+        // (adult + children) merged in PHP, reducing query count from 2 to 1
+        // while PostgreSQL handles the conditional aggregation natively.
+        $sessionAggregates = DB::table('attendance_sessions as s')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
             ->leftJoin('attendance_records as ar', function ($join) {
                 $join->on('ar.session_id', '=', 's.id')
                     ->whereNull('ar.deleted_at')
-                    ->whereNotNull('ar.member_id')
-                    ->where('ar.is_present', '=', true);
-            })
-            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
-            ->where('s.branch_id', $branchId)      // explicit: BranchScope doesn't apply here
-            ->where('st.type', 'adult')
-            ->select([
-                's.service_date',
-                's.cell_id',
-                'st.name AS service_type_name',
-                DB::raw("COALESCE(c.name, 'Unassigned') AS cell_name"),
-                DB::raw('COUNT(ar.id) AS count'),
-            ])
-            ->groupBy('s.service_date', 's.cell_id', 'st.name', 'c.name')
-            ->orderByDesc('s.service_date')
-            ->get();
-
-        // ─── Q1b: Aggregated children counts for all children sessions ────────
-        // Mirrors the adult query but uses child_id for counting. Children
-        // sessions are linked to the Children Ministry cell so the cell name
-        // comes from the cells table via the LEFT JOIN.
-        $childrenAggregates = DB::table('attendance_sessions as s')
-            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-            ->leftJoin('attendance_records as ar', function ($join) {
-                $join->on('ar.session_id', '=', 's.id')
-                    ->whereNull('ar.deleted_at')
-                    ->whereNotNull('ar.child_id')
                     ->where('ar.is_present', '=', true);
             })
             ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
             ->where('s.branch_id', $branchId)
-            ->where('st.type', 'children')
+            ->whereIn('st.type', ['adult', 'children'])
             ->select([
                 's.service_date',
                 's.cell_id',
                 'st.name AS service_type_name',
-                DB::raw("COALESCE(c.name, 'Children Ministry') AS cell_name"),
-                DB::raw('COUNT(ar.id) AS count'),
+                'st.type AS service_type',
+                DB::raw("COALESCE(c.name, 'Unassigned') AS cell_name"),
+                DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),
+                DB::raw('COUNT(*) FILTER (WHERE ar.child_id IS NOT NULL) AS children_count'),
             ])
-            ->groupBy('s.service_date', 's.cell_id', 'st.name', 'c.name')
+            ->groupBy('s.service_date', 's.cell_id', 'st.name', 'st.type', 'c.name')
+            ->orderByDesc('s.service_date')
             ->get();
 
-        // ─── Merge adult + children into a single collection ──────────────────
-        $sessionAggregates = $adultAggregates->concat($childrenAggregates);
+        // ─── Group by date for O(1) slicing ──────────────────────────────────
+        /** @var Collection<string, Collection> $byDate */
+        $byDate = $sessionAggregates->groupBy('service_date');
+        $allDates = $byDate->keys()->sortDesc()->values();
+
+        // ─── Compute total per row as adult_count + children_count ──────────
+        $sessionAggregates = $sessionAggregates->map(fn ($r) => (object) [
+            'service_date' => $r->service_date,
+            'cell_id' => $r->cell_id,
+            'service_type_name' => $r->service_type_name,
+            'service_type' => $r->service_type,
+            'cell_name' => $r->service_type === 'children'
+                ? 'Children Ministry'
+                : ($r->cell_name ?: 'Unassigned'),
+            'adult_count' => (int) $r->adult_count,
+            'children_count' => (int) $r->children_count,
+            'count' => (int) $r->adult_count + (int) $r->children_count,
+        ]);
 
         // ─── Group by date for O(1) slicing ──────────────────────────────────
         /** @var Collection<string, Collection> $byDate */
@@ -111,14 +103,17 @@ class AttendanceStatsService
         // ─── Last Sunday (most recent service date) ──────────────────────────
         $lastSundayDate = $allDates->first();
         $lastSundayTotal = 0;
+        $lastSundayAdults = 0;
+        $lastSundayChildren = 0;
         $lastSundayByCell = [];
 
         if ($lastSundayDate) {
             foreach ($byDate->get($lastSundayDate) as $row) {
-                $count = (int) $row->count;
-                $lastSundayTotal += $count;
+                $lastSundayTotal += $row->count;
+                $lastSundayAdults += $row->adult_count;
+                $lastSundayChildren += $row->children_count;
                 $cellName = $row->cell_name;
-                $lastSundayByCell[$cellName] = ($lastSundayByCell[$cellName] ?? 0) + $count;
+                $lastSundayByCell[$cellName] = ($lastSundayByCell[$cellName] ?? 0) + $row->count;
             }
         }
 
@@ -185,17 +180,19 @@ class AttendanceStatsService
             ->first();
 
         // ─── Separate averages for adults and children ───────────────────────
-        $avgAdults = $adultAggregates->count() > 0
-            ? (int) round($adultAggregates->avg('count'))
+        $avgAdults = $sessionAggregates->count() > 0
+            ? (int) round($sessionAggregates->avg('adult_count'))
             : 0;
 
-        $avgChildren = $childrenAggregates->count() > 0
-            ? (int) round($childrenAggregates->avg('count'))
+        $avgChildren = $sessionAggregates->count() > 0
+            ? (int) round($sessionAggregates->avg('children_count'))
             : 0;
 
         return [
             'last_sunday' => [
                 'total' => $lastSundayTotal,
+                'adults' => $lastSundayAdults,
+                'children' => $lastSundayChildren,
                 'by_cell' => $lastSundayByCell,
                 'date' => $lastSundayDate,
             ],

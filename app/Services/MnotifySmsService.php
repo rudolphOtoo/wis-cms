@@ -36,6 +36,13 @@ class MnotifySmsService
      */
     public function send(string $phone, string $message): bool
     {
+        // Safety gate: never fire real SMS from local or testing environments.
+        if (app()->environment('local', 'testing')) {
+            Log::info("[DEV DRY-RUN] SMS intercepted for {$phone}: {$message}");
+
+            return true;
+        }
+
         $apiKey = config('services.mnotify.api_key');
 
         // No key configured (dev / pre-launch): permanent failure.
