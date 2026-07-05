@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Attendance\CreateAttendanceSessionRequest;
+use App\Http\Requests\Attendance\MarkAttendanceRequest;
 use App\Http\Resources\AttendanceSessionResource;
 use App\Models\AttendanceRecord;
 use App\Models\AttendanceSession;
 use App\Models\Cell;
 use App\Models\Children;
 use App\Models\Department;
-use App\Models\Member;
 use App\Models\ServiceType;
 use App\Services\AttendanceStatsService;
 use Illuminate\Http\JsonResponse;
@@ -102,61 +103,16 @@ class AttendanceController extends Controller
     }
 
     // POST /api/attendance/sessions
-    public function createSession(Request $request): JsonResponse
+    public function createSession(CreateAttendanceSessionRequest $request): JsonResponse
     {
-        $request->validate([
-            'service_type_id' => ['required', 'uuid', 'exists:service_types,id'],
-            'service_date' => ['required', 'date'],
-            'notes' => ['nullable', 'string'],
-            'department_id' => ['nullable', 'uuid', 'exists:departments,id'],
-            'cell_id' => ['nullable', 'uuid', 'exists:cells,id'],
-        ]);
+        $validated = $request->validated();
+        $departmentId = $validated['department_id'] ?? null;
+        $cellId = $validated['cell_id'] ?? null;
 
-        if ($request->department_id && $request->cell_id) {
-            return response()->json([
-                'message' => 'A session cannot be both a department and a cell meeting.',
-            ], 422);
-        }
-
-        $serviceType = ServiceType::find($request->service_type_id);
-        if ($serviceType && $serviceType->type === 'adult' && ! $request->cell_id && ! $request->department_id) {
-            return response()->json([
-                'message' => 'Adult service attendance must be recorded per cell. Please select a cell.',
-                'errors' => ['cell_id' => ['Adult service attendance must be recorded per cell.']],
-            ], 422);
-        }
-
-        if ($serviceType && $serviceType->type === 'children' && ! $request->cell_id) {
-            return response()->json([
-                'message' => 'Children service attendance must be recorded per cell. Please select the Children Ministry cell.',
-                'errors' => ['cell_id' => ['Children service attendance must be recorded per cell.']],
-            ], 422);
-        }
-
-        $departmentId = $request->department_id;
-        if ($departmentId) {
-            $user = $request->user();
-            $leadsIt = Department::where('id', $departmentId)->where('leader_user_id', $user->id)->exists();
-            $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
-            if (! $leadsIt && ! $isAdmin) {
-                return response()->json(['message' => 'You can only record meetings for a department you lead.'], 403);
-            }
-        }
-
-        $cellId = $request->cell_id;
-        if ($cellId) {
-            $user = $request->user();
-            $leadsCell = Cell::where('id', $cellId)->where('leader_user_id', $user->id)->exists();
-            $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
-            if (! $leadsCell && ! $isAdmin) {
-                return response()->json(['message' => 'You can only record meetings for a cell you lead.'], 403);
-            }
-        }
-
-        $existing = AttendanceSession::where('service_type_id', $request->service_type_id)
+        $existing = AttendanceSession::where('service_type_id', $validated['service_type_id'])
             ->where('department_id', $departmentId)
             ->where('cell_id', $cellId)
-            ->whereDate('service_date', $request->service_date)
+            ->whereDate('service_date', $validated['service_date'])
             ->first();
 
         if ($existing) {
@@ -168,17 +124,17 @@ class AttendanceController extends Controller
 
         $session = AttendanceSession::create([
             'branch_id' => $request->user()->branch_id,
-            'service_type_id' => $request->service_type_id,
+            'service_type_id' => $validated['service_type_id'],
             'department_id' => $departmentId,
             'cell_id' => $cellId,
-            'service_date' => $request->service_date,
-            'notes' => $request->notes,
+            'service_date' => $validated['service_date'],
+            'notes' => $validated['notes'] ?? null,
             'recorded_by' => $request->user()->id,
         ]);
 
         activity()->causedBy($request->user())
             ->performedOn($session)
-            ->log("Opened attendance session for {$request->service_date}");
+            ->log("Opened attendance session for {$validated['service_date']}");
 
         return response()->json([
             'message' => 'Attendance session created.',
@@ -259,91 +215,35 @@ class AttendanceController extends Controller
      *
      * CRITICAL-02 FIX — three security holes closed:
      *
-     * 1. OWNERSHIP GATE: mirrors the createSession() check. The user marking
-     *    attendance must lead the cell/department the session belongs to, or
-     *    hold an admin role. Without this, any user with 'create attendance'
+     * 1. OWNERSHIP GATE: The FormRequest's authorize() ensures the user
+     *    leads the cell/department the session belongs to, or holds an
+     *    admin role. Without this, any user with 'create attendance'
      *    permission could overwrite another leader's attendance records.
      *
-     * 2. BRANCH-SCOPED person_id VALIDATION: records.*.person_id is validated
-     *    as a UUID but previously accepted any UUID — including member/child
-     *    IDs from other branches. We now pre-fetch the set of valid IDs
-     *    (scoped to this branch) and reject any person_id not in that set.
+     * 2. BRANCH-SCOPED person_id VALIDATION: The FormRequest's withValidator
+     *    pre-fetches the set of valid IDs (scoped to this branch) and rejects
+     *    any person_id not in that set — preventing cross-branch UUIDs.
      *
      * 3. DB::transaction() WRAP: the loop was previously un-wrapped. If it
      *    failed midway, the session was left with partial attendance records
      *    (e.g., 46 of 90 members marked). Now the entire batch is atomic —
      *    either all records are saved or none are.
      */
-    public function markAttendance(Request $request, string $id): JsonResponse
+    public function markAttendance(MarkAttendanceRequest $request, string $id): JsonResponse
     {
-        $request->validate([
-            'records' => ['required', 'array', 'min:1'],
-            'records.*.person_id' => ['required', 'uuid'],
-            'records.*.type' => ['required', 'in:member,child'],
-            'records.*.is_present' => ['required', 'boolean'],
-        ]);
-
-        // BranchScope on AttendanceSession ensures this session belongs to
-        // the auth user's branch — cross-branch sessions return 404 here.
         $session = AttendanceSession::findOrFail($id);
-        $user = $request->user();
-        $branchId = $user->branch_id;
-        $isAdmin = $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+        $this->authorize('markAttendance', $session);
 
-        // ── Ownership gate ─────────────────────────────────────────────────
-        if ($session->cell_id && ! $isAdmin) {
-            $leadsCell = Cell::where('id', $session->cell_id)
-                ->where('leader_user_id', $user->id)
-                ->exists();
-            abort_if(! $leadsCell, 403, 'You can only mark attendance for a cell you lead.');
-        }
+        $records = collect($request->validated('records'));
 
-        if ($session->department_id && ! $isAdmin) {
-            $leadsDept = Department::where('id', $session->department_id)
-                ->where('leader_user_id', $user->id)
-                ->exists();
-            abort_if(! $leadsDept, 403, 'You can only mark attendance for a department you lead.');
-        }
-
-        // ── Pre-fetch valid person IDs scoped to this branch ───────────────
-        // Collects all member_ids and child_ids from the payload in two
-        // single queries, then validates each record against these sets.
-        // This prevents cross-branch UUIDs from being written as attendance.
-        $records = collect($request->records);
-        $memberUuids = $records->where('type', 'member')->pluck('person_id')->unique();
-        $childUuids = $records->where('type', 'child')->pluck('person_id')->unique();
-
-        $validMemberIds = Member::whereIn('id', $memberUuids)
-            ->where('branch_id', $branchId)
-            ->pluck('id')
-            ->flip();
-
-        $validChildIds = Children::whereIn('id', $childUuids)
-            ->where('branch_id', $branchId)
-            ->pluck('id')
-            ->flip();
-
-        // ── Atomic batch write ─────────────────────────────────────────────
-        DB::transaction(function () use ($records, $session, $validMemberIds, $validChildIds): void {
+        DB::transaction(function () use ($records, $session): void {
             foreach ($records as $record) {
                 if ($record['type'] === 'member') {
-                    abort_unless(
-                        $validMemberIds->has($record['person_id']),
-                        422,
-                        "Member ID {$record['person_id']} is not valid for this branch."
-                    );
-
                     AttendanceRecord::updateOrCreate(
                         ['session_id' => $session->id, 'member_id' => $record['person_id']],
                         ['is_present' => $record['is_present'], 'child_id' => null]
                     );
                 } else {
-                    abort_unless(
-                        $validChildIds->has($record['person_id']),
-                        422,
-                        "Child ID {$record['person_id']} is not valid for this branch."
-                    );
-
                     AttendanceRecord::updateOrCreate(
                         ['session_id' => $session->id, 'child_id' => $record['person_id']],
                         ['is_present' => $record['is_present'], 'member_id' => null]
@@ -352,7 +252,7 @@ class AttendanceController extends Controller
             }
         });
 
-        activity()->causedBy($user)
+        activity()->causedBy($request->user())
             ->performedOn($session)
             ->log("Marked attendance for session {$session->service_date}");
 
