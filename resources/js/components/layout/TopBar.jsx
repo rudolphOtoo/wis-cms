@@ -9,7 +9,7 @@ const titles = {
   '/attendance':    'Attendance',
   '/finance':       'Finance',
   '/departments':   'Departments',
-  '/cells':         'Cells & Classes',
+  '/cells':         'Cells',
   '/visitors':      'Visitors',
   '/communication': 'Communication',
   '/admin/users':   'User Management',

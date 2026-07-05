@@ -139,7 +139,7 @@ export default function MemberDetail() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            Promote to Leader
+            Make a Leader
           </button>
         )}
         {can('manage users') && !member.has_user_account && (
@@ -396,7 +396,7 @@ function PromoteModal({ member, onClose, onSuccess }) {
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg" style={{boxShadow:'0 20px 50px rgba(0,0,0,0.2)'}}>
         <div className="flex justify-between items-start mb-4">
           <h2 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-navy)'}}>
-            {mode === 'temp-password' ? 'Leader Created' : `Promote ${member.full_name} to Leader`}
+            {mode === 'temp-password' ? 'Leader Created' : `Make ${member.full_name} a Leader`}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl leading-none">×</button>
         </div>
@@ -469,7 +469,7 @@ function PromoteModal({ member, onClose, onSuccess }) {
                       style={{backgroundColor:'white',border:'1px solid var(--color-navy)',color:'var(--color-navy)'}}>Cancel</button>
               <button onClick={submit} disabled={mode === 'submitting' || !targetId || !email}
                       className="btn-primary px-6 py-2" style={{opacity: (!targetId || !email) ? 0.5 : 1}}>
-                {mode === 'submitting' ? 'Promoting…' : 'Promote & Generate Login'}
+                {mode === 'submitting' ? 'Making a Leader…' : 'Make a Leader & Generate Login'}
               </button>
             </div>
           </div>
