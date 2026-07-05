@@ -26,12 +26,19 @@ use Illuminate\Console\Command;
 class ProcessPendingAttendanceFollowUps extends Command
 {
     protected $signature = 'attendance:process-follow-ups
-                            {--dry-run : Show what would be dispatched without queueing}';
+                            {--dry-run : Show what would be dispatched without queueing}
+                            {--force : Run even when APP_ENV is local or testing}';
 
     protected $description = 'Dispatch post-meeting follow-up SMS for sessions past their delay window';
 
     public function handle(): int
     {
+        if (app()->environment('local', 'testing') && ! $this->option('force')) {
+            $this->info('Skipping: APP_ENV is local/testing. Use --force to override.');
+
+            return self::SUCCESS;
+        }
+
         $dryRun = $this->option('dry-run');
 
         $this->info('Scanning for pending attendance follow-ups...');

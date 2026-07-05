@@ -15,12 +15,20 @@ use Throwable;
 
 class SendBirthdayGreetings extends Command
 {
-    protected $signature = 'birthdays:send {--date= : Override "today" as YYYY-MM-DD (testing)}';
+    protected $signature = 'birthdays:send
+                            {--date= : Override "today" as YYYY-MM-DD (testing)}
+                            {--force : Run even when APP_ENV is local or testing}';
 
     protected $description = 'Send birthday greetings to members whose birthday is today';
 
     public function handle(): int
     {
+        if (app()->environment('local', 'testing') && ! $this->option('force')) {
+            $this->info('Skipping: APP_ENV is local/testing. Use --force to override.');
+
+            return self::SUCCESS;
+        }
+
         if (! config('church.birthday.enabled')) {
             $this->info('Birthday greetings are disabled (config/church.php).');
 

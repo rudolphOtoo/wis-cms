@@ -40,7 +40,7 @@ export default function CellDetail() {
       setChildren(cRes.data.data.children ?? [])
 
       if (cRes.data.data.name === 'Children Ministry') {
-        const chRes = await getChildren({ per_page: 200, is_active: true, cell_id: 'null' })
+        const chRes = await getChildren({ per_page: 200, is_active: true, exclude_cell_id: id })
         setAllChildren(chRes.data.data ?? [])
         setAllMembers([])
       } else {
@@ -141,7 +141,8 @@ export default function CellDetail() {
   }
 
   const unassignedMembers = allMembers.filter(m => m.cell_id === null)
-  const unassignedChildren = allChildren
+  const enrolledChildIds = new Set(children.map(c => c.id))
+  const unassignedChildren = allChildren.filter(c => !enrolledChildIds.has(c.id))
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -332,7 +333,7 @@ export default function CellDetail() {
                     </button>
                   </div>
                   <p className="text-xs mt-2" style={{color:'#9ca3af'}}>
-                    Only children not currently assigned to any cell are shown.
+                    Only children not already in this cell are shown.
                   </p>
                 </div>
               ) : (

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\Cell;
 use App\Models\Children;
 use App\Models\Member;
 use App\Models\User;
@@ -234,6 +235,69 @@ class ChildrenTest extends TestCase
     }
 
     // ── Stats ──────────────────────────────────────────────────────────────
+
+    // ── Filter: exclude_cell_id ──────────────────────────────────────────
+
+    public function test_exclude_cell_id_filter_excludes_children_in_that_cell(): void
+    {
+        $cmCell = Cell::create([
+            'branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true,
+        ]);
+
+        $inCell = Children::create([...$this->childPayload(['first_name' => 'In']), 'branch_id' => $this->branch->id, 'cell_id' => $cmCell->id]);
+        $unassigned = Children::create([...$this->childPayload(['first_name' => 'Free']), 'branch_id' => $this->branch->id, 'cell_id' => null]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$this->token($this->secretary)}")
+            ->getJson('/api/children?exclude_cell_id='.$cmCell->id.'&per_page=50')
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('first_name')->all();
+        $this->assertContains('Free', $ids);
+        $this->assertNotContains('In', $ids);
+        $this->assertCount(1, $ids);
+    }
+
+    public function test_exclude_cell_id_still_returns_unassigned_children(): void
+    {
+        $cmCell = Cell::create([
+            'branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true,
+        ]);
+
+        Children::create([...$this->childPayload(['first_name' => 'ChildIn']), 'branch_id' => $this->branch->id, 'cell_id' => $cmCell->id]);
+        Children::create([...$this->childPayload(['first_name' => 'ChildFree']), 'branch_id' => $this->branch->id, 'cell_id' => null]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$this->token($this->secretary)}")
+            ->getJson('/api/children?exclude_cell_id='.$cmCell->id.'&per_page=50')
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('first_name')->all();
+        $this->assertContains('ChildFree', $ids);
+        $this->assertNotContains('ChildIn', $ids);
+        $this->assertCount(1, $ids);
+    }
+
+    public function test_exclude_cell_id_shows_children_in_other_cells(): void
+    {
+        $cmCell = Cell::create([
+            'branch_id' => $this->branch->id, 'name' => 'Children Ministry', 'is_active' => true,
+        ]);
+        $otherCell = Cell::create([
+            'branch_id' => $this->branch->id, 'name' => 'Other Cell', 'is_active' => true,
+        ]);
+
+        Children::create([...$this->childPayload(['first_name' => 'InCM']), 'branch_id' => $this->branch->id, 'cell_id' => $cmCell->id]);
+        Children::create([...$this->childPayload(['first_name' => 'InOther']), 'branch_id' => $this->branch->id, 'cell_id' => $otherCell->id]);
+        Children::create([...$this->childPayload(['first_name' => 'Unassigned']), 'branch_id' => $this->branch->id, 'cell_id' => null]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$this->token($this->secretary)}")
+            ->getJson('/api/children?exclude_cell_id='.$cmCell->id.'&per_page=50')
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('first_name')->all();
+        $this->assertContains('InOther', $ids, 'Child in a different cell should be visible');
+        $this->assertContains('Unassigned', $ids, 'Unassigned child should be visible');
+        $this->assertNotContains('InCM', $ids, 'Child in the excluded cell should be hidden');
+    }
 
     public function test_stats_returns_correct_counts(): void
     {

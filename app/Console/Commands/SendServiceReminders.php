@@ -28,12 +28,20 @@ use Throwable;
  */
 class SendServiceReminders extends Command
 {
-    protected $signature = 'reminders:send {--at= : Override "now" as YYYY-MM-DD HH:MM (testing)}';
+    protected $signature = 'reminders:send
+                            {--at= : Override "now" as YYYY-MM-DD HH:MM (testing)}
+                            {--force : Run even when APP_ENV is local or testing}';
 
     protected $description = 'Send pre-service SMS reminders to all active members';
 
     public function handle(): int
     {
+        if (app()->environment('local', 'testing') && ! $this->option('force')) {
+            $this->info('Skipping: APP_ENV is local/testing. Use --force to override.');
+
+            return self::SUCCESS;
+        }
+
         $now = $this->option('at')
             ? Carbon::parse($this->option('at'))
             : now();
