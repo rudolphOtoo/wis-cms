@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cell\AssignCellMemberRequest;
 use App\Http\Requests\Cell\CellMessageRequest;
 use App\Http\Requests\Cell\StoreCellRequest;
 use App\Http\Requests\Cell\UpdateCellRequest;
@@ -121,16 +122,15 @@ class CellController extends Controller
      * cell_id, this automatically REPLACES any previous cell — no
      * pivot cleanup needed.
      */
-    public function assignMember(Request $request, string $id, string $memberId): JsonResponse
+    public function assignMember(AssignCellMemberRequest $request, string $id, string $memberId): JsonResponse
     {
-        $cell = $this->scopedQuery($request)->findOrFail($id);
+        $cell = Cell::findOrFail($id);
+        $this->authorize('addMember', $cell);
 
-        // The Children Ministry cell tracks children, not adult members.
         abort_if($cell->name === 'Children Ministry', 422,
             'The Children Ministry cell is for children only. Adult members cannot be assigned here.');
 
         $member = Member::findOrFail($memberId);
-
         $member->update(['cell_id' => $cell->id]);
 
         activity()->causedBy($request->user())
@@ -145,9 +145,10 @@ class CellController extends Controller
 
     public function unassignMember(Request $request, string $id, string $memberId): JsonResponse
     {
-        $cell = $this->scopedQuery($request)->findOrFail($id);
-        $member = Member::where('cell_id', $cell->id)->findOrFail($memberId);
+        $cell = Cell::findOrFail($id);
+        $this->authorize('removeMember', $cell);
 
+        $member = Member::where('cell_id', $cell->id)->findOrFail($memberId);
         $member->update(['cell_id' => null]);
 
         activity()->causedBy($request->user())
@@ -159,12 +160,10 @@ class CellController extends Controller
         ]);
     }
 
-    /**
-     * Assign a child to this cell. Only works for the Children Ministry cell.
-     */
     public function assignChild(Request $request, string $id, string $childId): JsonResponse
     {
-        $cell = $this->scopedQuery($request)->findOrFail($id);
+        $cell = Cell::findOrFail($id);
+        $this->authorize('assignChild', $cell);
 
         abort_if($cell->name !== 'Children Ministry', 422,
             'Only the Children Ministry cell can have children assigned.');
@@ -188,9 +187,10 @@ class CellController extends Controller
 
     public function unassignChild(Request $request, string $id, string $childId): JsonResponse
     {
-        $cell = $this->scopedQuery($request)->findOrFail($id);
-        $child = Children::where('cell_id', $cell->id)->findOrFail($childId);
+        $cell = Cell::findOrFail($id);
+        $this->authorize('removeChild', $cell);
 
+        $child = Children::where('cell_id', $cell->id)->findOrFail($childId);
         $child->update(['cell_id' => null]);
 
         activity()->causedBy($request->user())
