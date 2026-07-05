@@ -127,6 +127,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     // ATTENDANCE
     Route::middleware('permission:view attendance')->group(function () {
         Route::get('attendance/stats', [AttendanceController::class, 'stats']);
+        Route::get('attendance/sundays', [AttendanceController::class, 'sundays']);
         Route::get('attendance/service-types', [AttendanceController::class, 'serviceTypes']);
         Route::get('attendance', [AttendanceController::class, 'index']);
         Route::get('attendance/sessions/{id}', [AttendanceController::class, 'showSession']);
