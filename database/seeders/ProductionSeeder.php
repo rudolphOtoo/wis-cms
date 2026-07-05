@@ -15,8 +15,7 @@ use Illuminate\Database\Seeder;
  * Idempotent: each called seeder uses firstOrCreate / updateOrCreate
  * so re-running is safe. Existing rows are not duplicated or clobbered.
  *
- * EXCLUDED from this seeder (dev-only data):
- *   - CellSeeder     (creates fake cells)
+ * EXCLUDED from this seeder (dev-only demo data):
  *   - DemoDataSeeder (members, attendance, transactions)
  *
  * For development with full demo data, use the default DatabaseSeeder
@@ -43,6 +42,7 @@ class ProductionSeeder extends Seeder
             ServiceTypeSeeder::class,
             FinanceCategorySeeder::class,
             SuperAdminSeeder::class,
+            CellSeeder::class,
         ]);
 
         $this->command->info('  ✓ Production seed complete.');
