@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Member;
 use App\Models\Transaction;
 use App\Models\Visitor;
+use Carbon\Carbon;
 
 /**
  * SMELL-01 FIX: Extracts the admin dashboard aggregation out of
