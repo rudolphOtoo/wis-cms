@@ -191,8 +191,7 @@ export default function TransactionForm() {
             </FIELD>
           </div>
 
-          {form.type === 'income' && (
-            <FIELD label="Member (for personal contributions like tithe)" error={errors.member_id?.[0]}>
+          <FIELD label={form.type === 'income' ? 'Member (for personal contributions like tithe)' : 'Member (recipient / beneficiary)'} error={errors.member_id?.[0]}>
               {(() => {
                 const selected = members.find(m => m.id === form.member_id)
                 const q = memberSearch.trim().toLowerCase()
@@ -245,7 +244,6 @@ export default function TransactionForm() {
                 )
               })()}
             </FIELD>
-          )}
 
           <FIELD label="Notes" error={errors.notes?.[0]}>
             <textarea className="input-field" value={form.notes}
