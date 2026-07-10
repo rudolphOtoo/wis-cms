@@ -58,6 +58,31 @@ class FinanceExportTest extends TestCase
         ], $attrs));
     }
 
+    /**
+     * Extract all text content from an XLSX binary string by reading
+     * the worksheet and shared strings XML inside the ZIP archive.
+     */
+    protected function xlsxText(string $xlsx): string
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'xlsx_');
+        file_put_contents($tmp, $xlsx);
+
+        $zip = new \ZipArchive;
+        $zip->open($tmp);
+
+        // Try shared strings first (used when SHOULD_USE_INLINE_STRINGS = false)
+        $text = $zip->getFromName('xl/sharedStrings.xml') ?? '';
+
+        // Also read the worksheet itself (inline strings live here)
+        $text .= $zip->getFromName('xl/worksheets/sheet1.xml') ?? '';
+
+        $zip->close();
+        unlink($tmp);
+
+        // Strip XML tags to get raw text content
+        return strip_tags($text);
+    }
+
     public function test_finance_officer_can_export_transactions(): void
     {
         $this->makeTransaction(['reference' => 'TITHE-AAA']);
@@ -67,10 +92,10 @@ class FinanceExportTest extends TestCase
             ->get('/api/finance/transactions/export');
 
         $response->assertOk();
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('Date', $csv);       // header
-        $this->assertStringContainsString('TITHE-AAA', $csv);  // data
-        $this->assertStringContainsString('Tithes', $csv);     // category name
+        $content = $this->xlsxText($response->streamedContent());
+        $this->assertStringContainsString('Date', $content);
+        $this->assertStringContainsString('TITHE-AAA', $content);
+        $this->assertStringContainsString('Tithes', $content);
     }
 
     public function test_export_respects_type_filter(): void
@@ -81,12 +106,14 @@ class FinanceExportTest extends TestCase
 
         $officer = $this->userWithRole('finance_officer');
 
-        $csv = $this->withHeader('Authorization', "Bearer {$this->token($officer)}")
-            ->get('/api/finance/transactions/export?type=income')
-            ->streamedContent();
+        $content = $this->xlsxText(
+            $this->withHeader('Authorization', "Bearer {$this->token($officer)}")
+                ->get('/api/finance/transactions/export?type=income')
+                ->streamedContent(),
+        );
 
-        $this->assertStringContainsString('INCOME-ROW', $csv);
-        $this->assertStringNotContainsString('EXPENSE-ROW', $csv);
+        $this->assertStringContainsString('INCOME-ROW', $content);
+        $this->assertStringNotContainsString('EXPENSE-ROW', $content);
     }
 
     public function test_usher_cannot_export_finance(): void

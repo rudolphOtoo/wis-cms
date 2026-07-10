@@ -15,7 +15,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Row;
-use OpenSpout\Writer\CSV\Writer;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Options as XlsxOptions;
+use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -600,9 +602,7 @@ class ReportsController extends Controller
         $label = $type === 'income' ? 'Income' : 'Expense';
         $subtotalLabel = $type === 'income' ? 'Total Income' : 'Total Expenses';
 
-        $filename = "{$type}-financial-report-{$from}-to-{$to}.csv";
-
-        $fmt = fn (float $v): string => number_format($v, 2);
+        $filename = "{$type}-financial-report-{$from}-to-{$to}.xlsx";
 
         // Group rows by month for the matrix
         $rowsByMonth = collect($data['rows'])->groupBy('month')->sortKeys();
@@ -620,16 +620,27 @@ class ReportsController extends Controller
             fn ($rows) => collect($rows)->sum('total'),
         )->all();
 
+        // Styles
+        $titleStyle = new Style(fontBold: true, fontSize: 16);
+        $sectionStyle = new Style(fontBold: true, fontSize: 13);
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
+        $amountStyle = new Style(format: '"GHS "#,##0.00');
+        $boldStyle = new Style(fontBold: true);
+        $boldAmountStyle = new Style(fontBold: true, format: '"GHS "#,##0.00');
+
         return new StreamedResponse(function () use (
-            $data, $branchName, $label, $subtotalLabel, $fmt,
+            $data, $branchName, $label, $subtotalLabel,
             $categories, $rowsByMonth, $monthlyTotals,
+            $titleStyle, $sectionStyle, $headerStyle,
+            $amountStyle, $boldStyle, $boldAmountStyle,
         ) {
-            $writer = new Writer;
+            $options = new XlsxOptions(DEFAULT_COLUMN_WIDTH: 18);
+            $writer = new Writer($options);
             $writer->openToFile('php://output');
 
             // ── SECTION 1: REPORT HEADER ──────────────────────────────
-            $writer->addRow(Row::fromValues([$branchName]));
-            $writer->addRow(Row::fromValues(["{$label} Financial Report"]));
+            $writer->addRow(Row::fromValuesWithStyle([$branchName], $titleStyle));
+            $writer->addRow(Row::fromValuesWithStyle(["{$label} Financial Report"], $sectionStyle));
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues([
                 'Period:',
@@ -637,100 +648,89 @@ class ReportsController extends Controller
                     .' to '
                     .Carbon::parse($data['period']['to'])->format('F j, Y'),
             ]));
-            $writer->addRow(Row::fromValues([
-                'Report Date:',
-                now()->format('F j, Y'),
-            ]));
+            $writer->addRow(Row::fromValues(['Report Date:', now()->format('F j, Y')]));
             $writer->addRow(Row::fromValues(['']));
 
             // ── SECTION 2: EXECUTIVE SUMMARY ──────────────────────────
-            $writer->addRow(Row::fromValues(['EXECUTIVE SUMMARY']));
+            $writer->addRow(Row::fromValuesWithStyle(['EXECUTIVE SUMMARY'], $sectionStyle));
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Period Covered',
                 Carbon::parse($data['period']['from'])->format('M j, Y')
                     .' - '
                     .Carbon::parse($data['period']['to'])->format('M j, Y'),
             ]));
-            $writer->addRow(Row::fromValues(['Months Covered', (string) $data['summary']['month_count']]));
-            $writer->addRow(Row::fromValues(['Grand Total', 'GHS '.$fmt($data['summary']['grand_total'])]));
-            $writer->addRow(Row::fromValues(['Monthly Average', 'GHS '.$fmt($data['summary']['monthly_average'])]));
+            $writer->addRow(Row::fromValues(['Months Covered', $data['summary']['month_count']]));
+            $writer->addRow(Row::fromValuesWithStyle(['Grand Total', $data['summary']['grand_total']], $boldAmountStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Monthly Average', $data['summary']['monthly_average']], $boldAmountStyle));
             if ($data['summary']['top_category']) {
                 $writer->addRow(Row::fromValues(['Highest Category', $data['summary']['top_category']]));
             }
             $writer->addRow(Row::fromValues(['']));
 
             // ── SECTION 3: MONTHLY BREAKDOWN MATRIX ───────────────────
-            $writer->addRow(Row::fromValues(['MONTHLY BREAKDOWN']));
+            $writer->addRow(Row::fromValuesWithStyle(['MONTHLY BREAKDOWN'], $sectionStyle));
             $writer->addRow(Row::fromValues(['']));
 
-            // Header row: Month | Category1 | Category2 | ... | Total
             $headerRow = array_merge(['Month'], $categories, ['Total']);
-            $writer->addRow(Row::fromValues($headerRow));
+            $writer->addRow(Row::fromValuesWithStyle($headerRow, $headerStyle));
 
-            // One row per month
             foreach ($rowsByMonth as $month => $monthRows) {
                 $byCat = collect($monthRows)->keyBy('category_name');
                 $cells = [$month];
                 foreach ($categories as $cat) {
-                    $cells[] = $fmt((float) ($byCat[$cat]['total'] ?? 0));
+                    $cells[] = (float) ($byCat[$cat]['total'] ?? 0);
                 }
-                $cells[] = $fmt($monthlyTotals[$month] ?? 0);
-                $writer->addRow(Row::fromValues($cells));
+                $cells[] = (float) ($monthlyTotals[$month] ?? 0);
+                $writer->addRow(Row::fromValuesWithStyle($cells, $amountStyle));
             }
 
             // Subtotal row
             $subCells = [$subtotalLabel];
             foreach ($categories as $cat) {
-                $subCells[] = $fmt(
-                    (float) (collect($data['summary']['category_totals'])
-                        ->firstWhere('category_name', $cat)['total'] ?? 0),
-                );
+                $subCells[] = (float) (collect($data['summary']['category_totals'])
+                    ->firstWhere('category_name', $cat)['total'] ?? 0);
             }
-            $subCells[] = $fmt($data['summary']['grand_total']);
-            $writer->addRow(Row::fromValues($subCells));
+            $subCells[] = (float) $data['summary']['grand_total'];
+            $writer->addRow(Row::fromValuesWithStyle($subCells, $boldAmountStyle));
             $writer->addRow(Row::fromValues(['']));
 
             // ── SECTION 4: CATEGORY TOTALS ────────────────────────────
-            $writer->addRow(Row::fromValues(['CATEGORY TOTALS']));
-            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Share (%)']));
+            $writer->addRow(Row::fromValuesWithStyle(['CATEGORY TOTALS'], $sectionStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Category', 'Total (GHS)', 'Share (%)'], $headerStyle));
             foreach ($data['summary']['category_totals'] as $cat) {
-                $writer->addRow(Row::fromValues([
+                $writer->addRow(Row::fromValuesWithStyle([
                     $cat['category_name'],
-                    'GHS '.$fmt($cat['total']),
-                    $cat['percentage'].'%',
-                ]));
+                    $cat['total'],
+                    $cat['percentage'] / 100,
+                ], $amountStyle));
             }
-            $writer->addRow(Row::fromValues([
+            $writer->addRow(Row::fromValuesWithStyle([
                 'TOTAL',
-                'GHS '.$fmt($data['summary']['grand_total']),
-                '100.0%',
-            ]));
+                $data['summary']['grand_total'],
+                1.0,
+            ], $boldAmountStyle));
             $writer->addRow(Row::fromValues(['']));
 
             // ── SECTION 5: MONTHLY TOTALS ─────────────────────────────
-            $writer->addRow(Row::fromValues(['MONTHLY TOTALS']));
-            $writer->addRow(Row::fromValues(['Month', 'Total (GHS)']));
+            $writer->addRow(Row::fromValuesWithStyle(['MONTHLY TOTALS'], $sectionStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Month', 'Total (GHS)'], $headerStyle));
             foreach ($monthlyTotals as $month => $total) {
-                $writer->addRow(Row::fromValues([
-                    $month,
-                    'GHS '.$fmt($total),
-                ]));
+                $writer->addRow(Row::fromValuesWithStyle([$month, $total], $amountStyle));
             }
-            $writer->addRow(Row::fromValues([
-                'TOTAL',
-                'GHS '.$fmt($data['summary']['grand_total']),
-            ]));
+            $writer->addRow(Row::fromValuesWithStyle([
+                'TOTAL', $data['summary']['grand_total'],
+            ], $boldAmountStyle));
             $writer->addRow(Row::fromValues(['']));
 
             // ── SECTION 6: NOTES ──────────────────────────────────────
-            $writer->addRow(Row::fromValues(['NOTES']));
+            $writer->addRow(Row::fromValuesWithStyle(['NOTES'], $boldStyle));
             $writer->addRow(Row::fromValues(['1. All amounts are in Ghana Cedis (GHS).']));
             $writer->addRow(Row::fromValues(['2. This report was generated by WIS-CMS on '
                 .now()->format('F j, Y \a\t g:i a').'.']));
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
