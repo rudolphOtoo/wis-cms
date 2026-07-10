@@ -174,8 +174,8 @@ class ReportsControllerTest extends TestCase
 
         $rows = $response->json('rows');
         $this->assertCount(2, $rows);
-        $this->assertEquals(300, collect($rows)->firstWhere('month', '2026-04')['total']);
-        $this->assertEquals(300, collect($rows)->firstWhere('month', '2026-05')['total']);
+        $this->assertEquals(300, collect($rows)->firstWhere('month', 'Apr 2026')['total']);
+        $this->assertEquals(300, collect($rows)->firstWhere('month', 'May 2026')['total']);
     }
 
     public function test_respects_from_date_filter(): void
@@ -624,8 +624,8 @@ class ReportsControllerTest extends TestCase
         $response->assertStatus(200);
         $rows = $response->json('rows');
         $this->assertCount(2, $rows, 'Two months should produce 2 rows');
-        $this->assertSame('2026-03', $rows[0]['month']);
-        $this->assertSame('2026-04', $rows[1]['month']);
+        $this->assertSame('Mar 2026', $rows[0]['month']);
+        $this->assertSame('Apr 2026', $rows[1]['month']);
     }
 
     public function test_expense_only_includes_expense_not_income(): void

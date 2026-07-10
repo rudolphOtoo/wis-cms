@@ -36,7 +36,7 @@
 <body>
   <div class="header">
     <span class="header-badge">{{ $branchName }}</span>
-    <h1>Financial Ledger</h1>
+    <h1>Financial Report</h1>
     <p>Methodist Church Ghana &middot; {{ \Carbon\Carbon::parse($period['from'])->format('M j, Y') }} &ndash; {{ \Carbon\Carbon::parse($period['to'])->format('M j, Y') }}</p>
   </div>
 

@@ -6,6 +6,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica', Arial, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.5; }
   .header { background: #0D1F3C; color: white; padding: 30px 40px; }
+  .header-top { display: table; width: 100%; }
+  .header-logo { display: table-cell; width: 50px; vertical-align: middle; }
+  .header-logo img { width: 44px; height: 44px; }
+  .header-text { display: table-cell; vertical-align: middle; padding-left: 14px; }
   .header-badge { display: inline-block; padding: 3px 10px; background: #C9A84C; color: #0D1F3C; font-size: 10px; font-weight: bold; border-radius: 10px; letter-spacing: 0.5px; }
   .header h1 { font-size: 22px; margin: 12px 0 2px; }
   .header p { color: rgba(255,255,255,0.6); font-size: 11px; }
@@ -15,7 +19,7 @@
   .meta-label { color: #9ca3af; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
   .meta-value { font-size: 13px; font-weight: bold; color: #0D1F3C; margin-bottom: 8px; }
   .content { padding: 24px 40px; }
-  .section-title { font-size: 14px; font-weight: bold; color: #ba1a1a; margin: 18px 0 12px; border-bottom: 1px solid #E5E9F2; padding-bottom: 6px; }
+  .section-title { font-size: 14px; font-weight: bold; margin: 18px 0 12px; border-bottom: 1px solid #E5E9F2; padding-bottom: 6px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
   th { text-align: left; padding: 8px 10px; background: #f9fafb; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 1px solid #E5E9F2; }
   td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 11px; }
@@ -35,9 +39,18 @@
 </head>
 <body>
   <div class="header">
-    <span class="header-badge">{{ $branchName }}</span>
-    <h1>Expense by Category</h1>
-    <p>Methodist Church Ghana &middot; {{ \Carbon\Carbon::parse($data['period']['from'])->format('M j, Y') }} &ndash; {{ \Carbon\Carbon::parse($data['period']['to'])->format('M j, Y') }}</p>
+    <div class="header-top">
+      @if (!empty($logoPath))
+        <div class="header-logo">
+          <img src="{{ $logoPath }}" alt="Logo" />
+        </div>
+      @endif
+      <div class="header-text">
+        <span class="header-badge">{{ $branchName }}</span>
+        <h1>{{ $reportType === 'income' ? 'Income' : 'Expense' }} Financial Report</h1>
+        <p>Methodist Church Ghana &middot; {{ \Carbon\Carbon::parse($data['period']['from'])->format('M j, Y') }} &ndash; {{ \Carbon\Carbon::parse($data['period']['to'])->format('M j, Y') }}</p>
+      </div>
+    </div>
   </div>
 
   <div class="meta">
@@ -64,9 +77,9 @@
   </div>
 
   <div class="content">
-    <div class="section-title">Category Breakdown</div>
+    <div class="section-title" style="color: {{ $accentColor }};">Category Breakdown</div>
     @if (empty($data['summary']['category_totals']))
-      <div class="empty">No expenses recorded in this period.</div>
+      <div class="empty">No {{ $reportType === 'income' ? 'income' : 'expenses' }} recorded in this period.</div>
     @else
       <table>
         <thead><tr><th>Category</th><th class="amount">Total (GHS)</th><th class="pct">Share</th></tr></thead>
@@ -79,7 +92,7 @@
             </tr>
           @endforeach
           <tr class="subtotal-row">
-            <td>Total Expenses</td>
+            <td>Total {{ $reportType === 'income' ? 'Income' : 'Expenses' }}</td>
             <td class="amount">{{ number_format($data['summary']['grand_total'], 2) }}</td>
             <td class="pct">100.0%</td>
           </tr>
@@ -101,6 +114,34 @@
               <td class="amount">{{ number_format($row['total'], 2) }}</td>
             </tr>
           @endforeach
+        </tbody>
+      </table>
+    @endif
+
+    <div class="section-title" style="color: {{ $accentColor }}; margin-top: 28px;">Monthly Summary</div>
+    @php
+      $monthlyTotals = collect($data['rows'])
+          ->groupBy('month')
+          ->map(fn ($rows) => $rows->sum('total'))
+          ->sortKeys()
+          ->all();
+    @endphp
+    @if (empty($monthlyTotals))
+      <div class="empty">No monthly data.</div>
+    @else
+      <table>
+        <thead><tr><th>Month</th><th class="amount">Total (GHS)</th></tr></thead>
+        <tbody>
+          @foreach ($monthlyTotals as $month => $total)
+            <tr>
+              <td>{{ $month }}</td>
+              <td class="amount">{{ number_format($total, 2) }}</td>
+            </tr>
+          @endforeach
+          <tr class="subtotal-row">
+            <td>Grand Total</td>
+            <td class="amount">{{ number_format($data['summary']['grand_total'], 2) }}</td>
+          </tr>
         </tbody>
       </table>
     @endif
