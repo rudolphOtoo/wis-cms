@@ -598,66 +598,135 @@ class ReportsController extends Controller
         $branch = Branch::find($request->user()->branch_id);
         $branchName = $branch?->name ?? 'Wesleyan International Society';
         $label = $type === 'income' ? 'Income' : 'Expense';
+        $subtotalLabel = $type === 'income' ? 'Total Income' : 'Total Expenses';
 
         $filename = "{$type}-financial-report-{$from}-to-{$to}.csv";
 
-        $monthlyTotals = collect($data['rows'])
-            ->groupBy('month')
-            ->map(fn ($rows) => collect($rows)->sum('total'))
-            ->sortKeys()
+        $fmt = fn (float $v): string => number_format($v, 2);
+
+        // Group rows by month for the matrix
+        $rowsByMonth = collect($data['rows'])->groupBy('month')->sortKeys();
+
+        // All unique category names (sorted) for matrix columns
+        $categories = collect($data['rows'])
+            ->pluck('category_name')
+            ->unique()
+            ->sort()
+            ->values()
             ->all();
 
-        return new StreamedResponse(function () use ($data, $branchName, $label, $monthlyTotals) {
+        // Per-month totals
+        $monthlyTotals = $rowsByMonth->map(
+            fn ($rows) => collect($rows)->sum('total'),
+        )->all();
+
+        return new StreamedResponse(function () use (
+            $data, $branchName, $label, $subtotalLabel, $fmt,
+            $categories, $rowsByMonth, $monthlyTotals,
+        ) {
             $writer = new Writer;
             $writer->openToFile('php://output');
 
-            // Header context
+            // ── SECTION 1: REPORT HEADER ──────────────────────────────
             $writer->addRow(Row::fromValues([$branchName]));
             $writer->addRow(Row::fromValues(["{$label} Financial Report"]));
+            $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues([
-                'Period',
-                $data['period']['from'].' to '.$data['period']['to'],
+                'Period:',
+                Carbon::parse($data['period']['from'])->format('F j, Y')
+                    .' to '
+                    .Carbon::parse($data['period']['to'])->format('F j, Y'),
+            ]));
+            $writer->addRow(Row::fromValues([
+                'Report Date:',
+                now()->format('F j, Y'),
             ]));
             $writer->addRow(Row::fromValues(['']));
 
-            // Monthly Detail
-            $writer->addRow(Row::fromValues(['Monthly Detail']));
-            $writer->addRow(Row::fromValues(['Month', 'Category', 'Total (GHS)']));
-            foreach ($data['rows'] as $row) {
-                $writer->addRow(Row::fromValues([
-                    $row['month'],
-                    $row['category_name'],
-                    number_format($row['total'], 2, '.', ''),
-                ]));
+            // ── SECTION 2: EXECUTIVE SUMMARY ──────────────────────────
+            $writer->addRow(Row::fromValues(['EXECUTIVE SUMMARY']));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Period Covered',
+                Carbon::parse($data['period']['from'])->format('M j, Y')
+                    .' - '
+                    .Carbon::parse($data['period']['to'])->format('M j, Y'),
+            ]));
+            $writer->addRow(Row::fromValues(['Months Covered', (string) $data['summary']['month_count']]));
+            $writer->addRow(Row::fromValues(['Grand Total', 'GHS '.$fmt($data['summary']['grand_total'])]));
+            $writer->addRow(Row::fromValues(['Monthly Average', 'GHS '.$fmt($data['summary']['monthly_average'])]));
+            if ($data['summary']['top_category']) {
+                $writer->addRow(Row::fromValues(['Highest Category', $data['summary']['top_category']]));
+            }
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 3: MONTHLY BREAKDOWN MATRIX ───────────────────
+            $writer->addRow(Row::fromValues(['MONTHLY BREAKDOWN']));
+            $writer->addRow(Row::fromValues(['']));
+
+            // Header row: Month | Category1 | Category2 | ... | Total
+            $headerRow = array_merge(['Month'], $categories, ['Total']);
+            $writer->addRow(Row::fromValues($headerRow));
+
+            // One row per month
+            foreach ($rowsByMonth as $month => $monthRows) {
+                $byCat = collect($monthRows)->keyBy('category_name');
+                $cells = [$month];
+                foreach ($categories as $cat) {
+                    $cells[] = $fmt((float) ($byCat[$cat]['total'] ?? 0));
+                }
+                $cells[] = $fmt($monthlyTotals[$month] ?? 0);
+                $writer->addRow(Row::fromValues($cells));
             }
 
-            // Monthly Summary
+            // Subtotal row
+            $subCells = [$subtotalLabel];
+            foreach ($categories as $cat) {
+                $subCells[] = $fmt(
+                    (float) (collect($data['summary']['category_totals'])
+                        ->firstWhere('category_name', $cat)['total'] ?? 0),
+                );
+            }
+            $subCells[] = $fmt($data['summary']['grand_total']);
+            $writer->addRow(Row::fromValues($subCells));
             $writer->addRow(Row::fromValues(['']));
-            $writer->addRow(Row::fromValues(['Monthly Summary']));
+
+            // ── SECTION 4: CATEGORY TOTALS ────────────────────────────
+            $writer->addRow(Row::fromValues(['CATEGORY TOTALS']));
+            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Share (%)']));
+            foreach ($data['summary']['category_totals'] as $cat) {
+                $writer->addRow(Row::fromValues([
+                    $cat['category_name'],
+                    'GHS '.$fmt($cat['total']),
+                    $cat['percentage'].'%',
+                ]));
+            }
+            $writer->addRow(Row::fromValues([
+                'TOTAL',
+                'GHS '.$fmt($data['summary']['grand_total']),
+                '100.0%',
+            ]));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 5: MONTHLY TOTALS ─────────────────────────────
+            $writer->addRow(Row::fromValues(['MONTHLY TOTALS']));
             $writer->addRow(Row::fromValues(['Month', 'Total (GHS)']));
             foreach ($monthlyTotals as $month => $total) {
                 $writer->addRow(Row::fromValues([
                     $month,
-                    number_format($total, 2, '.', ''),
+                    'GHS '.$fmt($total),
                 ]));
             }
-
-            // Category Totals
+            $writer->addRow(Row::fromValues([
+                'TOTAL',
+                'GHS '.$fmt($data['summary']['grand_total']),
+            ]));
             $writer->addRow(Row::fromValues(['']));
-            $writer->addRow(Row::fromValues(['Category Totals (entire period)']));
-            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Percentage']));
-            foreach ($data['summary']['category_totals'] as $cat) {
-                $writer->addRow(Row::fromValues([
-                    $cat['category_name'],
-                    number_format($cat['total'], 2, '.', ''),
-                    $cat['percentage'].'%',
-                ]));
-            }
 
-            // Summary
-            $writer->addRow(Row::fromValues(['']));
-            $writer->addRow(Row::fromValues(['Grand Total', number_format($data['summary']['grand_total'], 2, '.', '')]));
-            $writer->addRow(Row::fromValues(['Monthly Average', number_format($data['summary']['monthly_average'], 2, '.', '')]));
+            // ── SECTION 6: NOTES ──────────────────────────────────────
+            $writer->addRow(Row::fromValues(['NOTES']));
+            $writer->addRow(Row::fromValues(['1. All amounts are in Ghana Cedis (GHS).']));
+            $writer->addRow(Row::fromValues(['2. This report was generated by WIS-CMS on '
+                .now()->format('F j, Y \a\t g:i a').'.']));
 
             $writer->close();
         }, 200, [
