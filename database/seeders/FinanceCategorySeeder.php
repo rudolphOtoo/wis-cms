@@ -31,6 +31,10 @@ class FinanceCategorySeeder extends Seeder
             ['name' => 'Day Born Offering',                  'description' => 'Day-born / birthday offerings'],
             ['name' => 'Scholarship Fund',                   'description' => 'Scholarship and education support contributions'],
             ['name' => 'Pledges Redemption',                 'description' => 'Redemption of pledges made'],
+            ['name' => 'Harvest',                            'description' => 'Harvest thanksgiving offerings'],
+            ['name' => 'Children Harvest',                   'description' => 'Harvest thanksgiving offerings children'],
+            ['name' => 'Mens Harvest',                       'description' => 'Harvest thanksgiving offerings mens'],
+            ['name' => 'Womens Harvest',                     'description' => 'Harvest thanksgiving offerings womens'],
             ['name' => 'Others',                             'description' => 'Other miscellaneous income'],
         ];
 
