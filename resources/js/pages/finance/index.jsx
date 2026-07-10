@@ -81,10 +81,10 @@ export default function FinancePage() {
     setExporting(true)
     try {
       const res = await exportTransactions({ search, type: typeFilter, category_id: catFilter })
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`
+      a.download = `transactions-${new Date().toISOString().split('T')[0]}.xlsx`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(url)
     } catch (err) {
