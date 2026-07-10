@@ -340,7 +340,7 @@ class ReportsController extends Controller
             ->with('category:id,name')
             ->get()
             ->map(fn ($r) => [
-                'month' => $r->month,
+                'month' => Carbon::parse($r->month.'-01')->format('M Y'),
                 'category_id' => $r->category_id,
                 'category_name' => $r->category?->name ?? '(unknown)',
                 'total' => (float) $r->total,
@@ -542,98 +542,86 @@ class ReportsController extends Controller
     // GET /api/reports/finance/income-by-category/export-pdf
     public function incomeByCategoryPdf(Request $request)
     {
-        $data = $this->buildIncomeData($request);
-        $branch = Branch::find($request->user()->branch_id);
-
-        $pdf = Pdf::loadView('pdf.report-income-by-category', [
-            'data' => $data,
-            'branchName' => $branch?->name ?? 'Wesleyan International Society',
-            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
-        ]);
-
-        $from = $data['period']['from'];
-        $to = $data['period']['to'];
-
-        return $pdf->download("income-by-category-{$from}-to-{$to}.pdf");
+        return $this->financeCategoryPdf($request, 'income');
     }
 
     // GET /api/reports/finance/income-by-category/export-csv
     public function incomeByCategoryCsv(Request $request)
     {
-        $data = $this->buildIncomeData($request);
-        $from = $data['period']['from'];
-        $to = $data['period']['to'];
-
-        $filename = "income-by-category-{$from}-to-{$to}.csv";
-
-        return new StreamedResponse(function () use ($data) {
-            $writer = new Writer;
-            $writer->openToFile('php://output');
-
-            // Per-row sheet: month + category + total
-            $writer->addRow(Row::fromValues(['Month', 'Category', 'Total (GHS)']));
-            foreach ($data['rows'] as $row) {
-                $writer->addRow(Row::fromValues([
-                    $row['month'],
-                    $row['category_name'],
-                    number_format($row['total'], 2, '.', ''),
-                ]));
-            }
-
-            // Blank line then category summary
-            $writer->addRow(Row::fromValues(['']));
-            $writer->addRow(Row::fromValues(['Category Totals (entire period)']));
-            $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Percentage']));
-            foreach ($data['summary']['category_totals'] as $cat) {
-                $writer->addRow(Row::fromValues([
-                    $cat['category_name'],
-                    number_format($cat['total'], 2, '.', ''),
-                    $cat['percentage'].'%',
-                ]));
-            }
-
-            $writer->addRow(Row::fromValues(['']));
-            $writer->addRow(Row::fromValues(['Grand Total', number_format($data['summary']['grand_total'], 2, '.', '')]));
-            $writer->addRow(Row::fromValues(['Monthly Average', number_format($data['summary']['monthly_average'], 2, '.', '')]));
-
-            $writer->close();
-        }, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ]);
+        return $this->streamCsv($request, 'income');
     }
 
     // GET /api/reports/finance/expense-by-category/export-pdf
     public function expenseByCategoryPdf(Request $request)
     {
-        $data = $this->buildExpenseData($request);
-        $branch = Branch::find($request->user()->branch_id);
+        return $this->financeCategoryPdf($request, 'expense');
+    }
 
-        $pdf = Pdf::loadView('pdf.report-expense-by-category', [
+    // GET /api/reports/finance/expense-by-category/export-csv
+    public function expenseByCategoryCsv(Request $request)
+    {
+        return $this->streamCsv($request, 'expense');
+    }
+
+    private function financeCategoryPdf(Request $request, string $type)
+    {
+        $data = $this->buildTransactionCategoryData($request, $type);
+        $branch = Branch::find($request->user()->branch_id);
+        $branchName = $branch?->name ?? 'Wesleyan International Society';
+
+        $logoPath = null;
+        $logoFile = public_path('images/wis-logo.png');
+        if (file_exists($logoFile)) {
+            $logoPath = 'data:image/png;base64,'.base64_encode(file_get_contents($logoFile));
+        }
+
+        $pdf = Pdf::loadView('pdf.report-finance-by-category', [
             'data' => $data,
-            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'branchName' => $branchName,
+            'reportType' => $type,
+            'accentColor' => $type === 'income' ? '#15803d' : '#ba1a1a',
+            'logoPath' => $logoPath,
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
         $from = $data['period']['from'];
         $to = $data['period']['to'];
 
-        return $pdf->download("expense-by-category-{$from}-to-{$to}.pdf");
+        return $pdf->download("{$type}-financial-report-{$from}-to-{$to}.pdf");
     }
 
-    // GET /api/reports/finance/expense-by-category/export-csv
-    public function expenseByCategoryCsv(Request $request)
+    private function streamCsv(Request $request, string $type): StreamedResponse
     {
-        $data = $this->buildExpenseData($request);
+        $data = $this->buildTransactionCategoryData($request, $type);
         $from = $data['period']['from'];
         $to = $data['period']['to'];
+        $branch = Branch::find($request->user()->branch_id);
+        $branchName = $branch?->name ?? 'Wesleyan International Society';
+        $label = $type === 'income' ? 'Income' : 'Expense';
 
-        $filename = "expense-by-category-{$from}-to-{$to}.csv";
+        $filename = "{$type}-financial-report-{$from}-to-{$to}.csv";
 
-        return new StreamedResponse(function () use ($data) {
+        $monthlyTotals = collect($data['rows'])
+            ->groupBy('month')
+            ->map(fn ($rows) => collect($rows)->sum('total'))
+            ->sortKeys()
+            ->all();
+
+        return new StreamedResponse(function () use ($data, $branchName, $label, $monthlyTotals) {
             $writer = new Writer;
             $writer->openToFile('php://output');
 
+            // Header context
+            $writer->addRow(Row::fromValues([$branchName]));
+            $writer->addRow(Row::fromValues(["{$label} Financial Report"]));
+            $writer->addRow(Row::fromValues([
+                'Period',
+                $data['period']['from'].' to '.$data['period']['to'],
+            ]));
+            $writer->addRow(Row::fromValues(['']));
+
+            // Monthly Detail
+            $writer->addRow(Row::fromValues(['Monthly Detail']));
             $writer->addRow(Row::fromValues(['Month', 'Category', 'Total (GHS)']));
             foreach ($data['rows'] as $row) {
                 $writer->addRow(Row::fromValues([
@@ -643,6 +631,18 @@ class ReportsController extends Controller
                 ]));
             }
 
+            // Monthly Summary
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Monthly Summary']));
+            $writer->addRow(Row::fromValues(['Month', 'Total (GHS)']));
+            foreach ($monthlyTotals as $month => $total) {
+                $writer->addRow(Row::fromValues([
+                    $month,
+                    number_format($total, 2, '.', ''),
+                ]));
+            }
+
+            // Category Totals
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Category Totals (entire period)']));
             $writer->addRow(Row::fromValues(['Category', 'Total (GHS)', 'Percentage']));
@@ -654,6 +654,7 @@ class ReportsController extends Controller
                 ]));
             }
 
+            // Summary
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Grand Total', number_format($data['summary']['grand_total'], 2, '.', '')]));
             $writer->addRow(Row::fromValues(['Monthly Average', number_format($data['summary']['monthly_average'], 2, '.', '')]));
