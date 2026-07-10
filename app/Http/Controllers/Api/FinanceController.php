@@ -13,10 +13,13 @@ use App\Models\FinanceCategory;
 use App\Models\Transaction;
 use App\Services\FinanceStatsService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenSpout\Common\Entity\Row;
-use OpenSpout\Writer\CSV\Writer;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Options as XlsxOptions;
+use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
@@ -168,29 +171,180 @@ class FinanceController extends Controller
         }
 
         $query->orderByDesc('transaction_date');
-        $filename = 'transactions-'.now()->format('Y-m-d').'.csv';
 
-        return new StreamedResponse(function () use ($query) {
-            $writer = new Writer;
+        $branch = Branch::find($request->user()->branch_id);
+        $branchName = $branch?->name ?? 'Wesleyan International Society';
+
+        $allTransactions = $query->get();
+        $firstDate = $allTransactions->min('transaction_date');
+        $lastDate = $allTransactions->max('transaction_date');
+        $periodFrom = $firstDate ? Carbon::parse($firstDate)->format('M j, Y') : '—';
+        $periodTo = $lastDate ? Carbon::parse($lastDate)->format('M j, Y') : '—';
+
+        $totalIncome = (float) $allTransactions->where('type', 'income')->sum('amount');
+        $totalExpense = (float) $allTransactions->where('type', 'expense')->sum('amount');
+        $net = $totalIncome - $totalExpense;
+
+        $categoryStats = $allTransactions
+            ->groupBy('type')
+            ->map(fn ($txns) => $txns
+                ->groupBy(fn ($t) => $t->category?->name ?? '(Uncategorized)')
+                ->map(fn ($group, $name) => [
+                    'name' => $name,
+                    'count' => $group->count(),
+                    'total' => (float) $group->sum('amount'),
+                ])
+                ->sortByDesc('total')
+                ->values()
+                ->all()
+            );
+
+        $monthlyTotals = $allTransactions
+            ->groupBy(fn ($t) => Carbon::parse($t->transaction_date)->format('M Y'))
+            ->map(fn ($txns) => [
+                'income' => (float) $txns->where('type', 'income')->sum('amount'),
+                'expense' => (float) $txns->where('type', 'expense')->sum('amount'),
+            ])
+            ->sortKeys()
+            ->all();
+
+        $filename = 'transactions-'.now()->format('Y-m-d').'.xlsx';
+        $dateFmt = fn ($d) => $d ? Carbon::parse($d)->format('j M Y') : '';
+
+        // Styles
+        $titleStyle = new Style(fontBold: true, fontSize: 16);
+        $sectionStyle = new Style(fontBold: true, fontSize: 13);
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
+        $amountStyle = new Style(format: '"GHS "#,##0.00');
+        $negAmountStyle = new Style(format: '"-GHS "#,##0.00');
+        $boldStyle = new Style(fontBold: true);
+        $boldAmountStyle = new Style(fontBold: true, format: '"GHS "#,##0.00');
+        $boldNegAmountStyle = new Style(fontBold: true, format: '"-GHS "#,##0.00');
+
+        return new StreamedResponse(function () use (
+            $allTransactions, $branchName, $periodFrom, $periodTo,
+            $totalIncome, $totalExpense, $net, $categoryStats, $monthlyTotals,
+            $dateFmt, $titleStyle, $sectionStyle, $headerStyle,
+            $amountStyle, $negAmountStyle, $boldStyle, $boldAmountStyle, $boldNegAmountStyle,
+        ) {
+            $options = new XlsxOptions(DEFAULT_COLUMN_WIDTH: 20);
+            $writer = new Writer($options);
             $writer->openToFile('php://output');
-            $writer->addRow(Row::fromValues(['Date', 'Type', 'Category', 'Amount', 'Currency', 'Member', 'Reference', 'Notes']));
 
-            $query->lazy()->each(function ($t) use ($writer) {
-                $writer->addRow(Row::fromValues([
-                    optional($t->transaction_date)->toDateString(),
-                    ucfirst($t->type),
-                    $t->category?->name ?? '',
-                    (string) $t->amount,
-                    $t->currency ?? 'GHS',
-                    $t->member?->full_name ?? '',
-                    $t->reference,
-                    $t->notes,
-                ]));
-            });
+            // ── SECTION 1: REPORT HEADER ──────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle([$branchName], $titleStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Transaction Report'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Period:', $periodFrom.' to '.$periodTo]));
+            $writer->addRow(Row::fromValues(['Report Date:', now()->format('F j, Y')]));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 2: EXECUTIVE SUMMARY ──────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['EXECUTIVE SUMMARY'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Total Income', $totalIncome], $boldAmountStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Total Expenses', $totalExpense], $boldAmountStyle));
+            $netStyle = $net < 0 ? $boldNegAmountStyle : $boldAmountStyle;
+            $writer->addRow(Row::fromValuesWithStyle(['Net Position', abs($net)], $netStyle));
+            $writer->addRow(Row::fromValues(['Total Transactions', $allTransactions->count()]));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 3: INCOME TRANSACTIONS ────────────────────────
+            $incomeTransactions = $allTransactions->where('type', 'income');
+            $writer->addRow(Row::fromValuesWithStyle(['INCOME TRANSACTIONS'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+
+            if ($categoryStats->has('income') && count($categoryStats['income']) > 0) {
+                $writer->addRow(Row::fromValuesWithStyle(['Category', 'Entries', 'Total (GHS)'], $headerStyle));
+                foreach ($categoryStats['income'] as $cat) {
+                    $writer->addRow(Row::fromValuesWithStyle([$cat['name'], $cat['count'], $cat['total']], $amountStyle));
+                }
+                $writer->addRow(Row::fromValuesWithStyle([
+                    'Total Income', $incomeTransactions->count(), $totalIncome,
+                ], $boldAmountStyle));
+            } else {
+                $writer->addRow(Row::fromValues(['No income transactions recorded.']));
+            }
+            $writer->addRow(Row::fromValues(['']));
+
+            if ($incomeTransactions->isNotEmpty()) {
+                $writer->addRow(Row::fromValuesWithStyle([
+                    'Date', 'Member', 'Reference', 'Notes', 'Amount (GHS)',
+                ], $headerStyle));
+                foreach ($incomeTransactions as $t) {
+                    $writer->addRow(Row::fromValuesWithStyle([
+                        $dateFmt($t->transaction_date),
+                        $t->member?->full_name ?? '',
+                        $t->reference ?? '',
+                        $t->notes ?? '',
+                        (float) $t->amount,
+                    ], $amountStyle));
+                }
+                $writer->addRow(Row::fromValues(['']));
+            }
+
+            // ── SECTION 4: EXPENSE TRANSACTIONS ───────────────────────
+            $expenseTransactions = $allTransactions->where('type', 'expense');
+            $writer->addRow(Row::fromValuesWithStyle(['EXPENSE TRANSACTIONS'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+
+            if ($categoryStats->has('expense') && count($categoryStats['expense']) > 0) {
+                $writer->addRow(Row::fromValuesWithStyle(['Category', 'Entries', 'Total (GHS)'], $headerStyle));
+                foreach ($categoryStats['expense'] as $cat) {
+                    $writer->addRow(Row::fromValuesWithStyle([$cat['name'], $cat['count'], $cat['total']], $amountStyle));
+                }
+                $writer->addRow(Row::fromValuesWithStyle([
+                    'Total Expenses', $expenseTransactions->count(), $totalExpense,
+                ], $boldAmountStyle));
+            } else {
+                $writer->addRow(Row::fromValues(['No expense transactions recorded.']));
+            }
+            $writer->addRow(Row::fromValues(['']));
+
+            if ($expenseTransactions->isNotEmpty()) {
+                $writer->addRow(Row::fromValuesWithStyle([
+                    'Date', 'Member', 'Reference', 'Notes', 'Amount (GHS)',
+                ], $headerStyle));
+                foreach ($expenseTransactions as $t) {
+                    $writer->addRow(Row::fromValuesWithStyle([
+                        $dateFmt($t->transaction_date),
+                        $t->member?->full_name ?? '',
+                        $t->reference ?? '',
+                        $t->notes ?? '',
+                        (float) $t->amount,
+                    ], $amountStyle));
+                }
+                $writer->addRow(Row::fromValues(['']));
+            }
+
+            // ── SECTION 5: MONTHLY SUMMARY ────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['MONTHLY SUMMARY'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle([
+                'Month', 'Income (GHS)', 'Expenses (GHS)', 'Net (GHS)',
+            ], $headerStyle));
+            foreach ($monthlyTotals as $month => $totals) {
+                $monthNet = $totals['income'] - $totals['expense'];
+                $netStyle = $monthNet < 0 ? $negAmountStyle : $amountStyle;
+                $writer->addRow(Row::fromValuesWithStyle([
+                    $month, $totals['income'], $totals['expense'], abs($monthNet),
+                ], $netStyle));
+            }
+            $totalNetStyle = $net < 0 ? $boldNegAmountStyle : $boldAmountStyle;
+            $writer->addRow(Row::fromValuesWithStyle([
+                'TOTAL', $totalIncome, $totalExpense, abs($net),
+            ], $totalNetStyle));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 6: NOTES ──────────────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['NOTES'], $boldStyle));
+            $writer->addRow(Row::fromValues(['1. All amounts are in Ghana Cedis (GHS).']));
+            $writer->addRow(Row::fromValues(['2. This report was generated by WIS-CMS on '
+                .now()->format('F j, Y \a\t g:i a').'.']));
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
