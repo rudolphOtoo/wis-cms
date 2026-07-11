@@ -7,11 +7,13 @@ import { createChild, getChildren } from '../../api/children'
 import MemberSearchPicker from '../../components/MemberSearchPicker'
 import ChildSearchPicker from '../../components/ChildSearchPicker'
 import { useConfirm } from '../../hooks/useConfirm'
+import { usePermission } from '../../hooks/usePermission'
 
 export default function CellDetail() {
   const navigate = useNavigate()
   const { id }   = useParams()
   const { confirm, dialog } = useConfirm()
+  const { can } = usePermission()
   const [cell,       setCell]       = useState(null)
   const [members,    setMembers]    = useState([])
   const [children,   setChildren]   = useState([])
@@ -199,12 +201,14 @@ export default function CellDetail() {
           <h3 className="font-semibold" style={{color:'var(--color-navy)'}}>
             {isChildrenMinistry ? 'Children' : 'Cell Members'}
           </h3>
-          <button onClick={() => setShowAdd(!showAdd)} className="btn-primary text-sm px-3 py-1.5 gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-            </svg>
-            {isChildrenMinistry ? 'Add Child' : 'Add Member'}
-          </button>
+          {can('manage cell members') && (
+            <button onClick={() => setShowAdd(!showAdd)} className="btn-primary text-sm px-3 py-1.5 gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+              </svg>
+              {isChildrenMinistry ? 'Add Child' : 'Add Member'}
+            </button>
+          )}
         </div>
 
         {showAdd && (
@@ -404,11 +408,13 @@ export default function CellDetail() {
                   <td className="px-4 py-3 text-sm" style={{color:'#6b7280'}}>{child.age ?? '—'}</td>
                   <td className="px-4 py-3 text-sm" style={{color:'#6b7280'}}>{child.guardian?.name ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => handleRemove(child.id)} disabled={removing === child.id}
-                            className="text-xs px-2 py-1 rounded font-medium"
-                            style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                      {removing === child.id ? '...' : 'Remove'}
-                    </button>
+                    {can('manage cell members') && (
+                      <button onClick={() => handleRemove(child.id)} disabled={removing === child.id}
+                              className="text-xs px-2 py-1 rounded font-medium"
+                              style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                        {removing === child.id ? '...' : 'Remove'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -441,11 +447,13 @@ export default function CellDetail() {
                   <td className="px-4 py-3 text-sm font-mono" style={{color:'#6b7280'}}>{member.phone ?? '—'}</td>
                   <td className="px-4 py-3 text-sm capitalize" style={{color:'#374151'}}>{member.status}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => handleRemove(member.id)} disabled={removing === member.id}
-                            className="text-xs px-2 py-1 rounded font-medium"
-                            style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
-                      {removing === member.id ? '...' : 'Remove'}
-                    </button>
+                    {can('manage cell members') && (
+                      <button onClick={() => handleRemove(member.id)} disabled={removing === member.id}
+                              className="text-xs px-2 py-1 rounded font-medium"
+                              style={{color:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)'}}>
+                        {removing === member.id ? '...' : 'Remove'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
