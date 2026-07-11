@@ -100,7 +100,7 @@ class MemberController extends Controller
     // GET /api/members/{id}
     public function show(string $id): JsonResponse
     {
-        $member = Member::query()->withExists('user', 'cell')->findOrFail($id);
+        $member = Member::query()->withExists(['user', 'cell'])->findOrFail($id);
 
         return response()->json(['data' => new MemberResource($member)]);
     }

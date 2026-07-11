@@ -295,7 +295,7 @@ export default function MemberDetail() {
                                 <td style={{padding:'16px',fontSize:'14px',color:'#191c1e'}}>{t.date}</td>
                                 <td style={{padding:'16px'}}>
                                   <span className="uppercase" style={{padding:'4px 8px',borderRadius:'4px',fontSize:'11px',fontWeight:700,backgroundColor:b.bg,color:b.text}}>
-                                    {t.category}
+                                    {t.category?.name ?? t.category}
                                   </span>
                                 </td>
                                 <td style={{padding:'16px',fontSize:'14px',color:'#44474f',fontFamily:'monospace'}}>{t.reference ?? '—'}</td>
