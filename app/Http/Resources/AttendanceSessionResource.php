@@ -17,6 +17,8 @@ class AttendanceSessionResource extends JsonResource
                 'name' => $this->serviceType->name,
                 'type' => $this->serviceType->type,
             ]),
+            'cell_id' => $this->cell_id,
+            'department_id' => $this->department_id,
             'adult_count' => $this->adult_count,
             'children_count' => $this->children_count,
             'total_count' => $this->total_count,

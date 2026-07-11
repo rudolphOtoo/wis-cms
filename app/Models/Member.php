@@ -21,7 +21,8 @@ class Member extends Model
         'branch_id', 'cell_id', 'member_number', 'first_name', 'last_name',
         'other_names', 'gender', 'date_of_birth', 'phone', 'email',
         'address', 'occupation', 'marital_status', 'join_date',
-        'is_baptised', 'baptism_date', 'status', 'photo_path', 'notes',
+        'is_baptised', 'baptism_date', 'status', 'last_attendance_date',
+        'welfare_flag', 'photo_path', 'notes',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ class Member extends Model
             'join_date' => 'date',
             'baptism_date' => 'date',
             'is_baptised' => 'boolean',
+            'last_attendance_date' => 'date',
         ];
     }
 
@@ -97,6 +99,11 @@ class Member extends Model
     public function transactions()
     {
         return $this->hasMany(Transaction::class, 'member_id');
+    }
+
+    public function pastoralNotes()
+    {
+        return $this->hasMany(PastoralNote::class);
     }
 
     public function getFullNameAttribute(): string

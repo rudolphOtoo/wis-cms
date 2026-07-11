@@ -5,7 +5,7 @@ import { usePermission } from '../../hooks/usePermission'
 import {
   LayoutDashboard, Users, GraduationCap, ClipboardCheck,
   Building2, Home, UserPlus, MessageSquare, Gift, Bell, FileText,
-  UserCog, ScrollText, MessageCircle,
+  UserCog, ScrollText, MessageCircle, Heart,
   Wallet, TrendingUp, TrendingDown, BarChart2, LineChart,
   ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
 } from 'lucide-react'
@@ -44,7 +44,9 @@ const MAIN_NAV = [
   { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
   { to: '/birthdays',         label: 'Birthdays',   icon: Gift,            permission: 'view birthday messages',  hideForRoles: ['cell_leader'] },
   { to: '/reminders',         label: 'Reminders',   icon: Bell,            permission: 'view service reminders', hideForRoles: ['cell_leader'] },
-  { to: '/admin/submissions', label: 'Submissions', icon: FileText,        permission: 'view member submissions' },
+  { to: '/admin/submissions', label: 'Submissions', icon: FileText, permission: 'view member submissions' },
+  { to: '/pastoral-notes',    label: 'Pastoral Notes', icon: Heart,  permission: 'view pastoral notes' },
+  { to: '/pastoral/follow-ups', label: 'Follow-ups',  icon: Heart,   permission: 'view pastoral notes' },
 ]
 
 const FINANCE_NAV = [
@@ -53,6 +55,8 @@ const FINANCE_NAV = [
   { to: '/reports/finance/expense-by-category', label: 'Expenses',        icon: TrendingDown, permission: 'view finance' },
   { to: '/reports/cells/comparison',            label: 'Cell Comparison', icon: BarChart2,    permission: 'view finance' },
   { to: '/reports/attendance/trends',           label: 'Att. Trends',     icon: LineChart,    permission: 'view finance' },
+  { to: '/reports/attendance/summary',          label: 'Att. Summary',    icon: ClipboardCheck, permission: 'view finance' },
+  { to: '/reports/members/welfare',             label: 'Member Welfare',  icon: Users,           permission: 'view finance' },
 ]
 
 const ADMIN_NAV = [

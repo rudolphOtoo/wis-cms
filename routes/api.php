@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MemberSubmissionController;
 use App\Http\Controllers\Api\MemberSubmissionWebhookController;
 use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\PastoralNoteController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ServiceReminderController;
@@ -153,6 +154,8 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/finance/income-by-category', [ReportsController::class, 'incomeByCategory']);
         Route::get('reports/finance/expense-by-category', [ReportsController::class, 'expenseByCategory']);
         Route::get('reports/attendance/trends', [ReportsController::class, 'attendanceTrends']);
+        Route::get('reports/attendance/summary', [ReportsController::class, 'attendanceSummary']);
+        Route::get('reports/members/welfare', [ReportsController::class, 'memberWelfare']);
         Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
 
         // Report exports — PDF + CSV downloads (gated by 'export reports')
@@ -162,6 +165,10 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/finance/expense-by-category/export-csv', [ReportsController::class, 'expenseByCategoryCsv'])->middleware('permission:export reports');
         Route::get('reports/attendance/trends/export-pdf', [ReportsController::class, 'attendanceTrendsPdf'])->middleware('permission:export reports');
         Route::get('reports/attendance/trends/export-csv', [ReportsController::class, 'attendanceTrendsCsv'])->middleware('permission:export reports');
+        Route::get('reports/attendance/summary/export-pdf', [ReportsController::class, 'attendanceSummaryPdf'])->middleware('permission:export reports');
+        Route::get('reports/attendance/summary/export-xlsx', [ReportsController::class, 'attendanceSummaryXlsx'])->middleware('permission:export reports');
+        Route::get('reports/members/welfare/export-pdf', [ReportsController::class, 'memberWelfarePdf'])->middleware('permission:export reports');
+        Route::get('reports/members/welfare/export-csv', [ReportsController::class, 'memberWelfareCsv'])->middleware('permission:export reports');
         Route::get('reports/cells/comparison/export-pdf', [ReportsController::class, 'cellComparisonPdf'])->middleware('permission:export reports');
         Route::get('reports/cells/comparison/export-csv', [ReportsController::class, 'cellComparisonCsv'])->middleware('permission:export reports');
 
@@ -247,6 +254,22 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     // AUDIT
     Route::middleware('permission:view audit log')->group(function () {
         Route::get('audit', [AuditController::class, 'index']);
+    });
+
+    // PASTORAL NOTES
+    Route::middleware('permission:view pastoral notes')->group(function () {
+        Route::get('pastoral-notes', [PastoralNoteController::class, 'index']);
+        Route::get('pastoral-notes/follow-ups', [PastoralNoteController::class, 'followUps']);
+    });
+    Route::middleware('permission:create pastoral notes')->group(function () {
+        Route::post('pastoral-notes', [PastoralNoteController::class, 'store']);
+    });
+    Route::middleware('permission:update pastoral notes')->group(function () {
+        Route::put('pastoral-notes/{id}', [PastoralNoteController::class, 'update']);
+    });
+    Route::middleware('permission:delete members')->group(function () {
+        // Pastors/admins only — gated by PastoralNotePolicy::delete
+        Route::delete('pastoral-notes/{id}', [PastoralNoteController::class, 'destroy']);
     });
 
     // MEMBER PORTAL — scoped to the authenticated member's own data

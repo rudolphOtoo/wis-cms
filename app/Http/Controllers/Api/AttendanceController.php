@@ -310,7 +310,13 @@ class AttendanceController extends Controller
             })
             ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
             ->where('s.branch_id', $branchId)
-            ->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
+            ->where(function ($q) {
+                $q->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
+                    ->orWhere(function ($q) {
+                        $q->where('st.slug', 'cell_meeting')
+                            ->whereRaw('EXTRACT(DOW FROM s.service_date) = 0');
+                    });
+            })
             ->when($scope['type'] === 'scoped', fn ($q) => $q->where(function ($q) use ($scope) {
                 if (! empty($scope['cell_ids'])) {
                     $q->whereIn('s.cell_id', $scope['cell_ids']);
