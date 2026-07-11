@@ -7,6 +7,11 @@ use App\Models\User;
 
 class CellPolicy
 {
+    private function isAdmin(User $user): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'pastor', 'secretary']);
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->can('view cells');
@@ -37,25 +42,25 @@ class CellPolicy
     public function addMember(User $user, Cell $cell): bool
     {
         return $user->can('manage cell members')
-            && $cell->leader_user_id === $user->id;
+            && ($this->isAdmin($user) || $cell->leader_user_id === $user->id);
     }
 
     public function removeMember(User $user, Cell $cell): bool
     {
         return $user->can('manage cell members')
-            && $cell->leader_user_id === $user->id;
+            && ($this->isAdmin($user) || $cell->leader_user_id === $user->id);
     }
 
     public function assignChild(User $user, Cell $cell): bool
     {
         return $user->can('manage cell members')
-            && $cell->leader_user_id === $user->id;
+            && ($this->isAdmin($user) || $cell->leader_user_id === $user->id);
     }
 
     public function removeChild(User $user, Cell $cell): bool
     {
         return $user->can('manage cell members')
-            && $cell->leader_user_id === $user->id;
+            && ($this->isAdmin($user) || $cell->leader_user_id === $user->id);
     }
 
     public function message(User $user, Cell $cell): bool
