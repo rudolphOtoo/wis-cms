@@ -59,6 +59,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view departments', 'create departments', 'edit departments',
             'manage department members',
             'view cells', 'create cells', 'edit cells', 'delete cells',
+            'manage cell members',
             'view messages', 'send messages',
             'view reports', 'export reports',
             'view birthday messages',
