@@ -106,8 +106,8 @@
               $rateClass = $rate >= 70 ? 'rate-high' : ($rate >= 50 ? 'rate-mid' : 'rate-low');
             @endphp
             <tr>
-              <td>{{ $row['label'] ?? $row['period_start'] ?? '—' }}</td>
-              <td class="num">{{ $row['sessions'] ?? '—' }}</td>
+              <td>{{ $row['period_label'] ?? $row['period_start'] ?? '—' }}</td>
+              <td class="num">{{ $row['sessions_count'] ?? '—' }}</td>
               <td class="num">{{ $row['records_present'] ?? '—' }}</td>
               <td class="num">{{ $row['records_absent'] ?? '—' }}</td>
               <td class="num">{{ $row['records_total'] ?? '—' }}</td>

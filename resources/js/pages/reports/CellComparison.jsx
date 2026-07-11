@@ -14,6 +14,7 @@ const FLAG_META = {
   no_leader:            { label: 'No leader',    tint: '#c9a84c' },
   no_recent_attendance: { label: 'No recent attendance', tint: '#c9a84c' },
   low_membership:       { label: 'Low membership',       tint: '#c87533' },
+  high_inactive_rate:   { label: 'High inactive rate',   tint: '#ba1a1a' },
 }
 
 function formatRate(rate) {
@@ -131,6 +132,8 @@ export default function CellComparison() {
                     <th className="text-right px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#44474f'}}>Members</th>
                     <th className="text-right px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#44474f'}}>Sessions</th>
                     <th className="text-right px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#44474f'}}>Rate</th>
+                    <th className="text-right px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#15803d'}}>Engaged</th>
+                    <th className="text-right px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#ca8a04'}}>At Risk</th>
                     <th className="text-left px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#44474f'}}>Last Session</th>
                     <th className="text-left px-6 py-3 font-bold uppercase tracking-wider text-xs" style={{color:'#44474f'}}>Flags</th>
                   </tr>
@@ -145,6 +148,8 @@ export default function CellComparison() {
                       <td className="px-6 py-3 text-right font-mono">{c.member_count}</td>
                       <td className="px-6 py-3 text-right font-mono">{c.recent_sessions}</td>
                       <td className="px-6 py-3 text-right font-mono">{formatRate(c.recent_attendance_rate)}</td>
+                      <td className="px-6 py-3 text-right font-mono" style={{color:'#15803d'}}>{c.welfare_distribution?.engaged ?? 0}</td>
+                      <td className="px-6 py-3 text-right font-mono" style={{color:'#ba1a1a'}}>{(c.welfare_distribution?.at_risk ?? 0) + (c.welfare_distribution?.inactive_risk ?? 0)}</td>
                       <td className="px-6 py-3" style={{color:'#44474f'}}>{formatDate(c.last_session_date)}</td>
                       <td className="px-6 py-3">
                         <div className="flex flex-wrap gap-1">

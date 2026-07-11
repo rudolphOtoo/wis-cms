@@ -16,6 +16,7 @@ class Branch extends Model
 
     protected $fillable = [
         'name', 'location', 'address', 'phone', 'email', 'is_active', 'follow_up_enabled', 'follow_up_delay_hours', 'follow_up_present_template', 'follow_up_absent_template',
+        'engagement_window_weeks', 'at_risk_threshold_pct', 'inactive_weeks',
     ];
 
     protected function casts(): array
@@ -24,6 +25,9 @@ class Branch extends Model
             'is_active' => 'boolean',
             'follow_up_enabled' => 'boolean',
             'follow_up_delay_hours' => 'integer',
+            'engagement_window_weeks' => 'integer',
+            'at_risk_threshold_pct' => 'integer',
+            'inactive_weeks' => 'integer',
         ];
     }
 

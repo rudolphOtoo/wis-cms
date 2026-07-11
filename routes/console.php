@@ -40,3 +40,7 @@ Schedule::command('attendance:process-follow-ups')->everyFifteenMinutes();
 // actual fan-out to all active branch members. Idempotent: a member
 // is never sent the same reminder twice for the same service date.
 Schedule::command('reminders:send')->hourly();
+
+// Weekly welfare flag recomputation — runs Sunday evening after services.
+// Computes attendance-based welfare flags for all active members per branch.
+Schedule::command('welfare:compute')->weeklyOn(0, '20:00');

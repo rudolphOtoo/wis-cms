@@ -9,6 +9,8 @@ use App\Models\AttendanceSession;
 use App\Models\Branch;
 use App\Models\Cell;
 use App\Models\Transaction;
+use App\Services\AttendanceSummaryService;
+use App\Services\MemberWelfareService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +33,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReportsController extends Controller
 {
+    public function __construct(
+        private readonly AttendanceSummaryService $summaryService,
+        private readonly MemberWelfareService $welfareService,
+    ) {}
+
     // GET /api/reports/finance/income-by-category
     //
     // Returns monthly totals per income category for a date range,
@@ -462,8 +469,24 @@ class ReportsController extends Controller
             ->get()
             ->keyBy('cell_id');
 
+        // Pass C: welfare distribution per cell (from members.welfare_flag)
+        $welfareByCell = DB::table('members as m')
+            ->where('m.branch_id', $branchId)
+            ->whereNull('m.deleted_at')
+            ->where('m.status', 'active')
+            ->select(
+                'm.cell_id',
+                DB::raw("SUM(CASE WHEN m.welfare_flag = 'engaged' THEN 1 ELSE 0 END) AS engaged"),
+                DB::raw("SUM(CASE WHEN m.welfare_flag = 'moderate' THEN 1 ELSE 0 END) AS moderate"),
+                DB::raw("SUM(CASE WHEN m.welfare_flag = 'at_risk' THEN 1 ELSE 0 END) AS at_risk"),
+                DB::raw("SUM(CASE WHEN m.welfare_flag = 'inactive_risk' THEN 1 ELSE 0 END) AS inactive_risk")
+            )
+            ->groupBy('m.cell_id')
+            ->get()
+            ->keyBy('cell_id');
+
         // Shape per-cell rows with health flags
-        $cellRows = $cells->map(function ($cell) use ($attendanceByCell) {
+        $cellRows = $cells->map(function ($cell) use ($attendanceByCell, $welfareByCell) {
             $att = $attendanceByCell->get($cell->id);
             $sessions = (int) ($att->sessions ?? 0);
             $recordsTotal = (int) ($att->records_total ?? 0);
@@ -471,6 +494,14 @@ class ReportsController extends Controller
             $rate = $recordsTotal > 0
                 ? round(($recordsPresent / $recordsTotal) * 100, 1)
                 : null;
+
+            $welfare = $welfareByCell->get($cell->id);
+            $welfareDistribution = $welfare ? [
+                'engaged' => (int) $welfare->engaged,
+                'moderate' => (int) $welfare->moderate,
+                'at_risk' => (int) $welfare->at_risk,
+                'inactive_risk' => (int) $welfare->inactive_risk,
+            ] : ['engaged' => 0, 'moderate' => 0, 'at_risk' => 0, 'inactive_risk' => 0];
 
             $flags = [];
             if (! $cell->leader_user_id) {
@@ -481,6 +512,12 @@ class ReportsController extends Controller
             }
             if ($cell->members_count < 5) {
                 $flags[] = 'low_membership';
+            }
+            // New: high inactive rate (>20% of members are inactive_risk)
+            $totalForInactive = $welfareDistribution['engaged'] + $welfareDistribution['moderate']
+                + $welfareDistribution['at_risk'] + $welfareDistribution['inactive_risk'];
+            if ($totalForInactive > 0 && $welfareDistribution['inactive_risk'] / $totalForInactive > 0.2) {
+                $flags[] = 'high_inactive_rate';
             }
 
             return [
@@ -498,6 +535,7 @@ class ReportsController extends Controller
                 'recent_records_present' => $recordsPresent,
                 'recent_attendance_rate' => $rate,
                 'last_session_date' => $att->last_session_date ?? null,
+                'welfare_distribution' => $welfareDistribution,
                 'health_flags' => $flags,
             ];
         })->all();
@@ -535,6 +573,47 @@ class ReportsController extends Controller
                 'avg_attendance_rate' => $avgRate,
             ],
         ];
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // CHURCH ATTENDANCE SUMMARY — cell-to-church aggregation
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/attendance/summary
+    //
+    // Aggregates all cell-level attendance into church-wide totals per
+    // Sunday. Cell meetings on Sundays are included (leadership rule:
+    // cell attendance during Sunday breakout IS the Sunday attendance).
+    //
+    // Query params:
+    //   from_date (optional, default: 12 weeks ago)
+    //   to_date   (optional, default: today)
+    //   cell_id   (optional, filter to a single cell)
+    public function attendanceSummary(Request $request): JsonResponse
+    {
+        return response()->json($this->buildAttendanceSummaryData($request));
+    }
+
+    /**
+     * Build the attendance-summary dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildAttendanceSummaryData(Request $request): array
+    {
+        $validated = $request->validate([
+            'from_date' => 'nullable|date',
+            'to_date' => 'nullable|date|after_or_equal:from_date',
+            'cell_id' => 'nullable|uuid|exists:cells,id',
+        ]);
+
+        $branchId = $request->user()->branch_id;
+
+        return $this->summaryService->getSummary(
+            $branchId,
+            $validated['from_date'] ?? null,
+            $validated['to_date'] ?? null,
+            $validated['cell_id'] ?? null,
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -847,6 +926,326 @@ class ReportsController extends Controller
             $writer->addRow(Row::fromValues(['Total Members', (string) $data['summary']['total_members']]));
             $writer->addRow(Row::fromValues(['Avg Members per Cell', (string) $data['summary']['avg_members_per_cell']]));
             $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', (string) $data['summary']['avg_attendance_rate']]));
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // MEMBER WELFARE REPORT — engagement tracking for leadership
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/members/welfare
+    //
+    // Per-member engagement data: attendance rate, giving activity,
+    // welfare flag. Cell leaders see own cell; pastors/admins see all.
+    //
+    // Query params:
+    //   cell_id        (optional, filter to a single cell)
+    //   welfare_status (optional, filter by welfare flag)
+    public function memberWelfare(Request $request): JsonResponse
+    {
+        return response()->json($this->buildMemberWelfareData($request));
+    }
+
+    /**
+     * Build the member-welfare dataset. Used by JSON, PDF, and CSV
+     * export endpoints.
+     */
+    protected function buildMemberWelfareData(Request $request): array
+    {
+        $validated = $request->validate([
+            'cell_id' => 'nullable|uuid|exists:cells,id',
+            'welfare_status' => 'nullable|in:engaged,moderate,at_risk,inactive_risk,none,all',
+        ]);
+
+        $branchId = $request->user()->branch_id;
+
+        // Cell leaders are scoped to their own cells
+        $cellId = $validated['cell_id'] ?? null;
+        if (! $cellId && $request->user()->hasRole('cell_leader')) {
+            $userCellIds = Cell::where('leader_user_id', $request->user()->id)
+                ->pluck('id')
+                ->toArray();
+            $cellId = $userCellIds[0] ?? null;
+        }
+
+        return $this->welfareService->getWelfare(
+            $branchId,
+            $cellId,
+            $validated['welfare_status'] ?? null,
+        );
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // CHURCH ATTENDANCE SUMMARY EXPORTS
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/attendance/summary/export-pdf
+    public function attendanceSummaryPdf(Request $request)
+    {
+        $data = $this->buildAttendanceSummaryData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-attendance-summary', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        return $pdf->download("attendance-summary-{$from}-to-{$to}.pdf");
+    }
+
+    // GET /api/reports/attendance/summary/export-xlsx
+    //
+    // Multi-tab Excel export for Leaders' Meeting:
+    //   Tab 1: Executive Summary — KPIs and welfare overview
+    //   Tab 2: Cell Breakdown — per-Cell attendance, rates, welfare
+    //   Tab 3: State of Members — welfare flag distribution
+    //   Tab 4: Weekly Trend — per-Sunday attendance
+    public function attendanceSummaryXlsx(Request $request)
+    {
+        $data = $this->buildAttendanceSummaryData($request);
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+        $branch = Branch::find($request->user()->branch_id);
+        $branchName = $branch?->name ?? 'Wesleyan International Society';
+        $filename = "leaders-meeting-report-{$from}-to-{$to}.xlsx";
+
+        // Styles
+        $titleStyle = new Style(fontBold: true, fontSize: 16);
+        $sectionStyle = new Style(fontBold: true, fontSize: 13);
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
+        $boldStyle = new Style(fontBold: true);
+        $pctStyle = new Style(format: '0.0%');
+
+        return new StreamedResponse(function () use (
+            $data, $branchName, $from, $to,
+            $titleStyle, $sectionStyle, $headerStyle, $boldStyle, $pctStyle,
+        ) {
+            $options = new XlsxOptions(DEFAULT_COLUMN_WIDTH: 18);
+            $writer = new Writer($options);
+            $writer->openToFile('php://output');
+
+            // ════════════════════════════════════════════════════════
+            // TAB 1: EXECUTIVE SUMMARY
+            // ════════════════════════════════════════════════════════
+            $writer->addRow(Row::fromValuesWithStyle([$branchName], $titleStyle));
+            $writer->addRow(Row::fromValuesWithStyle(["Leaders' Meeting Report — Church Attendance Summary"], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues([
+                'Period:',
+                Carbon::parse($from)->format('F j, Y').' — '.Carbon::parse($to)->format('F j, Y'),
+            ]));
+            $writer->addRow(Row::fromValues(['Report Date:', now()->format('F j, Y')]));
+            $writer->addRow(Row::fromValues(['']));
+
+            $writer->addRow(Row::fromValuesWithStyle(['KEY PERFORMANCE INDICATORS'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Metric', 'Value'], $headerStyle));
+            $writer->addRow(Row::fromValues(['Overall Attendance Rate', $data['summary']['overall_attendance_rate'] / 100]));
+            $writer->addRow(Row::fromValues(['Average Attendance / Sunday', $data['summary']['avg_per_sunday']]));
+            $writer->addRow(Row::fromValues(['Total Attendance', $data['summary']['total_attendance']]));
+            $writer->addRow(Row::fromValues(['Sundays Covered', $data['summary']['total_sundays']]));
+            $writer->addRow(Row::fromValues(['Active Members', $data['summary']['total_active_members']]));
+            $writer->addRow(Row::fromValues(['Average Adults / Sunday', $data['summary']['avg_adults']]));
+            $writer->addRow(Row::fromValues(['Average Children / Sunday', $data['summary']['avg_children']]));
+            if ($data['summary']['highest_sunday']) {
+                $writer->addRow(Row::fromValues(['Highest Sunday', $data['summary']['highest_sunday'].' ('.$data['summary']['highest_count'].')']));
+            }
+            if ($data['summary']['lowest_sunday']) {
+                $writer->addRow(Row::fromValues(['Lowest Sunday', $data['summary']['lowest_sunday'].' ('.$data['summary']['lowest_count'].')']));
+            }
+            $trend = $data['summary']['trend'] ?? null;
+            if ($trend && $trend['direction'] !== 'unknown') {
+                $label = match ($trend['direction']) {
+                    'up' => 'Improving',
+                    'down' => 'Declining',
+                    default => 'Stable',
+                };
+                $writer->addRow(Row::fromValues(['Trend', $label.' ('.($trend['delta'] > 0 ? '+' : '').$trend['delta'].' avg)']));
+            }
+            $writer->addRow(Row::fromValues(['']));
+
+            // Welfare summary on Tab 1
+            $ws = $data['summary']['welfare_summary'];
+            $totalM = $ws['engaged'] + $ws['moderate'] + $ws['at_risk'] + $ws['inactive_risk'];
+            $writer->addRow(Row::fromValuesWithStyle(['WELFARE SNAPSHOT'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Status', 'Count', 'Share'], $headerStyle));
+            foreach (['engaged', 'moderate', 'at_risk', 'inactive_risk'] as $flag) {
+                $writer->addRow(Row::fromValues([
+                    ucfirst(str_replace('_', ' ', $flag)),
+                    $ws[$flag],
+                    $totalM > 0 ? $ws[$flag] / $totalM : 0,
+                ]));
+            }
+            $writer->addRow(Row::fromValues(['TOTAL', $totalM, 1.0]));
+            $writer->addRow(Row::fromValues(['']));
+
+            if (! empty($data['summary']['cells_at_risk'])) {
+                $writer->addRow(Row::fromValuesWithStyle(['CELLS REQUIRING ATTENTION'], $sectionStyle));
+                $writer->addRow(Row::fromValues(['Cells with attendance rate below 50%:']));
+                foreach ($data['summary']['cells_at_risk'] as $cellName) {
+                    $writer->addRow(Row::fromValues(['  • '.$cellName]));
+                }
+            }
+
+            // ════════════════════════════════════════════════════════
+            // TAB 2: CELL / CLASS BREAKDOWN
+            // ════════════════════════════════════════════════════════
+            $writer->addNewSheet();
+            $writer->setCurrentSheet(1);
+            $writer->addRow(Row::fromValuesWithStyle(['Cell / Class Breakdown'], $titleStyle));
+            $writer->addRow(Row::fromValues([
+                Carbon::parse($from)->format('F j, Y').' — '.Carbon::parse($to)->format('F j, Y'),
+            ]));
+            $writer->addRow(Row::fromValues(['']));
+
+            $writer->addRow(Row::fromValuesWithStyle([
+                'Cell / Class', 'Members', 'Avg Attendance', 'Attendance Rate',
+                'Contribution (%)', 'Engaged', 'Moderate', 'At Risk', 'Inactive Risk',
+                'Pastoral Notes (4wk)',
+            ], $headerStyle));
+
+            $grandTotal = array_sum(array_column($data['cell_summary'], 'avg_attendance'));
+            foreach ($data['cell_summary'] as $cell) {
+                $contribution = $grandTotal > 0 ? $cell['avg_attendance'] / $grandTotal : 0;
+                $writer->addRow(Row::fromValuesWithStyle([
+                    $cell['name'],
+                    $cell['member_count'],
+                    $cell['avg_attendance'],
+                    $cell['attendance_rate'] !== null ? $cell['attendance_rate'] / 100 : null,
+                    $contribution,
+                    $cell['welfare_distribution']['engaged'],
+                    $cell['welfare_distribution']['moderate'],
+                    $cell['welfare_distribution']['at_risk'],
+                    $cell['welfare_distribution']['inactive_risk'],
+                    $cell['recent_pastoral_notes_count'],
+                ], $pctStyle));
+            }
+
+            // ════════════════════════════════════════════════════════
+            // TAB 3: STATE OF THE MEMBERS
+            // ════════════════════════════════════════════════════════
+            $writer->addNewSheet();
+            $writer->setCurrentSheet(2);
+            $writer->addRow(Row::fromValuesWithStyle(['State of the Members'], $titleStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Cell / Class', 'Members', 'Engaged', 'Moderate', 'At Risk', 'Inactive Risk', 'Pastoral Notes'], $headerStyle));
+
+            foreach ($data['cell_summary'] as $cell) {
+                $writer->addRow(Row::fromValues([
+                    $cell['name'],
+                    $cell['member_count'],
+                    $cell['welfare_distribution']['engaged'],
+                    $cell['welfare_distribution']['moderate'],
+                    $cell['welfare_distribution']['at_risk'],
+                    $cell['welfare_distribution']['inactive_risk'],
+                    $cell['recent_pastoral_notes_count'],
+                ]));
+            }
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['BRANCH TOTAL', $totalM, $ws['engaged'], $ws['moderate'], $ws['at_risk'], $ws['inactive_risk']], $boldStyle));
+
+            // ════════════════════════════════════════════════════════
+            // TAB 4: WEEKLY TREND
+            // ════════════════════════════════════════════════════════
+            $writer->addNewSheet();
+            $writer->setCurrentSheet(3);
+            $writer->addRow(Row::fromValuesWithStyle(['Weekly Attendance Trend'], $titleStyle));
+            $writer->addRow(Row::fromValues([
+                Carbon::parse($from)->format('F j, Y').' — '.Carbon::parse($to)->format('F j, Y'),
+            ]));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Sunday', 'Adults', 'Children', 'Total', 'Attendance Rate'], $headerStyle));
+
+            foreach ($data['sundays'] as $sunday) {
+                $rate = $data['summary']['total_active_members'] > 0
+                    ? $sunday['total_count'] / $data['summary']['total_active_members']
+                    : 0;
+                $writer->addRow(Row::fromValuesWithStyle([
+                    $sunday['date_label'],
+                    $sunday['adult_count'],
+                    $sunday['children_count'],
+                    $sunday['total_count'],
+                    $rate,
+                ], $pctStyle));
+            }
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // MEMBER WELFARE EXPORTS
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/members/welfare/export-pdf
+    public function memberWelfarePdf(Request $request)
+    {
+        $data = $this->buildMemberWelfareData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-member-welfare', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+
+        return $pdf->download("member-welfare-{$from}-to-{$to}.pdf");
+    }
+
+    // GET /api/reports/members/welfare/export-csv
+    public function memberWelfareCsv(Request $request)
+    {
+        $data = $this->buildMemberWelfareData($request);
+        $from = $data['period']['from'];
+        $to = $data['period']['to'];
+        $filename = "member-welfare-{$from}-to-{$to}.csv";
+
+        return new StreamedResponse(function () use ($data) {
+            $writer = new Writer;
+            $writer->openToFile('php://output');
+
+            $writer->addRow(Row::fromValues([
+                'Name', 'Member No.', 'Cell', 'Welfare Flag',
+                'Attendance Rate (%)', 'Attended', 'Total Sundays',
+                'Giving Total', 'Last Attendance',
+            ]));
+            foreach ($data['members'] as $member) {
+                $writer->addRow(Row::fromValues([
+                    $member['name'],
+                    $member['member_number'],
+                    $member['cell_name'],
+                    $member['welfare_flag'],
+                    (string) $member['attendance_rate'],
+                    (string) $member['attended_services'],
+                    (string) $member['total_sundays_in_window'],
+                    (string) $member['giving_total'],
+                    $member['last_attendance_date'] ?? '—',
+                ]));
+            }
+
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Summary']));
+            $writer->addRow(Row::fromValues(['Total Members', (string) $data['summary']['total_members']]));
+            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', (string) $data['summary']['avg_attendance_rate']]));
+            foreach ($data['summary']['flag_counts'] as $flag => $count) {
+                $writer->addRow(Row::fromValues(["Flag: {$flag}", (string) $count]));
+            }
 
             $writer->close();
         }, 200, [

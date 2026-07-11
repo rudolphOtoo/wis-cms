@@ -45,10 +45,14 @@ const FollowUpSettings = lazy(() => import('../pages/settings/FollowUpSettings')
 const IncomeByCategory  = lazy(() => import('../pages/reports/IncomeByCategory'))
 const ExpenseByCategory = lazy(() => import('../pages/reports/ExpenseByCategory'))
 const AttendanceTrends  = lazy(() => import('../pages/reports/AttendanceTrends'))
+const AttendanceSummary = lazy(() => import('../pages/reports/AttendanceSummary'))
+const MemberWelfare    = lazy(() => import('../pages/reports/MemberWelfare'))
 const CellComparison    = lazy(() => import('../pages/reports/CellComparison'))
 const Birthdays        = lazy(() => import('../pages/birthdays/Birthdays'))
 const Reminders        = lazy(() => import('../pages/reminders/Reminders'))
 const Submissions      = lazy(() => import('../pages/submissions/Submissions'))
+const PastoralNotes    = lazy(() => import('../pages/pastoral/PastoralNotes'))
+const FollowUpQueue    = lazy(() => import('../pages/pastoral/FollowUpQueue'))
 
 export default function AppRouter() {
   return (
@@ -112,10 +116,14 @@ export default function AppRouter() {
             <Route path="/reports/finance/income-by-category"  element={<IncomeByCategory />} />
             <Route path="/reports/finance/expense-by-category" element={<ExpenseByCategory />} />
             <Route path="/reports/attendance/trends"            element={<AttendanceTrends />} />
+            <Route path="/reports/attendance/summary"           element={<AttendanceSummary />} />
+            <Route path="/reports/members/welfare"              element={<MemberWelfare />} />
             <Route path="/reports/cells/comparison"             element={<CellComparison />} />
 
             <Route path="/birthdays" element={<Birthdays />} />
             <Route path="/reminders" element={<Reminders />} />
+            <Route path="/pastoral-notes" element={<PastoralNotes />} />
+            <Route path="/pastoral/follow-ups" element={<FollowUpQueue />} />
           </Route>
         </Route>
 

@@ -29,6 +29,9 @@
   .flag-no-leader     { background: #fee2e2; color: #991b1b; }
   .flag-low-membership{ background: #fef3c7; color: #92400e; }
   .flag-no-recent     { background: #f3f4f6; color: #6b7280; }
+  .flag-high-inactive { background: #fee2e2; color: #991b1b; }
+  .welfare-engaged    { color: #15803d; font-weight: bold; }
+  .welfare-at-risk    { color: #ba1a1a; font-weight: bold; }
   .leader-missing { color: #6b7280; font-style: italic; }
   .summary-card { margin-top: 24px; padding: 20px; background: #0D1F3C; color: white; border-radius: 4px; }
   .summary-row { display: table; width: 100%; margin-bottom: 6px; }
@@ -77,6 +80,8 @@
             <th class="num">Members</th>
             <th class="num">Sessions</th>
             <th class="rate">Rate</th>
+            <th class="num">Engaged</th>
+            <th class="num">At Risk</th>
             <th>Last Session</th>
             <th>Flags</th>
           </tr>
@@ -105,6 +110,8 @@
                   —
                 @endif
               </td>
+              <td class="num welfare-engaged">{{ $cell['welfare_distribution']['engaged'] ?? 0 }}</td>
+              <td class="num welfare-at-risk">{{ ($cell['welfare_distribution']['at_risk'] ?? 0) + ($cell['welfare_distribution']['inactive_risk'] ?? 0) }}</td>
               <td>{{ $cell['last_session_date'] ?? '—' }}</td>
               <td>
                 @foreach ($cell['health_flags'] ?? [] as $flag)
@@ -114,6 +121,8 @@
                     <span class="flag-badge flag-low-membership">Low membership</span>
                   @elseif ($flag === 'no_recent_attendance')
                     <span class="flag-badge flag-no-recent">No recent attendance</span>
+                  @elseif ($flag === 'high_inactive_rate')
+                    <span class="flag-badge flag-high-inactive">High inactive rate</span>
                   @else
                     <span class="flag-badge flag-no-recent">{{ $flag }}</span>
                   @endif
