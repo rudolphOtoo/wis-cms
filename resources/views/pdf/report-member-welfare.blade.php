@@ -20,11 +20,12 @@
   th { text-align: left; padding: 8px 10px; background: #f9fafb; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 1px solid #E5E9F2; }
   td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 11px; }
   .num { text-align: right; }
-  .rate { text-align: right; font-weight: bold; }
-  .rate-high { color: #15803d; }
-  .rate-mid { color: #ca8a04; }
-  .rate-low { color: #ba1a1a; }
   .empty { padding: 12px; color: #9ca3af; font-style: italic; font-size: 11px; }
+  .flag-engaged { color: #15803d; font-weight: bold; }
+  .flag-moderate { color: #2e7d32; }
+  .flag-at_risk { color: #ca8a04; font-weight: bold; }
+  .flag-inactive_risk { color: #ba1a1a; font-weight: bold; }
+  .flag-none { color: #9ca3af; }
   .summary-card { margin-top: 24px; padding: 20px; background: #0D1F3C; color: white; border-radius: 4px; }
   .summary-row { display: table; width: 100%; margin-bottom: 6px; }
   .summary-row .lbl { display: table-cell; font-size: 12px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -32,17 +33,13 @@
   .summary-card .highlight { border-top: 1px solid rgba(255,255,255,0.2); padding-top: 8px; margin-top: 8px; }
   .summary-card .highlight .lbl { color: #C9A84C; font-size: 13px; }
   .summary-card .highlight .val { font-size: 18px; color: #C9A84C; }
-  .trend-badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: bold; }
-  .trend-up { background: #15803d; color: white; }
-  .trend-down { background: #ba1a1a; color: white; }
-  .trend-flat { background: #6b7280; color: white; }
   .footer { padding: 20px 40px; margin-top: 20px; border-top: 2px solid #E5E9F2; color: #9ca3af; font-size: 10px; text-align: center; }
 </style>
 </head>
 <body>
   <div class="header">
     <span class="header-badge">{{ $branchName }}</span>
-    <h1>Attendance Trends</h1>
+    <h1>Member Welfare Report</h1>
     <p>Methodist Church Ghana &middot; {{ \Carbon\Carbon::parse($data['period']['from'])->format('M j, Y') }} &ndash; {{ \Carbon\Carbon::parse($data['period']['to'])->format('M j, Y') }}</p>
   </div>
 
@@ -53,66 +50,76 @@
         <div class="meta-value">{{ \Carbon\Carbon::parse($data['period']['from'])->format('F j, Y') }} &ndash; {{ \Carbon\Carbon::parse($data['period']['to'])->format('F j, Y') }}</div>
       </div>
       <div class="meta-cell">
-        <div class="meta-label">Grouping</div>
-        <div class="meta-value">{{ ucfirst($data['period']['group_by']) }}</div>
+        <div class="meta-label">Window</div>
+        <div class="meta-value">{{ $data['period']['window_weeks'] }} weeks</div>
       </div>
       <div class="meta-cell">
         <div class="meta-label">Generated</div>
         <div class="meta-value">{{ $generatedAt }}</div>
       </div>
     </div>
-    @php $trend = $data['summary']['trend'] ?? null; @endphp
-    @if ($trend && !empty($trend['direction']))
-    <div class="meta-row">
-      <div class="meta-cell">
-        <div class="meta-label">Trend</div>
-        <div class="meta-value">
-          @if ($trend['direction'] === 'up')
-            <span class="trend-badge trend-up">↑ Improving</span>
-          @elseif ($trend['direction'] === 'down')
-            <span class="trend-badge trend-down">↓ Declining</span>
-          @else
-            <span class="trend-badge trend-flat">→ Stable</span>
-          @endif
-          @if (isset($trend['delta_pct']))
-            <span style="margin-left: 8px; font-weight: normal; color: #6b7280;">{{ $trend['delta_pct'] > 0 ? '+' : '' }}{{ $trend['delta_pct'] }}%</span>
-          @endif
-        </div>
-      </div>
-    </div>
-    @endif
   </div>
 
   <div class="content">
-    <div class="section-title">Period Breakdown</div>
-    @if (empty($data['rows']))
-      <div class="empty">No attendance recorded in this period.</div>
+    {{-- Cell Breakdown --}}
+    @if (!empty($data['summary']['by_cell']))
+    <div class="section-title">Cell Welfare Overview</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Cell</th>
+          <th class="num">Members</th>
+          <th class="num">Avg Rate</th>
+          <th class="num">Engaged</th>
+          <th class="num">Moderate</th>
+          <th class="num">At Risk</th>
+          <th class="num">Inactive Risk</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach ($data['summary']['by_cell'] as $cell)
+        <tr>
+          <td style="font-weight: bold;">{{ $cell['name'] }}</td>
+          <td class="num">{{ $cell['member_count'] }}</td>
+          <td class="num">{{ $cell['avg_attendance_rate'] }}%</td>
+          <td class="num" style="color: #15803d;">{{ $cell['engaged'] }}</td>
+          <td class="num" style="color: #2e7d32;">{{ $cell['moderate'] }}</td>
+          <td class="num" style="color: #ca8a04;">{{ $cell['at_risk'] }}</td>
+          <td class="num" style="color: #ba1a1a;">{{ $cell['inactive_risk'] }}</td>
+        </tr>
+        @endforeach
+      </tbody>
+    </table>
+    @endif
+
+    {{-- Detailed Member List --}}
+    <div class="section-title">Member Details</div>
+    @if (empty($data['members']))
+      <div class="empty">No members found.</div>
     @else
       <table>
         <thead>
           <tr>
-            <th>Period</th>
-            <th class="num">Sessions</th>
-            <th class="num">Present</th>
-            <th class="num">Absent</th>
-            <th class="num">Total</th>
-            <th class="rate">Rate</th>
+            <th>Name</th>
+            <th>Cell</th>
+            <th>Flag</th>
+            <th class="num">Rate</th>
+            <th class="num">Attended</th>
+            <th class="num">Giving</th>
+            <th>Last Attendance</th>
           </tr>
         </thead>
         <tbody>
-          @foreach ($data['rows'] as $row)
-            @php
-              $rate = (float) ($row['attendance_rate'] ?? 0);
-              $rateClass = $rate >= 70 ? 'rate-high' : ($rate >= 50 ? 'rate-mid' : 'rate-low');
-            @endphp
-            <tr>
-              <td>{{ $row['period_label'] ?? $row['period_start'] ?? '—' }}</td>
-              <td class="num">{{ $row['sessions_count'] ?? '—' }}</td>
-              <td class="num">{{ $row['records_present'] ?? '—' }}</td>
-              <td class="num">{{ $row['records_absent'] ?? '—' }}</td>
-              <td class="num">{{ $row['records_total'] ?? '—' }}</td>
-              <td class="rate {{ $rateClass }}">{{ $row['attendance_rate'] ?? '—' }}%</td>
-            </tr>
+          @foreach ($data['members'] as $member)
+          <tr>
+            <td>{{ $member['name'] }}</td>
+            <td>{{ $member['cell_name'] }}</td>
+            <td class="flag-{{ $member['welfare_flag'] }}">{{ ucfirst(str_replace('_', ' ', $member['welfare_flag'])) }}</td>
+            <td class="num">{{ $member['attendance_rate'] }}%</td>
+            <td class="num">{{ $member['attended_services'] }} / {{ $member['total_sundays_in_window'] }}</td>
+            <td class="num">GHS {{ number_format($member['giving_total'], 2) }}</td>
+            <td>{{ $member['last_attendance_date'] ?? '—' }}</td>
+          </tr>
           @endforeach
         </tbody>
       </table>
@@ -120,25 +127,19 @@
 
     <div class="summary-card">
       <div class="summary-row">
-        <span class="lbl">Total Sessions</span>
-        <span class="val">{{ $data['summary']['total_sessions'] }}</span>
+        <span class="lbl">Total Members</span>
+        <span class="val">{{ $data['summary']['total_members'] }}</span>
       </div>
       <div class="summary-row">
-        <span class="lbl">Total Present</span>
-        <span class="val">{{ $data['summary']['total_present'] }}</span>
+        <span class="lbl">Avg Attendance Rate</span>
+        <span class="val">{{ $data['summary']['avg_attendance_rate'] }}%</span>
       </div>
+      @foreach ($data['summary']['flag_counts'] as $flag => $count)
       <div class="summary-row">
-        <span class="lbl">Total Absent</span>
-        <span class="val">{{ $data['summary']['total_absent'] }}</span>
+        <span class="lbl">{{ ucfirst(str_replace('_', ' ', $flag)) }}</span>
+        <span class="val">{{ $count }}</span>
       </div>
-      <div class="summary-row">
-        <span class="lbl">Avg per Session</span>
-        <span class="val">{{ $data['summary']['avg_per_session'] }}</span>
-      </div>
-      <div class="summary-row highlight">
-        <span class="lbl">Overall Attendance Rate</span>
-        <span class="val">{{ $data['summary']['overall_attendance_rate'] }}%</span>
-      </div>
+      @endforeach
     </div>
   </div>
 
