@@ -200,6 +200,10 @@ export default function ChildrenPage() {
                     </td>
                     <td style={{padding:'16px 24px'}}>
                       <div className="flex justify-end gap-3">
+                        {can('view children') && (
+                          <button onClick={() => navigate(`/children/${child.id}`)}
+                                  className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>View</button>
+                        )}
                         {can('edit children') && (
                           <button onClick={() => navigate(`/children/${child.id}/edit`)}
                                   className="hover:underline" style={{fontSize:'14px',fontWeight:600,color:'var(--color-navy)'}}>Edit</button>

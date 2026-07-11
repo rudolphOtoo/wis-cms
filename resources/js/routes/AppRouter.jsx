@@ -34,6 +34,7 @@ const TakeAttendance   = lazy(() => import('../pages/attendance/TakeAttendance')
 const FinancePage      = lazy(() => import('../pages/finance/index'))
 const TransactionForm  = lazy(() => import('../pages/finance/TransactionForm'))
 const ChildrenPage     = lazy(() => import('../pages/children/index'))
+const ChildDetail      = lazy(() => import('../pages/children/ChildDetail'))
 const ChildForm        = lazy(() => import('../pages/children/ChildForm'))
 const CommunicationPage = lazy(() => import('../pages/communication/index'))
 const Compose          = lazy(() => import('../pages/communication/Compose'))
@@ -96,6 +97,7 @@ export default function AppRouter() {
 
             <Route path="/children"             element={<ChildrenPage />} />
             <Route path="/children/new"         element={<ChildForm />} />
+            <Route path="/children/:id"         element={<ChildDetail />} />
             <Route path="/children/:id/edit"    element={<ChildForm />} />
 
             <Route path="/communication"          element={<CommunicationPage />} />
