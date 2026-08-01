@@ -31,6 +31,11 @@ npm-debug.log
 yarn-error.log
 /.fleet
 /database/church-data.json
+# Membership migration — derived PII artifacts (kept local, not committed)
+/data/raw/
+/data/cleaned/
+/data/backups/
+/data/reports/
 # Vim swap files
 *.swp
 *.swo
