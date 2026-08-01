@@ -23,6 +23,15 @@ use App\Http\Controllers\Api\VisitorController;
 use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Support\Facades\Route;
 
+// Every domain model uses UUID primary keys. Constrain route params to
+// valid UUIDs so empty/invalid values (e.g. "/api/cells/" from a client)
+// get a clean 404 instead of reaching Postgres with "invalid input syntax
+// for type uuid" and crashing with a 500.
+Route::pattern('id', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+Route::pattern('memberId', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+Route::pattern('childId', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+Route::pattern('serviceTypeId', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])
