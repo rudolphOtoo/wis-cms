@@ -21,3 +21,7 @@ tests
 .npmrc
 Dockerfile
 docker-compose.yml
+*.xlsx
+data
+scripts
+database/church-data.json
