@@ -332,6 +332,39 @@ class ReportsControllerTest extends TestCase
         ]);
     }
 
+    public function test_attendance_summary_survives_members_without_a_cell(): void
+    {
+        // Regression: members with cell_id = NULL grouped under an empty
+        // string key; the service used to pass that '' to Cell::find(),
+        // crashing with "invalid input syntax for type uuid".
+        Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'No',
+            'last_name' => 'Cell',
+            'gender' => 'female',
+            'status' => 'active',
+        ]);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/attendance/summary');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'period' => ['from', 'to'],
+                'sundays',
+                'cell_summary',
+                'summary' => [
+                    'total_sundays', 'total_attendance',
+                    'overall_attendance_rate', 'cells_at_risk',
+                ],
+            ]);
+
+        // Unassigned members should surface as an "Unassigned" bucket, not crash.
+        $names = array_column($response->json('cell_summary'), 'name');
+        $this->assertContains('Unassigned', $names, 'Unassigned members should be bucketed');
+    }
+
     public function test_attendance_report_returns_period_and_summary_shape(): void
     {
         $token = $this->financeToken();

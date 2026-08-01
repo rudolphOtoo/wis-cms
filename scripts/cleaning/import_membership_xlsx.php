@@ -27,13 +27,13 @@ declare(strict_types=1);
 
 use OpenSpout\Reader\XLSX\Reader;
 
-require __DIR__ . '/../../vendor/autoload.php';
+require __DIR__.'/../../vendor/autoload.php';
 
-const SOURCE_XLSX = __DIR__ . '/../../data/raw/WIS_Ayeduase_Membership_Form2026-07-29_06_56_57.xlsx';
-const OUT_CSV = __DIR__ . '/../../data/cleaned/WIS_Ayeduase.csv';
-const OUT_JSON = __DIR__ . '/../../data/cleaned/members.json';
-const OUT_AUDIT_JSON = __DIR__ . '/../../data/reports/cleaning_audit.json';
-const OUT_AUDIT_CSV = __DIR__ . '/../../data/reports/cleaning_audit.csv';
+const SOURCE_XLSX = __DIR__.'/../../data/raw/WIS_Ayeduase_Membership_Form2026-07-29_06_56_57.xlsx';
+const OUT_CSV = __DIR__.'/../../data/cleaned/WIS_Ayeduase.csv';
+const OUT_JSON = __DIR__.'/../../data/cleaned/members.json';
+const OUT_AUDIT_JSON = __DIR__.'/../../data/reports/cleaning_audit.json';
+const OUT_AUDIT_CSV = __DIR__.'/../../data/reports/cleaning_audit.csv';
 
 // Child classification threshold: dob >= 2008-08-01 is a child (18y at 2026-08-01).
 const CHILD_THRESHOLD = '2008-08-01';
@@ -78,6 +78,7 @@ function parseDob(?string $raw): ?Carbon\Carbon
 
     try {
         $dt = new DateTimeImmutable($raw);
+
         return Carbon\Carbon::instance($dt)->startOfDay();
     } catch (Throwable) {
         return null;
@@ -86,7 +87,7 @@ function parseDob(?string $raw): ?Carbon\Carbon
 
 function readXlsxRows(string $path): array
 {
-    $reader = new Reader();
+    $reader = new Reader;
     $reader->open($path);
 
     $rows = [];
@@ -146,6 +147,7 @@ foreach ($rawRows as $idx => $row) {
             'full_name' => $fullName,
             'dob_raw' => is_scalar($dobRaw) ? (string) $dobRaw : null,
         ];
+
         continue;
     }
 
@@ -161,6 +163,7 @@ foreach ($rawRows as $idx => $row) {
             'full_name' => $fullName,
             'gender_raw' => (string) $genderRaw,
         ];
+
         continue;
     }
 
@@ -200,9 +203,10 @@ foreach ($rawRows as $idx => $row) {
 
     // ── Exclusions (before dedupe so they never affect dedupe maps) ──
     if (in_array($fullName, EXCLUDED_NAMES, true)) {
-        $record['_note'] = 'EXCLUDED from CSV: no guardian in dataset and DOB ('. $record['date_of_birth'] .') likely erroneous for stated status "'.($record['current_status'] ?? '?').'"; flagged for manual review.';
+        $record['_note'] = 'EXCLUDED from CSV: no guardian in dataset and DOB ('.$record['date_of_birth'].') likely erroneous for stated status "'.($record['current_status'] ?? '?').'"; flagged for manual review.';
         $audit['excluded'][] = ['sheet_row' => $record['sheet_row'], 'full_name' => $fullName, 'reason' => 'no resolvable guardian; DOB likely erroneous'];
         $records[] = $record;
+
         continue;
     }
 
@@ -221,6 +225,7 @@ foreach ($rawRows as $idx => $row) {
         $key = mb_strtolower("{$record['first_name']}|{$record['last_name']}|{$record['date_of_birth']}");
         if (isset($seenChildIdentity[$key])) {
             $audit['dropped_duplicate'][] = ['sheet_row' => $record['sheet_row'], 'full_name' => $fullName, 'reason' => "same child identity as sheet_row {$seenChildIdentity[$key]}"];
+
             continue;
         }
         $seenChildIdentity[$key] = $record['sheet_row'];
@@ -228,6 +233,7 @@ foreach ($rawRows as $idx => $row) {
         $key = $record['phone'] ?: mb_strtolower("{$record['first_name']}|{$record['last_name']}");
         if (isset($seenAdultPhone[$key])) {
             $audit['dropped_duplicate'][] = ['sheet_row' => $record['sheet_row'], 'full_name' => $fullName, 'reason' => "same normalized phone as sheet_row {$seenAdultPhone[$key]}"];
+
             continue;
         }
         $seenAdultPhone[$key] = $record['sheet_row'];
@@ -238,6 +244,7 @@ foreach ($rawRows as $idx => $row) {
         $idKey = mb_strtolower("{$record['first_name']}|{$record['last_name']}|{$record['date_of_birth']}|".($record['email'] ?? ''));
         if (isset($seenAdultIdentity[$idKey])) {
             $audit['dropped_duplicate'][] = ['sheet_row' => $record['sheet_row'], 'full_name' => $fullName, 'reason' => "same identity (name+dob+email) as sheet_row {$seenAdultIdentity[$idKey]}, different phone"];
+
             continue;
         }
         $seenAdultIdentity[$idKey] = $record['sheet_row'];
@@ -294,10 +301,10 @@ fclose($auditCsv);
 echo "Total rows:          {$audit['total_rows']}\n";
 echo "Kept (in DB output): {$audit['kept']}\n";
 echo "CSV rows written:    {$audit['csv_rows']}\n";
-echo "Dropped duplicates:  ".count($audit['dropped_duplicate'])."\n";
-echo "Phone fixes:         ".count($audit['phone_fixed'])."\n";
-echo "Guardian links:      ".count($audit['guardian_linked'])."\n";
-echo "Excluded:            ".count($audit['excluded'])."\n";
-echo "Parse errors:        ".count($audit['parse_errors'])."\n";
-echo "Children (kept):     ".count($audit['children'])."\n";
-echo "Wrote: ".OUT_CSV."\n";
+echo 'Dropped duplicates:  '.count($audit['dropped_duplicate'])."\n";
+echo 'Phone fixes:         '.count($audit['phone_fixed'])."\n";
+echo 'Guardian links:      '.count($audit['guardian_linked'])."\n";
+echo 'Excluded:            '.count($audit['excluded'])."\n";
+echo 'Parse errors:        '.count($audit['parse_errors'])."\n";
+echo 'Children (kept):     '.count($audit['children'])."\n";
+echo 'Wrote: '.OUT_CSV."\n";

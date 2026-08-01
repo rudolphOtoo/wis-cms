@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use OpenSpout\Reader\XLSX\Reader;
 
-require __DIR__ . '/../../vendor/autoload.php';
+require __DIR__.'/../../vendor/autoload.php';
 
 $path = $argv[1] ?? null;
 if ($path === null || ! is_file($path)) {
@@ -13,9 +13,9 @@ if ($path === null || ! is_file($path)) {
 }
 
 try {
-    $reader = new Reader();
+    $reader = new Reader;
 } catch (Throwable $e) {
-    fwrite(STDERR, 'Cannot create reader: ' . $e->getMessage() . "\n");
+    fwrite(STDERR, 'Cannot create reader: '.$e->getMessage()."\n");
     exit(1);
 }
 
@@ -29,15 +29,15 @@ foreach ($reader->getSheetIterator() as $sheet) {
         $col = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
         $out = [];
         foreach ($values as $i => $v) {
-            $label = $col[$i] ?? ('?' . $i);
+            $label = $col[$i] ?? ('?'.$i);
             if ($v === null || $v === '') {
                 continue;
             }
             if (is_string($v) && (str_contains($v, "\n") || mb_strlen($v) > 40)) {
                 $v = str_replace("\n", '\\n', $v);
-                $v = mb_substr($v, 0, 40) . '…';
+                $v = mb_substr($v, 0, 40).'…';
             }
-            $out[] = $label . '=' . (is_scalar($v) ? $v : json_encode($v));
+            $out[] = $label.'='.(is_scalar($v) ? $v : json_encode($v));
         }
         printf("%3d: %s\n", $rowNo, implode(' | ', $out));
     }
