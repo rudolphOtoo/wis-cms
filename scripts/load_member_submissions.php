@@ -24,19 +24,21 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-/** @var Illuminate\Foundation\Application $app */
+/** @var Application $app */
 $app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Models\Branch;
 use App\Models\MemberSubmission;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 const MEMBERS_JSON = __DIR__.'/../data/cleaned/members.json';
 
 if (! is_file(MEMBERS_JSON)) {
-    fwrite(STDERR, "Missing ".MEMBERS_JSON." — run scripts/cleaning/import_membership_xlsx.php first.\n");
+    fwrite(STDERR, 'Missing '.MEMBERS_JSON." — run scripts/cleaning/import_membership_xlsx.php first.\n");
     exit(1);
 }
 
@@ -62,6 +64,7 @@ try {
 
         if (! $excluded && ! empty($record['is_child'])) {
             $skippedChildren++;
+
             continue;
         }
 
@@ -70,6 +73,7 @@ try {
         $existing = MemberSubmission::where('idempotency_key', $key)->first();
         if ($existing !== null) {
             $skippedExisting++;
+
             continue;
         }
 

@@ -164,6 +164,26 @@ class CellTest extends TestCase
         $this->assertNull($child->fresh()->cell_id);
     }
 
+    public function test_invalid_uuid_cell_id_returns_404_not_a_500(): void
+    {
+        // Regression: an empty/non-UUID id used to hit Postgres with
+        // "invalid input syntax for type uuid" and crash with a 500.
+        $this->asAdmin()
+            ->getJson('/api/cells/not-a-uuid')
+            ->assertNotFound();
+
+        $this->asAdmin()
+            ->getJson('/api/cells/1234')
+            ->assertNotFound();
+    }
+
+    public function test_valid_uuid_but_unknown_cell_returns_404(): void
+    {
+        $this->asAdmin()
+            ->getJson('/api/cells/019fbdb4-537d-73fe-93fd-68627e36e9b1')
+            ->assertNotFound();
+    }
+
     public function test_member_role_cannot_manage_cells(): void
     {
         $member = User::create([

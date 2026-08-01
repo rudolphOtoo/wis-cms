@@ -194,11 +194,13 @@ class AttendanceSummaryService
         }
 
         // ── Build cell summary (one row per cell, aggregated) ──────
-        $cellNames = $cellMembers->mapWithKeys(function ($cm, $cellId) {
-            $cell = Cell::find($cellId);
-
-            return [$cellId => $cell?->name ?? 'Unassigned'];
-        });
+        // Members without a cell (cell_id = NULL) group under an EMPTY
+        // string key here — PHP arrays can't use null as a key, so
+        // keyBy('cell_id') coerces it to ''. Never pass that empty string
+        // to Cell::find(): Postgres rejects '' as a uuid and the report
+        // would 500. Load all cell names in one query instead.
+        $knownCellIds = $cellMembers->keys()->filter()->values()->all();
+        $cellsById = Cell::whereIn('id', $knownCellIds)->pluck('name', 'id');
 
         $cellSummary = [];
         foreach ($cellMembers as $cellId => $cm) {
@@ -218,7 +220,7 @@ class AttendanceSummaryService
 
             $cellSummary[] = [
                 'cell_id' => $cellId,
-                'name' => $cm->name ?? ($cellNames[$cellId] ?? 'Unassigned'),
+                'name' => $cellsById[$cellId] ?? 'Unassigned',
                 'member_count' => $memberCount,
                 'avg_attendance' => $avgAtt,
                 'attendance_rate' => $memberCount > 0
