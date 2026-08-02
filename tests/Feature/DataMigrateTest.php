@@ -29,12 +29,25 @@ class DataMigrateTest extends TestCase
             unlink($this->tempJson);
         }
 
-        putenv('ADMIN_EMAIL');
-        putenv('ADMIN_PASSWORD');
-        putenv('CHURCH_NAME');
-        putenv('CHURCH_LOCATION');
+        $this->clearEnvVar('ADMIN_EMAIL');
+        $this->clearEnvVar('ADMIN_PASSWORD');
+        $this->clearEnvVar('CHURCH_NAME');
+        $this->clearEnvVar('CHURCH_LOCATION');
 
         parent::tearDown();
+    }
+
+    private function setEnvVar(string $key, string $value): void
+    {
+        putenv($key.'='.$value);
+        $_ENV[$key] = $value;
+        $_SERVER[$key] = $value;
+    }
+
+    private function clearEnvVar(string $key): void
+    {
+        putenv($key);
+        unset($_ENV[$key], $_SERVER[$key]);
     }
 
     private function migrateFresh(): void
@@ -197,9 +210,9 @@ class DataMigrateTest extends TestCase
         $userId = (string) Str::uuid();
         $oldHash = Hash::make('old-password-123');
 
-        putenv('ADMIN_EMAIL=admin_override@test.local');
-        putenv('ADMIN_PASSWORD=EnvP@ssword42!');
-        putenv('CHURCH_NAME=Admin Override Branch');
+        $this->setEnvVar('ADMIN_EMAIL', 'admin_override@test.local');
+        $this->setEnvVar('ADMIN_PASSWORD', 'EnvP@ssword42!');
+        $this->setEnvVar('CHURCH_NAME', 'Admin Override Branch');
 
         $this->writeJson($this->makePayload([
             'branches' => [
@@ -254,9 +267,9 @@ class DataMigrateTest extends TestCase
         $branchId = (string) Str::uuid();
         $userId = (string) Str::uuid();
 
-        putenv('ADMIN_EMAIL=admin_preserve@test.local');
-        putenv('ADMIN_PASSWORD=AdminP@ss1');
-        putenv('CHURCH_NAME=Preserve Branch');
+        $this->setEnvVar('ADMIN_EMAIL', 'admin_preserve@test.local');
+        $this->setEnvVar('ADMIN_PASSWORD', 'AdminP@ss1');
+        $this->setEnvVar('CHURCH_NAME', 'Preserve Branch');
 
         $this->writeJson($this->makePayload([
             'branches' => [
