@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Member;
+use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class MemberTest extends TestCase
@@ -64,5 +67,93 @@ class MemberTest extends TestCase
         ]);
 
         $this->assertEquals('CUSTOM-001', $member->member_number);
+    }
+
+    protected function seededAdmin(): array
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $branch = Branch::factory()->create();
+        $admin = User::create([
+            'branch_id' => $branch->id, 'name' => 'Admin',
+            'email' => 'admin@test.local', 'password' => Hash::make('x'), 'is_active' => true,
+        ]);
+        $admin->assignRole('super_admin');
+
+        return [$branch, $admin];
+    }
+
+    protected function memberPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'first_name' => 'Ama', 'last_name' => 'Serwaa', 'gender' => 'female', 'phone' => '0241111111',
+        ], $overrides);
+    }
+
+    // BUG-004 regression: a duplicate (branch_id, phone) must return 422,
+    // not a 500 from the DB unique constraint.
+    public function test_duplicate_phone_is_rejected_with_422_on_create(): void
+    {
+        [$branch, $admin] = $this->seededAdmin();
+        $admin->refresh();
+
+        Member::create([
+            'branch_id' => $branch->id, 'first_name' => 'Existing',
+            'last_name' => 'Member', 'gender' => 'male', 'phone' => '0241111111',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$admin->createToken('t')->plainTextToken}")
+            ->postJson('/api/members', $this->memberPayload())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('phone');
+    }
+
+    public function test_duplicate_phone_is_rejected_with_422_on_update(): void
+    {
+        [$branch, $admin] = $this->seededAdmin();
+
+        $first = Member::create([
+            'branch_id' => $branch->id, 'first_name' => 'First',
+            'last_name' => 'Member', 'gender' => 'male', 'phone' => '0241111111',
+        ]);
+        $second = Member::create([
+            'branch_id' => $branch->id, 'first_name' => 'Second',
+            'last_name' => 'Member', 'gender' => 'female', 'phone' => '0242222222',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$admin->createToken('t')->plainTextToken}")
+            ->putJson("/api/members/{$second->id}", ['phone' => '0241111111'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('phone');
+    }
+
+    public function test_update_keeping_own_phone_is_allowed(): void
+    {
+        [$branch, $admin] = $this->seededAdmin();
+
+        $member = Member::create([
+            'branch_id' => $branch->id, 'first_name' => 'Own',
+            'last_name' => 'Phone', 'gender' => 'male', 'phone' => '0241111111',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$admin->createToken('t')->plainTextToken}")
+            ->putJson("/api/members/{$member->id}", [
+                'phone' => '0241111111', 'first_name' => 'Renamed', 'last_name' => 'Phone',
+            ])
+            ->assertOk();
+    }
+
+    public function test_same_phone_in_another_branch_is_allowed(): void
+    {
+        [$branch, $admin] = $this->seededAdmin();
+        $other = Branch::factory()->create();
+
+        Member::create([
+            'branch_id' => $other->id, 'member_number' => 'OTHER-0001',
+            'first_name' => 'Other', 'last_name' => 'Branch', 'gender' => 'male', 'phone' => '0241111111',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$admin->createToken('t')->plainTextToken}")
+            ->postJson('/api/members', $this->memberPayload())
+            ->assertStatus(201);
     }
 }

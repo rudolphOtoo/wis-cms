@@ -26,14 +26,31 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
     return () => document.removeEventListener('mousedown', onClick)
   }, [open])
 
-  const trigger = async (handler, ext) => {
+  const trigger = async (handler) => {
     setOpen(false)
     setDownloading(true)
     try {
       const res = await handler()
+
+      // Derive the real format from the server's Content-Type instead of
+      // assuming every non-PDF export is XLSX. CSV endpoints stream
+      // text/csv; only the attendance summary streams a real xlsx
+      // (spreadsheetml). Previously CSV bytes were saved with a .xlsx
+      // extension (BUG-007).
+      const contentType = res.headers?.['content-type'] ?? ''
+      let ext = 'csv'
+      let mime = 'text/csv'
+      if (contentType.includes('spreadsheetml')) {
+        ext = 'xlsx'
+        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      } else if (contentType.includes('pdf')) {
+        ext = 'pdf'
+        mime = 'application/pdf'
+      }
+
       const blob = res.data instanceof Blob
         ? res.data
-        : new Blob([res.data], { type: ext === 'pdf' ? 'application/pdf' : 'text/csv' })
+        : new Blob([res.data], { type: mime })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -91,7 +108,7 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
         >
           <button
             type="button"
-            onClick={() => trigger(pdfHandler, 'pdf')}
+            onClick={() => trigger(pdfHandler)}
             className="block w-full text-left px-4 py-2 text-sm"
             style={{ color: 'var(--color-navy)', borderBottom: '1px solid var(--color-surface-border)' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}
@@ -102,7 +119,7 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
           </button>
           <button
             type="button"
-            onClick={() => trigger(csvHandler, 'xlsx')}
+            onClick={() => trigger(csvHandler)}
             className="block w-full text-left px-4 py-2 text-sm"
             style={{ color: 'var(--color-navy)' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}

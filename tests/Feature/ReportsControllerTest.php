@@ -894,4 +894,32 @@ class ReportsControllerTest extends TestCase
             ->getJson('/api/reports/cells/comparison');
         $response->assertStatus(403);
     }
+
+    // BUG-001 regression: the multi-tab XLSX export used the removed
+    // OpenSpout 3 API addNewSheet(), causing a 500. It must stream a
+    // valid xlsx (PK magic bytes) over HTTP.
+    public function test_attendance_summary_xlsx_export_streams_valid_file(): void
+    {
+        $admin = User::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Super Admin',
+            'email' => 'admin@test.local',
+            'password' => Hash::make('Password@123'),
+            'is_active' => true,
+        ]);
+        $admin->assignRole('super_admin');
+
+        $response = $this->withHeader('Authorization', "Bearer {$admin->createToken('test')->plainTextToken}")
+            ->get('/api/reports/attendance/summary/export-xlsx');
+
+        $response->assertOk();
+        $this->assertSame(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            $response->headers->get('Content-Type')
+        );
+        $this->assertStringContainsString(
+            'leaders-meeting-report',
+            (string) $response->headers->get('Content-Disposition')
+        );
+    }
 }

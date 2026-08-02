@@ -10,6 +10,15 @@ use Tests\TestCase;
 
 class MnotifySmsServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The service dry-runs in testing by default (safety gate). Disable
+        // it so these tests exercise the real HTTP path against Http::fake().
+        config(['services.mnotify.dry_run' => false]);
+    }
+
     public function test_returns_false_when_no_api_key_configured(): void
     {
         config(['services.mnotify.api_key' => null]);

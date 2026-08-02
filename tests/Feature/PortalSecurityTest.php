@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\FinanceCategory;
 use App\Models\Member;
+use App\Models\Transaction;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,6 +59,28 @@ class PortalSecurityTest extends TestCase
             ->getJson('/api/portal/giving')
             ->assertOk()
             ->assertJsonStructure(['data' => ['total', 'by_category', 'transactions']]);
+    }
+
+    // BUG-005 regression: Postgres numeric `amount` is cast to decimal:2
+    // (a string), so round() previously threw a TypeError → 500.
+    public function test_member_giving_returns_rounded_amounts_with_data(): void
+    {
+        [$user, $member, $token] = $this->portalMember();
+
+        $category = FinanceCategory::factory()->create();
+        Transaction::factory()->create([
+            'branch_id' => $this->branch->id,
+            'category_id' => $category->id,
+            'member_id' => $member->id,
+            'type' => 'income',
+            'amount' => 1234.567,
+            'transaction_date' => now(),
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/portal/giving')
+            ->assertOk()
+            ->assertJsonPath('data.transactions.0.amount', 1234.57);
     }
 
     public function test_member_canno_t_access_staff_member_list(): void

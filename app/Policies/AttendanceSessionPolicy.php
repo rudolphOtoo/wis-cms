@@ -35,6 +35,13 @@ class AttendanceSessionPolicy
             return false;
         }
 
+        // Leadership roles may mark any session, mirroring
+        // MarkAttendanceRequest::authorize(). Only cell/department leaders
+        // below them are restricted to their own units.
+        if ($user->hasAnyRole(['super_admin', 'pastor', 'secretary'])) {
+            return true;
+        }
+
         if ($session->cell_id) {
             return Cell::where('id', $session->cell_id)
                 ->where('leader_user_id', $user->id)

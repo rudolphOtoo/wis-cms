@@ -23,7 +23,7 @@ const ICONS = {
 const CAT_ICONS = ['savings', 'redeem', 'hands']
 
 export default function Portal() {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
   const [tab, setTab] = useState('giving')
 
   const [profile,    setProfile]    = useState(null)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getCellComparisonReport, downloadCellComparisonPdf, downloadCellComparisonCsv } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell as RechartsCell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 // Bar color per cell — assigned in order rather than by health.
 // Health is communicated via badges in the table, not by chart color.

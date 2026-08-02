@@ -276,7 +276,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::middleware('permission:update pastoral notes')->group(function () {
         Route::put('pastoral-notes/{id}', [PastoralNoteController::class, 'update']);
     });
-    Route::middleware('permission:delete members')->group(function () {
+    Route::middleware('permission:delete pastoral notes')->group(function () {
         // Pastors/admins only — gated by PastoralNotePolicy::delete
         Route::delete('pastoral-notes/{id}', [PastoralNoteController::class, 'destroy']);
     });

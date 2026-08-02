@@ -3,7 +3,7 @@ import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttenda
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend,
-  ResponsiveContainer, CartesianGrid, ReferenceLine
+  ResponsiveContainer, CartesianGrid
 } from 'recharts'
 
 // Service-type line colors. The chart picks 3-5 from this palette

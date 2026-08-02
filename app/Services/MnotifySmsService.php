@@ -36,8 +36,9 @@ class MnotifySmsService
      */
     public function send(string $phone, string $message): bool
     {
-        // Safety gate: never fire real SMS from local or testing environments.
-        if (app()->environment('local', 'testing')) {
+        // Safety gate: never fire real SMS from local or testing environments
+        // by default. Tests disable the flag to exercise the HTTP path.
+        if (config('services.mnotify.dry_run', app()->environment('local', 'testing'))) {
             Log::info("[DEV DRY-RUN] SMS intercepted for {$phone}: {$message}");
 
             return true;

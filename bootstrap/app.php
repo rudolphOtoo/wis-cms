@@ -21,6 +21,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
+        // This app has no web login route. The framework default
+        // redirectGuestsTo(route('login')) makes unauthenticated requests
+        // throw RouteNotFoundException → 500 with a full stack trace
+        // (BUG-006). Returning null keeps the request in the exception
+        // pipeline, where the AuthenticationException renderer below
+        // returns a clean 401 JSON for /api/*.
+        $middleware->redirectTo(guests: fn () => null);
+
         // Spatie Permission middleware aliases
         $middleware->alias([
             'role' => RoleMiddleware::class,

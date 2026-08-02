@@ -195,4 +195,71 @@ class AttendanceStatsTest extends TestCase
         $res->assertStatus(422);
         $res->assertJsonPath('message', 'Adult service attendance must be recorded per cell. Please select a cell.');
     }
+
+    // BUG-002 regression: a super_admin who does NOT lead the cell must be
+    // able to mark attendance on any session. Previously AttendanceSessionPolicy
+    // had no admin bypass while MarkAttendanceRequest did, so admins got 403.
+    public function test_admin_can_mark_attendance_on_a_cell_they_do_not_lead(): void
+    {
+        $serviceType = ServiceType::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Sunday Adult Service',
+            'slug' => 'sunday_adult_bug2',
+            'type' => 'adult',
+            'is_active' => true,
+        ]);
+
+        $leader = User::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Cell Leader',
+            'email' => 'leader@test.local',
+            'password' => Hash::make('x'),
+            'is_active' => true,
+        ]);
+
+        $cell = Cell::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Ayeduase',
+            'leader_user_id' => $leader->id,
+            'is_active' => true,
+        ]);
+
+        $session = AttendanceSession::create([
+            'branch_id' => $this->branch->id,
+            'service_type_id' => $serviceType->id,
+            'cell_id' => $cell->id,
+            'service_date' => '2026-06-21',
+        ]);
+
+        $member = Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'Kofi',
+            'last_name' => 'Yeboah',
+            'gender' => 'male',
+            'status' => 'active',
+        ]);
+
+        $admin = User::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Super Admin',
+            'email' => 'admin2@test.local',
+            'password' => Hash::make('x'),
+            'is_active' => true,
+        ]);
+        $admin->assignRole('super_admin');
+
+        $this->withHeader('Authorization', "Bearer {$admin->createToken('test')->plainTextToken}")
+            ->postJson("/api/attendance/sessions/{$session->id}/mark", [
+                'records' => [
+                    ['person_id' => $member->id, 'type' => 'member', 'is_present' => true],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('attendance_records', [
+            'session_id' => $session->id,
+            'member_id' => $member->id,
+            'is_present' => true,
+        ]);
+    }
 }

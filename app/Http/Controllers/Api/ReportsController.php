@@ -1100,8 +1100,7 @@ class ReportsController extends Controller
             // ════════════════════════════════════════════════════════
             // TAB 2: CELL / CLASS BREAKDOWN
             // ════════════════════════════════════════════════════════
-            $writer->addNewSheet();
-            $writer->setCurrentSheet(1);
+            $writer->addNewSheetAndMakeItCurrent();
             $writer->addRow(Row::fromValuesWithStyle(['Cell / Class Breakdown'], $titleStyle));
             $writer->addRow(Row::fromValues([
                 Carbon::parse($from)->format('F j, Y').' — '.Carbon::parse($to)->format('F j, Y'),
@@ -1134,8 +1133,7 @@ class ReportsController extends Controller
             // ════════════════════════════════════════════════════════
             // TAB 3: STATE OF THE MEMBERS
             // ════════════════════════════════════════════════════════
-            $writer->addNewSheet();
-            $writer->setCurrentSheet(2);
+            $writer->addNewSheetAndMakeItCurrent();
             $writer->addRow(Row::fromValuesWithStyle(['State of the Members'], $titleStyle));
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValuesWithStyle(['Cell / Class', 'Members', 'Engaged', 'Moderate', 'At Risk', 'Inactive Risk', 'Pastoral Notes'], $headerStyle));
@@ -1157,8 +1155,7 @@ class ReportsController extends Controller
             // ════════════════════════════════════════════════════════
             // TAB 4: WEEKLY TREND
             // ════════════════════════════════════════════════════════
-            $writer->addNewSheet();
-            $writer->setCurrentSheet(3);
+            $writer->addNewSheetAndMakeItCurrent();
             $writer->addRow(Row::fromValuesWithStyle(['Weekly Attendance Trend'], $titleStyle));
             $writer->addRow(Row::fromValues([
                 Carbon::parse($from)->format('F j, Y').' — '.Carbon::parse($to)->format('F j, Y'),
