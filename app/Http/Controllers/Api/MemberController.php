@@ -320,6 +320,7 @@ class MemberController extends Controller
             'byCategory' => $byCategory,
             'total' => round($transactions->sum('amount'), 2),
             'branchName' => $member->branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y'),
         ]);
 

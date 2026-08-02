@@ -650,18 +650,12 @@ class ReportsController extends Controller
         $branch = Branch::find($request->user()->branch_id);
         $branchName = $branch?->name ?? 'Wesleyan International Society';
 
-        $logoPath = null;
-        $logoFile = public_path('images/wis-logo.png');
-        if (file_exists($logoFile)) {
-            $logoPath = 'data:image/png;base64,'.base64_encode(file_get_contents($logoFile));
-        }
-
         $pdf = Pdf::loadView('pdf.report-finance-by-category', [
             'data' => $data,
             'branchName' => $branchName,
             'reportType' => $type,
             'accentColor' => $type === 'income' ? '#15803d' : '#ba1a1a',
-            'logoPath' => $logoPath,
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
@@ -823,6 +817,7 @@ class ReportsController extends Controller
         $pdf = Pdf::loadView('pdf.report-attendance-trends', [
             'data' => $data,
             'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
@@ -883,6 +878,7 @@ class ReportsController extends Controller
         $pdf = Pdf::loadView('pdf.report-cell-comparison', [
             'data' => $data,
             'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
@@ -993,6 +989,7 @@ class ReportsController extends Controller
         $pdf = Pdf::loadView('pdf.report-attendance-summary', [
             'data' => $data,
             'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
@@ -1196,6 +1193,7 @@ class ReportsController extends Controller
         $pdf = Pdf::loadView('pdf.report-member-welfare', [
             'data' => $data,
             'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
         ]);
 
