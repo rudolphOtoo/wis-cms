@@ -32,12 +32,15 @@ class MemberController extends Controller
         $query = Member::query();
 
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'ilike', "%{$search}%")
-                    ->orWhere('last_name', 'ilike', "%{$search}%")
-                    ->orWhere('other_names', 'ilike', "%{$search}%")
-                    ->orWhere('phone', 'ilike', "%{$search}%")
-                    ->orWhere('member_number', 'ilike', "%{$search}%");
+            // BUG-011 FIX: escape LIKE wildcards so a search for "%" or "_"
+            // matches literally instead of matching every member.
+            $escaped = addcslashes($search, '\\%_');
+            $query->where(function ($q) use ($escaped) {
+                $q->where('first_name', 'ilike', "%{$escaped}%")
+                    ->orWhere('last_name', 'ilike', "%{$escaped}%")
+                    ->orWhere('other_names', 'ilike', "%{$escaped}%")
+                    ->orWhere('phone', 'ilike', "%{$escaped}%")
+                    ->orWhere('member_number', 'ilike', "%{$escaped}%");
             });
         }
 
@@ -140,12 +143,13 @@ class MemberController extends Controller
         $query = Member::query();
 
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'ilike', "%{$search}%")
-                    ->orWhere('last_name', 'ilike', "%{$search}%")
-                    ->orWhere('other_names', 'ilike', "%{$search}%")
-                    ->orWhere('phone', 'ilike', "%{$search}%")
-                    ->orWhere('member_number', 'ilike', "%{$search}%");
+            $escaped = addcslashes($search, '\\%_');
+            $query->where(function ($q) use ($escaped) {
+                $q->where('first_name', 'ilike', "%{$escaped}%")
+                    ->orWhere('last_name', 'ilike', "%{$escaped}%")
+                    ->orWhere('other_names', 'ilike', "%{$escaped}%")
+                    ->orWhere('phone', 'ilike', "%{$escaped}%")
+                    ->orWhere('member_number', 'ilike', "%{$escaped}%");
             });
         }
         if ($status = $request->input('status')) {

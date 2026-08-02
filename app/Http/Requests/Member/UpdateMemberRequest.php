@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Member;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateMemberRequest extends FormRequest
 {
@@ -19,7 +20,14 @@ class UpdateMemberRequest extends FormRequest
             'other_names' => ['nullable', 'string', 'max:100'],
             'gender' => ['sometimes', 'required', 'in:male,female'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => [
+                'nullable', 'string', 'max:20',
+                // Same (branch_id, phone) uniqueness as create, ignoring
+                // this member's own current value on update.
+                Rule::unique('members', 'phone')
+                    ->where(fn ($q) => $q->where('branch_id', $this->user()->branch_id))
+                    ->ignore($this->route('id')),
+            ],
             'email' => ['nullable', 'email', 'max:150'],
             'address' => ['nullable', 'string', 'max:500'],
             'occupation' => ['nullable', 'string', 'max:100'],

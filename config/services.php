@@ -32,6 +32,10 @@ return [
         'api_key' => env('MNOTIFY_API_KEY'),
         'sender_id' => env('MNOTIFY_SENDER_ID', 'WIS'),
         'base_url' => env('MNOTIFY_BASE_URL', 'https://api.mnotify.com/api'),
+        // When true, send() logs and returns true without hitting mNotify.
+        // Defaults to on in local/testing; tests set it to false to exercise
+        // the real HTTP path against Http::fake().
+        'dry_run' => env('MNOTIFY_DRY_RUN'),
     ],
 
     'slack' => [

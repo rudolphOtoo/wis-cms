@@ -42,7 +42,7 @@ export default function PastoralNotes() {
       if (filterCategory) params.category = filterCategory
       const res = await getPastoralNotes(params)
       setNotes(res.data.data)
-    } catch (e) {
+    } catch (_e) {
       toast.error('Failed to load pastoral notes.')
     } finally {
       setLoading(false)
@@ -53,7 +53,7 @@ export default function PastoralNotes() {
     try {
       const res = await getMembers({ per_page: 1000 })
       setMembers(res.data.data)
-    } catch (e) { /* silent */ }
+    } catch (_e) { /* silent */ }
   }
 
   useEffect(() => { loadNotes(); loadMembers() }, [])

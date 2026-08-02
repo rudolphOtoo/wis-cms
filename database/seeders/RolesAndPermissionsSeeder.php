@@ -31,6 +31,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view birthday messages', 'manage birthday messages',
             'view service reminders', 'manage service reminders',
             'view member submissions', 'manage member submissions',
+            'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
         ];
 
         foreach ($permissions as $permission) {
@@ -48,6 +49,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view birthday messages', 'manage birthday messages',
             'view service reminders', 'manage service reminders',
             'view member submissions', 'manage member submissions',
+            'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
         ]);
 
         $secretary = Role::firstOrCreate(['name' => 'secretary']);
@@ -65,6 +67,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view birthday messages',
             'view service reminders',
             'view member submissions', 'manage member submissions',
+            'view pastoral notes', 'create pastoral notes', 'update pastoral notes',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance_officer']);
@@ -88,6 +91,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'message own cell',
             'view birthday messages',
             'view service reminders',
+            'view pastoral notes', 'create pastoral notes', 'update pastoral notes',
         ]);
 
         $childrenMinistryLeader = Role::firstOrCreate(['name' => 'children_ministry_leader']);
