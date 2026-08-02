@@ -50,7 +50,7 @@ export default function VisitorForm() {
       })
       .catch(() => navigate('/visitors'))
       .finally(() => setFetching(false))
-  }, [id, isEdit])
+  }, [id, isEdit, navigate])
 
   const set = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }))

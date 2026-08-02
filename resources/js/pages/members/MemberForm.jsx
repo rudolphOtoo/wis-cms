@@ -52,7 +52,7 @@ export default function MemberForm() {
       })
       .catch(() => navigate('/members'))
       .finally(() => setFetching(false))
-  }, [id, isEdit])
+  }, [id, isEdit, navigate])
 
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value

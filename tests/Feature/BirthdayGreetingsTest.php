@@ -41,7 +41,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])
             ->expectsOutputToContain('dispatched to 1')
             ->assertSuccessful();
 
@@ -59,7 +59,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $this->makeMember(['date_of_birth' => '1990-01-15']); // not today
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])
             ->expectsOutputToContain('No birthdays today')
             ->assertSuccessful();
 
@@ -75,7 +75,7 @@ class BirthdayGreetingsTest extends TestCase
         $this->makeMember(['date_of_birth' => '1975-05-28', 'phone' => '0240000001']);
         $this->makeMember(['date_of_birth' => '2001-05-28', 'phone' => '0240000002']);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])->assertSuccessful();
 
         $this->assertSame(2, Message::where('recipient_group', 'birthday')->count());
     }
@@ -88,7 +88,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])
             ->expectsOutputToContain('disabled')
             ->assertSuccessful();
 
@@ -102,7 +102,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $this->makeMember(['date_of_birth' => '1990-05-28', 'status' => 'inactive']);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])->assertSuccessful();
 
         $this->assertSame(0, Message::where('recipient_group', 'birthday')->count());
     }
@@ -115,12 +115,12 @@ class BirthdayGreetingsTest extends TestCase
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
         // First run sends
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])
             ->expectsOutputToContain('dispatched to 1')
             ->assertSuccessful();
 
         // Second run on the same day should skip
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])
             ->expectsOutputToContain('dispatched to 0')
             ->assertSuccessful();
 
@@ -135,7 +135,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $member = $this->makeMember(['date_of_birth' => '1990-05-28', 'phone' => null]);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])->assertSuccessful();
 
         $log = BirthdayMessageLog::where('member_id', $member->id)->first();
         $this->assertNotNull($log);
@@ -150,7 +150,7 @@ class BirthdayGreetingsTest extends TestCase
 
         $member = $this->makeMember(['date_of_birth' => '1990-05-28']);
 
-        $this->artisan('birthdays:send', ['--date' => '2026-05-28'])->assertSuccessful();
+        $this->artisan('birthdays:send', ['--date' => '2026-05-28', '--force' => true])->assertSuccessful();
 
         $log = BirthdayMessageLog::where('member_id', $member->id)->first();
         $this->assertNotNull($log);

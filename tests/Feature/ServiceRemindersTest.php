@@ -86,7 +86,7 @@ class ServiceRemindersTest extends TestCase
     {
         $this->makeMember(['date_of_birth' => '1990-05-28']);
 
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])
             ->expectsOutputToContain('No reminders configured')
             ->assertSuccessful();
 
@@ -111,7 +111,7 @@ class ServiceRemindersTest extends TestCase
         // 1 inactive member — should be ignored entirely
         $this->makeMember(['first_name' => 'Kwame', 'status' => 'inactive']);
 
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])
             ->expectsOutputToContain('3 sent')
             ->assertSuccessful();
 
@@ -134,11 +134,11 @@ class ServiceRemindersTest extends TestCase
         $this->makeMember();
 
         // First run: dispatches
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])->assertSuccessful();
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])->assertSuccessful();
         $this->assertSame(1, ServiceReminderLog::status('sent')->count());
 
         // Second run at the same moment: skips (idempotent)
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])
             ->expectsOutputToContain('1 idempotent-skip')
             ->assertSuccessful();
 
@@ -151,7 +151,7 @@ class ServiceRemindersTest extends TestCase
         $this->makeSettings(['is_active' => false]);
         $this->makeMember();
 
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])
             ->expectsOutputToContain('No reminders configured')
             ->assertSuccessful();
 
@@ -165,7 +165,7 @@ class ServiceRemindersTest extends TestCase
         $this->makeMember();
 
         // Fires Saturday 13 Jun 2026 8 PM → intended service is Sunday 14 Jun 2026
-        $this->artisan('reminders:send', ['--at' => $this->saturday8pm])->assertSuccessful();
+        $this->artisan('reminders:send', ['--at' => $this->saturday8pm, '--force' => true])->assertSuccessful();
 
         $log = ServiceReminderLog::first();
         $this->assertSame('2026-06-14', $log->intended_service_date->toDateString());
@@ -178,7 +178,7 @@ class ServiceRemindersTest extends TestCase
         $this->makeMember();
 
         // Same day, but 7 PM instead of 8 PM
-        $this->artisan('reminders:send', ['--at' => '2026-06-13 19:00:00'])
+        $this->artisan('reminders:send', ['--at' => '2026-06-13 19:00:00', '--force' => true])
             ->expectsOutputToContain('No reminders configured')
             ->assertSuccessful();
 

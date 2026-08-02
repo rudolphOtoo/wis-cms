@@ -98,7 +98,7 @@ class PortalController extends Controller
                     'id' => $t->id,
                     'date' => $t->transaction_date?->format('Y-m-d'),
                     'category' => $t->category?->name ?? 'Uncategorised',
-                    'amount' => round($t->amount, 2),
+                    'amount' => round((float) $t->amount, 2),
                     'reference' => $t->reference,
                 ]),
             ],
