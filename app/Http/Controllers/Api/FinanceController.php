@@ -392,6 +392,7 @@ class FinanceController extends Controller
             'totalExpense' => $totalExpense,
             'net' => round($totalIncome - $totalExpense, 2),
             'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
             'generatedAt' => now()->format('F j, Y'),
         ]);
 

@@ -6,6 +6,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica', Arial, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.5; }
   .header { background: #0D1F3C; color: white; padding: 30px 40px; }
+  .header-top { display: table; width: 100%; }
+  .header-logo { display: table-cell; width: 50px; vertical-align: middle; }
+  .header-logo img { width: 44px; height: 44px; }
+  .header-text { display: table-cell; vertical-align: middle; padding-left: 14px; }
   .header-badge { display: inline-block; padding: 3px 10px; background: #C9A84C; color: #0D1F3C; font-size: 10px; font-weight: bold; border-radius: 10px; letter-spacing: 0.5px; }
   .header h1 { font-size: 22px; margin: 12px 0 2px; }
   .header p { color: rgba(255,255,255,0.6); font-size: 11px; }
@@ -29,9 +33,18 @@
 </head>
 <body>
   <div class="header">
-    <span class="header-badge">{{ $branchName }}</span>
-    <h1>Annual Giving Statement</h1>
-    <p>Methodist Church Ghana &middot; Year {{ $year }}</p>
+    <div class="header-top">
+      @if (!empty($logoPath))
+        <div class="header-logo">
+          <img src="{{ $logoPath }}" alt="Logo" />
+        </div>
+      @endif
+      <div class="header-text">
+        <span class="header-badge">{{ $branchName }}</span>
+        <h1>Annual Giving Statement</h1>
+        <p>Methodist Church Ghana &middot; Year {{ $year }}</p>
+      </div>
+    </div>
   </div>
 
   <div class="meta">
