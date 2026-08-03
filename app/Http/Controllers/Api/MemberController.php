@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Row;
-use OpenSpout\Writer\CSV\Writer;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberController extends Controller
@@ -160,15 +161,17 @@ class MemberController extends Controller
         }
 
         $query->orderBy('first_name')->orderBy('last_name');
-        $filename = 'members-'.now()->format('Y-m-d').'.csv';
+        $filename = 'members-'.now()->format('Y-m-d').'.xlsx';
 
-        return new StreamedResponse(function () use ($query) {
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
+
+        return new StreamedResponse(function () use ($query, $headerStyle) {
             $writer = new Writer;
             $writer->openToFile('php://output');
-            $writer->addRow(Row::fromValues([
+            $writer->addRow(Row::fromValuesWithStyle([
                 'Member Number', 'First Name', 'Last Name', 'Other Names',
                 'Phone', 'Email', 'Gender', 'Status', 'Join Date',
-            ]));
+            ], $headerStyle));
 
             $query->lazy()->each(function ($m) use ($writer) {
                 $writer->addRow(Row::fromValues([
@@ -186,7 +189,7 @@ class MemberController extends Controller
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }

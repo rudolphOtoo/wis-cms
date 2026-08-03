@@ -8,6 +8,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use OpenSpout\Reader\XLSX\Reader;
 use Tests\TestCase;
 
 class MemberExportTest extends TestCase
@@ -42,7 +43,30 @@ class MemberExportTest extends TestCase
         return $u->createToken('test')->plainTextToken;
     }
 
-    public function test_authorised_user_can_export_members_as_csv(): void
+    /**
+     * Read an exported XLSX byte stream back into a flat array of
+     * cell values so tests can assert on the actual contents.
+     */
+    protected function readXlsx(string $bytes): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'wis_xlsx_');
+        file_put_contents($path, $bytes);
+
+        $rows = [];
+        $reader = new Reader;
+        $reader->open($path);
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $rows[] = $row->toArray();
+            }
+        }
+        $reader->close();
+        unlink($path);
+
+        return $rows;
+    }
+
+    public function test_authorised_user_can_export_members_as_xlsx(): void
     {
         Member::create(['branch_id' => $this->branch->id, 'first_name' => 'Ama', 'last_name' => 'Mensah', 'gender' => 'female', 'phone' => '0241234567']);
         Member::create(['branch_id' => $this->branch->id, 'first_name' => 'Kofi', 'last_name' => 'Boateng', 'gender' => 'male', 'phone' => '0209876543']);
@@ -53,12 +77,12 @@ class MemberExportTest extends TestCase
             ->get('/api/members/export');
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('Member Number', $csv); // header row
-        $this->assertStringContainsString('Ama', $csv);
-        $this->assertStringContainsString('Kofi', $csv);
+        $rows = $this->readXlsx($response->streamedContent());
+        $this->assertSame('Member Number', $rows[0][0]); // header row
+        $this->assertStringContainsString('Ama', json_encode($rows[1]));
+        $this->assertStringContainsString('Kofi', json_encode($rows[2]));
     }
 
     public function test_export_respects_status_filter(): void
@@ -68,12 +92,13 @@ class MemberExportTest extends TestCase
 
         $admin = $this->userWithRole('super_admin');
 
-        $csv = $this->withHeader('Authorization', "Bearer {$this->token($admin)}")
+        $rows = $this->readXlsx($this->withHeader('Authorization', "Bearer {$this->token($admin)}")
             ->get('/api/members/export?status=active')
-            ->streamedContent();
+            ->streamedContent());
 
-        $this->assertStringContainsString('Active', $csv);
-        $this->assertStringNotContainsString('Inactive', $csv);
+        $content = json_encode($rows);
+        $this->assertStringContainsString('Active', $content);
+        $this->assertStringNotContainsString('Inactive', $content);
     }
 
     public function test_usher_without_export_permission_is_forbidden(): void
