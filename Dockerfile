@@ -9,7 +9,7 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev --ignore-platform-reqs
 
 # ---- Stage: frontend assets ----
-FROM node:20-alpine AS frontend
+FROM node:24-alpine AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
