@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCellComparisonReport, downloadCellComparisonPdf, downloadCellComparisonCsv } from '../../api/reports'
+import { getCellComparisonReport, downloadCellComparisonPdf, downloadCellComparisonXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
@@ -80,7 +80,7 @@ export default function CellComparison() {
         </button>
         <DownloadReportMenu
           pdfHandler={() => downloadCellComparisonPdf({ weeks })}
-          csvHandler={() => downloadCellComparisonCsv({ weeks })}
+          xlsxHandler={() => downloadCellComparisonXlsx({ weeks })}
           filenameBase={`cell-comparison-${new Date().toISOString().slice(0,10)}`}
           disabled={loading || !data}
         />

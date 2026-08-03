@@ -320,10 +320,10 @@ export default function FinancePage() {
                 disabled={exporting}
                 className="btn-secondary"
                 style={{ padding: '10px 20px', opacity: exporting ? 0.6 : 1 }}
-                aria-label="Export transactions as CSV"
+                aria-label="Export transactions as Excel"
               >
                 <Download size={16} strokeWidth={2} aria-hidden="true" />
-                {exporting ? 'Exporting…' : 'Export CSV'}
+                {exporting ? 'Exporting…' : 'Export Excel'}
               </button>
             )}
             {can('create transactions') && (

@@ -167,19 +167,19 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/members/welfare', [ReportsController::class, 'memberWelfare']);
         Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
 
-        // Report exports — PDF + CSV downloads (gated by 'export reports')
+        // Report exports — PDF + XLSX downloads (gated by 'export reports')
         Route::get('reports/finance/income-by-category/export-pdf', [ReportsController::class, 'incomeByCategoryPdf'])->middleware('permission:export reports');
-        Route::get('reports/finance/income-by-category/export-csv', [ReportsController::class, 'incomeByCategoryCsv'])->middleware('permission:export reports');
+        Route::get('reports/finance/income-by-category/export-xlsx', [ReportsController::class, 'incomeByCategoryXlsx'])->middleware('permission:export reports');
         Route::get('reports/finance/expense-by-category/export-pdf', [ReportsController::class, 'expenseByCategoryPdf'])->middleware('permission:export reports');
-        Route::get('reports/finance/expense-by-category/export-csv', [ReportsController::class, 'expenseByCategoryCsv'])->middleware('permission:export reports');
+        Route::get('reports/finance/expense-by-category/export-xlsx', [ReportsController::class, 'expenseByCategoryXlsx'])->middleware('permission:export reports');
         Route::get('reports/attendance/trends/export-pdf', [ReportsController::class, 'attendanceTrendsPdf'])->middleware('permission:export reports');
-        Route::get('reports/attendance/trends/export-csv', [ReportsController::class, 'attendanceTrendsCsv'])->middleware('permission:export reports');
+        Route::get('reports/attendance/trends/export-xlsx', [ReportsController::class, 'attendanceTrendsXlsx'])->middleware('permission:export reports');
         Route::get('reports/attendance/summary/export-pdf', [ReportsController::class, 'attendanceSummaryPdf'])->middleware('permission:export reports');
         Route::get('reports/attendance/summary/export-xlsx', [ReportsController::class, 'attendanceSummaryXlsx'])->middleware('permission:export reports');
         Route::get('reports/members/welfare/export-pdf', [ReportsController::class, 'memberWelfarePdf'])->middleware('permission:export reports');
-        Route::get('reports/members/welfare/export-csv', [ReportsController::class, 'memberWelfareCsv'])->middleware('permission:export reports');
+        Route::get('reports/members/welfare/export-xlsx', [ReportsController::class, 'memberWelfareXlsx'])->middleware('permission:export reports');
         Route::get('reports/cells/comparison/export-pdf', [ReportsController::class, 'cellComparisonPdf'])->middleware('permission:export reports');
-        Route::get('reports/cells/comparison/export-csv', [ReportsController::class, 'cellComparisonCsv'])->middleware('permission:export reports');
+        Route::get('reports/cells/comparison/export-xlsx', [ReportsController::class, 'cellComparisonXlsx'])->middleware('permission:export reports');
 
         // Birthday messages
         Route::get('birthdays/settings', [BirthdayController::class, 'showSettings'])

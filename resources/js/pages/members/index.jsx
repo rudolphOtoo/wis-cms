@@ -55,10 +55,13 @@ export default function MembersPage() {
     setExporting(true)
     try {
       const res = await exportMembers({ search, status: statusFilter, gender: genderFilter })
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+      const blob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `members-${new Date().toISOString().split('T')[0]}.csv`
+      a.download = `members-${new Date().toISOString().split('T')[0]}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -154,10 +157,10 @@ export default function MembersPage() {
               disabled={exporting}
               className="btn-secondary"
               style={{ padding: '10px 20px' }}
-              aria-label="Export members list as CSV"
+              aria-label="Export members list as Excel"
             >
               <Download size={16} strokeWidth={2} aria-hidden="true" />
-              {exporting ? 'Exporting…' : 'Export CSV'}
+              {exporting ? 'Exporting…' : 'Export Excel'}
             </button>
           )}
           {can('create members') && (

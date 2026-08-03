@@ -2,15 +2,15 @@ import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 
 /**
- * A small download menu button. Click to open dropdown with PDF + CSV options.
+ * A small download menu button. Click to open dropdown with PDF + Excel options.
  *
  * Props:
- *   pdfHandler:  () => Promise<{ data: Blob }>   axios call returning blob
- *   csvHandler:  () => Promise<{ data: Blob }>   axios call returning blob
- *   filenameBase: string  (without extension; '.pdf' or '.xlsx' appended)
- *   disabled?:   boolean  (e.g. while data is still loading)
+ *   pdfHandler:    () => Promise<{ data: Blob }>   axios call returning blob
+ *   xlsxHandler:   () => Promise<{ data: Blob }>   axios call returning blob
+ *   filenameBase:  string  (without extension; '.pdf' or '.xlsx' appended)
+ *   disabled?:     boolean  (e.g. while data is still loading)
  */
-export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBase, disabled = false }) {
+export default function DownloadReportMenu({ pdfHandler, xlsxHandler, filenameBase, disabled = false }) {
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const ref = useRef(null)
@@ -32,18 +32,12 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
     try {
       const res = await handler()
 
-      // Derive the real format from the server's Content-Type instead of
-      // assuming every non-PDF export is XLSX. CSV endpoints stream
-      // text/csv; only the attendance summary streams a real xlsx
-      // (spreadsheetml). Previously CSV bytes were saved with a .xlsx
-      // extension (BUG-007).
+      // Non-PDF exports are always XLSX (spreadsheetml). Derive the real
+      // format from the server's Content-Type to pick the right extension.
       const contentType = res.headers?.['content-type'] ?? ''
-      let ext = 'csv'
-      let mime = 'text/csv'
-      if (contentType.includes('spreadsheetml')) {
-        ext = 'xlsx'
-        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      } else if (contentType.includes('pdf')) {
+      let ext = 'xlsx'
+      let mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      if (contentType.includes('pdf')) {
         ext = 'pdf'
         mime = 'application/pdf'
       }
@@ -119,7 +113,7 @@ export default function DownloadReportMenu({ pdfHandler, csvHandler, filenameBas
           </button>
           <button
             type="button"
-            onClick={() => trigger(csvHandler)}
+            onClick={() => trigger(xlsxHandler)}
             className="block w-full text-left px-4 py-2 text-sm"
             style={{ color: 'var(--color-navy)' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}
