@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttendanceTrendsCsv } from '../../api/reports'
+import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttendanceTrendsXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend,
@@ -147,7 +147,7 @@ export default function AttendanceTrends() {
         </button>
         <DownloadReportMenu
           pdfHandler={() => downloadAttendanceTrendsPdf({ from_date: fromDate, to_date: toDate })}
-          csvHandler={() => downloadAttendanceTrendsCsv({ from_date: fromDate, to_date: toDate })}
+          xlsxHandler={() => downloadAttendanceTrendsXlsx({ from_date: fromDate, to_date: toDate })}
           filenameBase={`attendance-trends-${fromDate}-to-${toDate}`}
           disabled={loading || !data}
         />

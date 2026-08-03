@@ -142,7 +142,7 @@ export default function AttendanceSummary() {
         </button>
         <DownloadReportMenu
           pdfHandler={() => downloadAttendanceSummaryPdf({ from_date: fromDate, to_date: toDate })}
-          csvHandler={() => downloadAttendanceSummaryXlsx({ from_date: fromDate, to_date: toDate })}
+          xlsxHandler={() => downloadAttendanceSummaryXlsx({ from_date: fromDate, to_date: toDate })}
           filenameBase={`leaders-meeting-report-${fromDate}-to-${toDate}`}
           disabled={loading || !data}
         />

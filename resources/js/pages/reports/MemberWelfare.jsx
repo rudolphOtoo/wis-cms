@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMemberWelfareReport, downloadMemberWelfarePdf, downloadMemberWelfareCsv } from '../../api/reports'
+import { getMemberWelfareReport, downloadMemberWelfarePdf, downloadMemberWelfareXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
@@ -83,7 +83,7 @@ export default function MemberWelfare() {
         </button>
         <DownloadReportMenu
           pdfHandler={() => downloadMemberWelfarePdf({ welfare_status: welfareStatus })}
-          csvHandler={() => downloadMemberWelfareCsv({ welfare_status: welfareStatus })}
+          xlsxHandler={() => downloadMemberWelfareXlsx({ welfare_status: welfareStatus })}
           filenameBase={`member-welfare-${welfareStatus}`}
           disabled={loading || !data}
         />

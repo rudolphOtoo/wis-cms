@@ -53,7 +53,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the income-by-category dataset. Used by JSON, PDF, and CSV
+     * Build the income-by-category dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildIncomeData(Request $request): array
@@ -93,7 +93,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the attendance-trends dataset. Used by JSON, PDF, and CSV
+     * Build the attendance-trends dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildAttendanceTrendsData(Request $request): array
@@ -300,7 +300,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the expense-by-category dataset. Used by JSON, PDF, and CSV
+     * Build the expense-by-category dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildExpenseData(Request $request): array
@@ -313,7 +313,7 @@ class ReportsController extends Controller
      *
      * The old code had two ~70-line methods (`buildIncomeData` and
      * `buildExpenseData`) that were structurally identical — only the
-     * `type` filter differed. All six callers (JSON, PDF, CSV × 2)
+     * `type` filter differed. All six callers (JSON, PDF, XLSX × 2)
      * now route through this single method via the thin wrappers above.
      *
      * @param  string  $type  'income' | 'expense'
@@ -418,7 +418,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the cell-comparison dataset. Used by JSON, PDF, and CSV
+     * Build the cell-comparison dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildCellComparisonData(Request $request): array
@@ -595,7 +595,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the attendance-summary dataset. Used by JSON, PDF, and CSV
+     * Build the attendance-summary dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildAttendanceSummaryData(Request $request): array
@@ -617,7 +617,7 @@ class ReportsController extends Controller
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // EXPORT ENDPOINTS — PDF + CSV downloads for each report
+    // EXPORT ENDPOINTS — PDF + XLSX downloads for each report
     // ──────────────────────────────────────────────────────────────────
 
     // GET /api/reports/finance/income-by-category/export-pdf
@@ -626,10 +626,10 @@ class ReportsController extends Controller
         return $this->financeCategoryPdf($request, 'income');
     }
 
-    // GET /api/reports/finance/income-by-category/export-csv
-    public function incomeByCategoryCsv(Request $request)
+    // GET /api/reports/finance/income-by-category/export-xlsx
+    public function incomeByCategoryXlsx(Request $request)
     {
-        return $this->streamCsv($request, 'income');
+        return $this->streamXlsx($request, 'income');
     }
 
     // GET /api/reports/finance/expense-by-category/export-pdf
@@ -638,10 +638,10 @@ class ReportsController extends Controller
         return $this->financeCategoryPdf($request, 'expense');
     }
 
-    // GET /api/reports/finance/expense-by-category/export-csv
-    public function expenseByCategoryCsv(Request $request)
+    // GET /api/reports/finance/expense-by-category/export-xlsx
+    public function expenseByCategoryXlsx(Request $request)
     {
-        return $this->streamCsv($request, 'expense');
+        return $this->streamXlsx($request, 'expense');
     }
 
     private function financeCategoryPdf(Request $request, string $type)
@@ -665,7 +665,7 @@ class ReportsController extends Controller
         return $pdf->download("{$type}-financial-report-{$from}-to-{$to}.pdf");
     }
 
-    private function streamCsv(Request $request, string $type): StreamedResponse
+    private function streamXlsx(Request $request, string $type): StreamedResponse
     {
         $data = $this->buildTransactionCategoryData($request, $type);
         $from = $data['period']['from'];
@@ -827,44 +827,45 @@ class ReportsController extends Controller
         return $pdf->download("attendance-trends-{$from}-to-{$to}.pdf");
     }
 
-    // GET /api/reports/attendance/trends/export-csv
-    public function attendanceTrendsCsv(Request $request)
+    // GET /api/reports/attendance/trends/export-xlsx
+    public function attendanceTrendsXlsx(Request $request)
     {
         $data = $this->buildAttendanceTrendsData($request);
         $from = $data['period']['from'];
         $to = $data['period']['to'];
 
-        $filename = "attendance-trends-{$from}-to-{$to}.csv";
+        $filename = "attendance-trends-{$from}-to-{$to}.xlsx";
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
 
-        return new StreamedResponse(function () use ($data) {
+        return new StreamedResponse(function () use ($data, $headerStyle) {
             $writer = new Writer;
             $writer->openToFile('php://output');
 
-            $writer->addRow(Row::fromValues([
+            $writer->addRow(Row::fromValuesWithStyle([
                 'Period', 'Sessions', 'Present', 'Absent', 'Total Records', 'Attendance Rate (%)',
-            ]));
+            ], $headerStyle));
             foreach ($data['rows'] as $row) {
                 $writer->addRow(Row::fromValues([
                     $row['label'] ?? $row['period_start'] ?? '',
-                    (string) ($row['sessions'] ?? ''),
-                    (string) ($row['records_present'] ?? ''),
-                    (string) ($row['records_absent'] ?? ''),
-                    (string) ($row['records_total'] ?? ''),
-                    (string) ($row['attendance_rate'] ?? ''),
+                    $row['sessions'] ?? '',
+                    $row['records_present'] ?? '',
+                    $row['records_absent'] ?? '',
+                    $row['records_total'] ?? '',
+                    $row['attendance_rate'] ?? '',
                 ]));
             }
 
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Summary']));
-            $writer->addRow(Row::fromValues(['Total Sessions', (string) $data['summary']['total_sessions']]));
-            $writer->addRow(Row::fromValues(['Total Present', (string) $data['summary']['total_present']]));
-            $writer->addRow(Row::fromValues(['Total Absent', (string) $data['summary']['total_absent']]));
-            $writer->addRow(Row::fromValues(['Overall Rate (%)', (string) $data['summary']['overall_attendance_rate']]));
-            $writer->addRow(Row::fromValues(['Avg per Session', (string) $data['summary']['avg_per_session']]));
+            $writer->addRow(Row::fromValues(['Total Sessions', $data['summary']['total_sessions']]));
+            $writer->addRow(Row::fromValues(['Total Present', $data['summary']['total_present']]));
+            $writer->addRow(Row::fromValues(['Total Absent', $data['summary']['total_absent']]));
+            $writer->addRow(Row::fromValues(['Overall Rate (%)', $data['summary']['overall_attendance_rate']]));
+            $writer->addRow(Row::fromValues(['Avg per Session', $data['summary']['avg_per_session']]));
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
@@ -887,28 +888,29 @@ class ReportsController extends Controller
         return $pdf->download("cell-comparison-{$today}.pdf");
     }
 
-    // GET /api/reports/cells/comparison/export-csv
-    public function cellComparisonCsv(Request $request)
+    // GET /api/reports/cells/comparison/export-xlsx
+    public function cellComparisonXlsx(Request $request)
     {
         $data = $this->buildCellComparisonData($request);
         $today = now()->format('Y-m-d');
-        $filename = "cell-comparison-{$today}.csv";
+        $filename = "cell-comparison-{$today}.xlsx";
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
 
-        return new StreamedResponse(function () use ($data) {
+        return new StreamedResponse(function () use ($data, $headerStyle) {
             $writer = new Writer;
             $writer->openToFile('php://output');
 
-            $writer->addRow(Row::fromValues([
+            $writer->addRow(Row::fromValuesWithStyle([
                 'Cell', 'Leader', 'Members', 'Recent Sessions', 'Attendance Rate (%)',
                 'Last Session', 'Health Flags',
-            ]));
+            ], $headerStyle));
             foreach ($data['cells'] as $cell) {
                 $writer->addRow(Row::fromValues([
                     $cell['name'],
                     $cell['leader']['name'] ?? '(no leader)',
-                    (string) $cell['member_count'],
-                    (string) ($cell['recent_sessions'] ?? 0),
-                    (string) ($cell['recent_attendance_rate'] ?? ''),
+                    $cell['member_count'],
+                    $cell['recent_sessions'] ?? 0,
+                    $cell['recent_attendance_rate'] ?? '',
                     $cell['last_session_date'] ?? '—',
                     implode('; ', $cell['health_flags'] ?? []),
                 ]));
@@ -916,16 +918,16 @@ class ReportsController extends Controller
 
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Summary']));
-            $writer->addRow(Row::fromValues(['Total Cells', (string) $data['summary']['total_cells']]));
-            $writer->addRow(Row::fromValues(['Cells with Leader', (string) $data['summary']['cells_with_leader']]));
-            $writer->addRow(Row::fromValues(['Cells with Recent Attendance', (string) $data['summary']['cells_with_recent_attendance']]));
-            $writer->addRow(Row::fromValues(['Total Members', (string) $data['summary']['total_members']]));
-            $writer->addRow(Row::fromValues(['Avg Members per Cell', (string) $data['summary']['avg_members_per_cell']]));
-            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', (string) $data['summary']['avg_attendance_rate']]));
+            $writer->addRow(Row::fromValues(['Total Cells', $data['summary']['total_cells']]));
+            $writer->addRow(Row::fromValues(['Cells with Leader', $data['summary']['cells_with_leader']]));
+            $writer->addRow(Row::fromValues(['Cells with Recent Attendance', $data['summary']['cells_with_recent_attendance']]));
+            $writer->addRow(Row::fromValues(['Total Members', $data['summary']['total_members']]));
+            $writer->addRow(Row::fromValues(['Avg Members per Cell', $data['summary']['avg_members_per_cell']]));
+            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', $data['summary']['avg_attendance_rate']]));
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
@@ -948,7 +950,7 @@ class ReportsController extends Controller
     }
 
     /**
-     * Build the member-welfare dataset. Used by JSON, PDF, and CSV
+     * Build the member-welfare dataset. Used by JSON, PDF, and XLSX
      * export endpoints.
      */
     protected function buildMemberWelfareData(Request $request): array
@@ -1203,48 +1205,49 @@ class ReportsController extends Controller
         return $pdf->download("member-welfare-{$from}-to-{$to}.pdf");
     }
 
-    // GET /api/reports/members/welfare/export-csv
-    public function memberWelfareCsv(Request $request)
+    // GET /api/reports/members/welfare/export-xlsx
+    public function memberWelfareXlsx(Request $request)
     {
         $data = $this->buildMemberWelfareData($request);
         $from = $data['period']['from'];
         $to = $data['period']['to'];
-        $filename = "member-welfare-{$from}-to-{$to}.csv";
+        $filename = "member-welfare-{$from}-to-{$to}.xlsx";
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
 
-        return new StreamedResponse(function () use ($data) {
+        return new StreamedResponse(function () use ($data, $headerStyle) {
             $writer = new Writer;
             $writer->openToFile('php://output');
 
-            $writer->addRow(Row::fromValues([
+            $writer->addRow(Row::fromValuesWithStyle([
                 'Name', 'Member No.', 'Cell', 'Welfare Flag',
                 'Attendance Rate (%)', 'Attended', 'Total Sundays',
                 'Giving Total', 'Last Attendance',
-            ]));
+            ], $headerStyle));
             foreach ($data['members'] as $member) {
                 $writer->addRow(Row::fromValues([
                     $member['name'],
                     $member['member_number'],
                     $member['cell_name'],
                     $member['welfare_flag'],
-                    (string) $member['attendance_rate'],
-                    (string) $member['attended_services'],
-                    (string) $member['total_sundays_in_window'],
-                    (string) $member['giving_total'],
+                    $member['attendance_rate'],
+                    $member['attended_services'],
+                    $member['total_sundays_in_window'],
+                    $member['giving_total'],
                     $member['last_attendance_date'] ?? '—',
                 ]));
             }
 
             $writer->addRow(Row::fromValues(['']));
             $writer->addRow(Row::fromValues(['Summary']));
-            $writer->addRow(Row::fromValues(['Total Members', (string) $data['summary']['total_members']]));
-            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', (string) $data['summary']['avg_attendance_rate']]));
+            $writer->addRow(Row::fromValues(['Total Members', $data['summary']['total_members']]));
+            $writer->addRow(Row::fromValues(['Avg Attendance Rate (%)', $data['summary']['avg_attendance_rate']]));
             foreach ($data['summary']['flag_counts'] as $flag => $count) {
-                $writer->addRow(Row::fromValues(["Flag: {$flag}", (string) $count]));
+                $writer->addRow(Row::fromValues(["Flag: {$flag}", $count]));
             }
 
             $writer->close();
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }

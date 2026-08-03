@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getExpenseByCategoryReport, downloadExpenseByCategoryPdf, downloadExpenseByCategoryCsv } from '../../api/reports'
+import { getExpenseByCategoryReport, downloadExpenseByCategoryPdf, downloadExpenseByCategoryXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 
@@ -120,7 +120,7 @@ export default function ExpenseByCategory() {
         </button>
         <DownloadReportMenu
           pdfHandler={() => downloadExpenseByCategoryPdf({ from_date: fromDate, to_date: toDate })}
-          csvHandler={() => downloadExpenseByCategoryCsv({ from_date: fromDate, to_date: toDate })}
+          xlsxHandler={() => downloadExpenseByCategoryXlsx({ from_date: fromDate, to_date: toDate })}
           filenameBase={`expense-by-category-${fromDate}-to-${toDate}`}
           disabled={loading || !data}
         />
