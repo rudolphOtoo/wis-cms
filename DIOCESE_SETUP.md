@@ -49,7 +49,10 @@ once Postgres is reachable:
    imported under `wis`. Under `mcgh` a profile-declared snapshot
    (`database/church-data-mcgh.json`) is used if present; otherwise
    reference data is seeded and nothing WIS is imported,
-4. caches config, routes, and views (`php artisan config:cache`).
+4. **imports the diocese member CSV** (`MCC_Members.csv`) when one ships in
+   the image — the same idempotent `import:csv` pipeline WIS uses, so
+   re-runs on later boots never duplicate members (see step 7),
+5. caches config, routes, and views (`php artisan config:cache`).
 
 Profile branding (logo, favicon, app name, report footer) is injected
 server-side into the login page and app shell
@@ -182,6 +185,33 @@ docker compose -f docker-compose.deploy.yml exec app \
 
 Member numbers follow the diocese's scheme (`MCC/{year}/{00001}` for the
 `mcgh` profile) automatically.
+
+## 7. Shipping member data inside the image (WIS-style)
+
+Instead of the diocese importing after boot (step 6), the maintainer can
+bake the diocese's members into the image so they are present **automatically
+on first boot** — exactly how WIS ships `WIS_Ayeduase.csv`.
+
+1. Convert the diocese's member export to the same headerless CSV format:
+   `last_name, first_name, dob, gender, phone` (dates `DD-MM-YYYY`, gender
+   `Male`/`Female`, one Ghana phone per row).
+2. Save it at the repo root as **`MCC_Members.csv`** and commit it.
+   (`docker/entrypoint.sh` only imports it when present, so images without
+   the file boot normally.)
+3. Rebuild and push the image (CI `docker-publish` does this on `main`).
+4. Diocese pulls and runs `up -d` — on the first boot the members are
+   imported with `MCC/{year}/{00001}` numbers. The `import:csv` upsert is
+   idempotent, so every subsequent boot re-runs it without duplicating.
+
+Always dry-run before committing the file:
+
+```bash
+php artisan import:csv MCC_Members.csv --dry-run
+```
+
+> **Note:** the CSV (and therefore member PII) ships inside the image, same
+> as `WIS_Ayeduase.csv` today. Ensure the GHCR package is **private** before
+> pushing a diocese's real member data.
 
 ## Troubleshooting
 
