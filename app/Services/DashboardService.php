@@ -52,10 +52,11 @@ class DashboardService
             ")
             ->first();
 
-        // ─── Q2: Last session with records pre-loaded (adult + children) ────
-        // total_count uses the in-memory records collection (PERF-01 fixed).
+        // ─── Q2: Last session with pre-aggregated counts (view) ─────────────
+        // total_count comes from attendance_session_counts — one query for
+        // the whole page, correct for both register and headcount sessions.
         $lastSession = AttendanceSession::query()
-            ->with('records')
+            ->with('counts')
             ->latest('service_date')
             ->first();
 
@@ -124,7 +125,7 @@ class DashboardService
 
         // ─── Q6: Attendance chart — last 8 distinct dates, total per date
         $attendanceChart = AttendanceSession::query()
-            ->with('records')
+            ->with('counts')
             ->latest('service_date')
             ->get()
             ->groupBy(fn ($s) => $s->service_date->toDateString())

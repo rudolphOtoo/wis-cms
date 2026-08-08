@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Diocese\Diocese;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -13,103 +14,25 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $permissions = [
-            'view members', 'create members', 'edit members', 'delete members', 'export members',
-            'view children', 'create children', 'edit children', 'delete children',
-            'view visitors', 'create visitors', 'edit visitors', 'delete visitors',
-            'view attendance', 'create attendance', 'edit attendance', 'delete attendance',
-            'view departments', 'create departments', 'edit departments', 'delete departments',
-            'view cells', 'create cells', 'edit cells', 'delete cells',
-            'manage cell members', 'message own cell',
-            'manage department members',
-            'view finance', 'create transactions', 'edit transactions', 'delete transactions', 'export finance',
-            'view messages', 'send messages', 'message own department',
-            'view reports', 'export reports',
-            'manage users', 'manage roles', 'manage branches', 'manage service types',
-            'manage finance categories', 'view audit log',
-            'access portal',
-            'view birthday messages', 'manage birthday messages',
-            'view service reminders', 'manage service reminders',
-            'view member submissions', 'manage member submissions',
-            'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
-        ];
+        // Permission list is the union of every permission granted to any
+        // role (super_admin's '*' is excluded — it is a grant, not a name).
+        $permissions = array_values(array_filter(
+            Diocese::referenceData('permissions', []),
+            fn (string $permission) => $permission !== '*',
+        ));
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        $superAdmin = Role::firstOrCreate(['name' => 'super_admin']);
-        $superAdmin->syncPermissions(Permission::all());
+        foreach (Diocese::referenceData('roles', []) as $roleName => $config) {
+            $role = Role::firstOrCreate(['name' => $roleName]);
 
-        $pastor = Role::firstOrCreate(['name' => 'pastor']);
-        $pastor->syncPermissions([
-            'view members', 'view children', 'view visitors', 'view attendance',
-            'view departments', 'view cells', 'view finance', 'view messages', 'view reports',
-            'export reports', 'export members', 'export finance',
-            'view birthday messages', 'manage birthday messages',
-            'view service reminders', 'manage service reminders',
-            'view member submissions', 'manage member submissions',
-            'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
-        ]);
-
-        $secretary = Role::firstOrCreate(['name' => 'secretary']);
-        $secretary->syncPermissions([
-            'view members', 'create members', 'edit members', 'export members',
-            'view children', 'create children', 'edit children',
-            'view visitors', 'create visitors', 'edit visitors',
-            'view attendance', 'create attendance', 'edit attendance',
-            'view departments', 'create departments', 'edit departments',
-            'manage department members',
-            'view cells', 'create cells', 'edit cells', 'delete cells',
-            'manage cell members',
-            'view messages', 'send messages',
-            'view reports', 'export reports',
-            'view birthday messages',
-            'view service reminders',
-            'view member submissions', 'manage member submissions',
-            'view pastoral notes', 'create pastoral notes', 'update pastoral notes',
-        ]);
-
-        $finance = Role::firstOrCreate(['name' => 'finance_officer']);
-        $finance->syncPermissions([
-            'view finance', 'create transactions', 'edit transactions',
-            'delete transactions', 'export finance',
-            'view members', 'view reports', 'export reports',
-        ]);
-
-        $deptLeader = Role::firstOrCreate(['name' => 'department_leader']);
-        $deptLeader->syncPermissions([
-            'view members', 'view departments', 'manage department members',
-            'view attendance', 'create attendance', 'view reports',
-            'message own department',
-        ]);
-
-        $cellLeader = Role::firstOrCreate(['name' => 'cell_leader']);
-        $cellLeader->syncPermissions([
-            'view members', 'create members', 'edit members', 'view cells', 'manage cell members',
-            'view attendance', 'create attendance', 'view reports',
-            'message own cell',
-            'view birthday messages',
-            'view service reminders',
-            'view pastoral notes', 'create pastoral notes', 'update pastoral notes',
-        ]);
-
-        $childrenMinistryLeader = Role::firstOrCreate(['name' => 'children_ministry_leader']);
-        $childrenMinistryLeader->syncPermissions([
-            'view members', 'create members', 'edit members', 'view cells', 'manage cell members',
-            'view attendance', 'create attendance', 'view reports',
-            'message own cell',
-            'view birthday messages',
-            'view service reminders',
-            'view children', 'create children', 'edit children',
-        ]);
-
-        $usher = Role::firstOrCreate(['name' => 'usher']);
-        $usher->syncPermissions([
-            'view members', 'view children', 'create attendance', 'view attendance',
-        ]);
-
-        $member = Role::firstOrCreate(['name' => 'member']);
-        $member->syncPermissions(['access portal']);
+            if (($config['permissions'] ?? null) === '*') {
+                $role->syncPermissions(Permission::all());
+            } else {
+                $role->syncPermissions($config['permissions'] ?? []);
+            }
+        }
     }
 }
