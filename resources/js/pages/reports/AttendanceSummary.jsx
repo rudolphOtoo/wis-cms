@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAttendanceSummaryReport, downloadAttendanceSummaryPdf, downloadAttendanceSummaryXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
@@ -81,7 +81,9 @@ export default function AttendanceSummary() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   // Chart data: total attendance per Sunday, oldest first
   const chartData = data?.sundays

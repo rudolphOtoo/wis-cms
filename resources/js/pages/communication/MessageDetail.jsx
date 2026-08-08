@@ -19,7 +19,7 @@ export default function MessageDetail() {
       .then(res => setMsg(res.data.data))
       .catch(() => navigate('/communication'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, navigate])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">

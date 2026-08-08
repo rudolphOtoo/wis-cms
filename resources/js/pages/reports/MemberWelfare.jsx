@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getMemberWelfareReport, downloadMemberWelfarePdf, downloadMemberWelfareXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
@@ -40,7 +40,9 @@ export default function MemberWelfare() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   // Pie chart data from flag counts
   const pieData = data?.summary?.flag_counts
