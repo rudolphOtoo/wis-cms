@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getExpenseByCategoryReport, downloadExpenseByCategoryPdf, downloadExpenseByCategoryXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -85,7 +85,9 @@ export default function ExpenseByCategory() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   const chartData = data?.rows ? pivotForChart(data.rows) : []
   const categoryNames = data?.summary?.category_totals?.map(c => c.category_name) ?? []

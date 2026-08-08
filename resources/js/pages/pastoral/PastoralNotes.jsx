@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getPastoralNotes, createPastoralNote } from '../../api/pastoral'
 import { getMembers } from '../../api/members'
 import { toast } from 'sonner'
@@ -42,7 +42,7 @@ export default function PastoralNotes() {
       if (filterCategory) params.category = filterCategory
       const res = await getPastoralNotes(params)
       setNotes(res.data.data)
-    } catch (_e) {
+    } catch {
       toast.error('Failed to load pastoral notes.')
     } finally {
       setLoading(false)
@@ -53,10 +53,16 @@ export default function PastoralNotes() {
     try {
       const res = await getMembers({ per_page: 1000 })
       setMembers(res.data.data)
-    } catch (_e) { /* silent */ }
+    } catch { /* silent */ }
   }
 
-  useEffect(() => { loadNotes(); loadMembers() }, [])
+  const loadNotesRef   = useRef(loadNotes)
+  const loadMembersRef = useRef(loadMembers)
+  useEffect(() => {
+    loadNotesRef.current   = loadNotes
+    loadMembersRef.current = loadMembers
+  })
+  useEffect(() => { loadNotesRef.current(); loadMembersRef.current() }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()

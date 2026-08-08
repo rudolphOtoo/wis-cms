@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConfirm } from '../../hooks/useConfirm'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
@@ -54,8 +54,11 @@ export default function ChildrenPage() {
   }, [search, classFilter, page])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const fetchDataRef = useRef(fetchData)
+  useEffect(() => { fetchDataRef.current = fetchData })
   useEffect(() => {
-    const t = setTimeout(() => fetchData(), 400)
+    const t = setTimeout(() => fetchDataRef.current(), 400)
     return () => clearTimeout(t)
   }, [search])
 
