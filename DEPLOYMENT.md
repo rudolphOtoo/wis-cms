@@ -4,36 +4,6 @@ This guide covers the production deployment of WIS-CMS (Wesleyan
 International Society Church Management System) for the Methodist
 Church Ghana.
 
-## Docker-Based Local Spin-Up
-
-The fastest way to run a fresh install locally is the Docker stack. One
-install uses **one** diocese profile, chosen in a single step:
-
-```bash
-# 1. Copy the shipped env template (docker-compose.deploy.yml is already in
-#    the repo — nothing to copy for Compose itself)
-cp .env.example .env
-
-# 2. Select ONE profile in .env (uncomment exactly one line):
-#    DIOCESE_PROFILE=wis   # default — per-member register attendance
-#    DIOCESE_PROFILE=mcgh  # Methodist Church Ghana — headcount tally
-
-# 3. Boot the stack
-docker compose -f docker-compose.deploy.yml up -d
-```
-
-**How it works under the hood:** on boot, `docker/entrypoint.sh` reads
-`DIOCESE_PROFILE` (default `wis`), waits for Postgres, runs migrations, and
-seeds profile-specific reference data for the active profile (roles +
-permissions, service types, finance categories, branch, super admin). The
-default WIS CSV imports (`WIS_Ayeduase.csv`, the WIS church-data snapshot)
-are **skipped for every non-WIS profile**, so a diocese install never
-receives another church's membership data. Branding (logo, favicon, app
-name, report footer) is injected server-side from the active profile.
-
-For the full diocese onboarding runbook, see
-[`DIOCESE_SETUP.md`](./DIOCESE_SETUP.md).
-
 ## Prerequisites
 
 Before deploying, ensure the production server has:
@@ -136,12 +106,6 @@ member list and the legacy `database/church-data.json` snapshot) when
 migrations + `ProductionSeeder` for that profile and imports a profile-declared
 snapshot (`database/church-data-mcgh.json` if the diocese provides one) —
 a diocese install never receives another church's membership data.
-
-A diocese member CSV (`MCC_Members.csv`) placed at the repo root ships in
-the image and is imported automatically on first boot via the same
-idempotent `import:csv` pipeline WIS uses (see `DIOCESE_SETUP.md` step 7).
-The import is skipped when the file is absent, so images without data boot
-normally.
 
 For a complete diocese onboarding runbook (Docker path), see
 [`DIOCESE_SETUP.md`](./DIOCESE_SETUP.md).
