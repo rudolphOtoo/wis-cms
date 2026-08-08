@@ -212,6 +212,14 @@ Always dry-run before committing the file:
 php artisan import:csv MCC_Members.csv --dry-run
 ```
 
+Confirm the data landed after the first boot (member count + numbering):
+
+```bash
+docker compose -f docker-compose.deploy.yml exec app \
+  php artisan tinker --execute="echo App\\Models\\Member::count().' members — '.App\\Models\\Member::min('member_number').' .. '.App\\Models\\Member::max('member_number');"
+# e.g. → 369 members — MCC/2026/00001 .. MCC/2026/00369
+```
+
 > **Note:** the CSV (and therefore member PII) ships inside the image, same
 > as `WIS_Ayeduase.csv` today. Ensure the GHCR package is **private** before
 > pushing a diocese's real member data.
