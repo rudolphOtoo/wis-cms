@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Diocese\Diocese;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\UserResource;
@@ -84,6 +85,21 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($user),
+        ]);
+    }
+
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $user = $request->user()->load(['roles', 'permissions']);
+
+        return response()->json([
+            'user' => new UserResource($user),
+            'diocese' => [
+                'key' => Diocese::key(),
+                'label' => Diocese::label(),
+                'capabilities' => Diocese::all()['capabilities'] ?? [],
+                'strings' => Diocese::all()['strings'] ?? [],
+            ],
         ]);
     }
 

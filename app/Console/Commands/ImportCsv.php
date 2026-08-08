@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Diocese\Diocese;
 use App\Models\Branch;
 use App\Models\Cell;
 use App\Models\Children;
@@ -36,12 +37,12 @@ class ImportCsv extends Command
         // Use the explicit --branch option if given; otherwise resolve
         // to the first existing branch so the admin user (attached to
         // whichever branch already exists) can see the data immediately.
-        // Only create "Ayeduase-Wis" when no branch exists at all.
+        // Only create a profile branch when no branch exists at all.
         $branchName = $this->option('branch');
 
         if (! $branchName) {
             $existing = Branch::first();
-            $branchName = $existing ? $existing->name : 'Ayeduase-Wis';
+            $branchName = $existing ? $existing->name : (Diocese::referenceData('branch.name') ?: 'Ayeduase-Wis');
         }
 
         $branch = Branch::firstOrCreate(
@@ -91,9 +92,7 @@ class ImportCsv extends Command
 
             $dob = null;
 
-            if (empty($dobRaw)) {
-                $rowErrors[] = 'Empty date of birth';
-            } else {
+            if (! empty($dobRaw)) {
                 try {
                     $dob = Carbon::createFromFormat('d-m-Y', $dobRaw);
                     $dob->startOfDay();
@@ -104,9 +103,13 @@ class ImportCsv extends Command
 
             $gender = strtolower($genderRaw);
 
-            if (! in_array($gender, ['male', 'female'], true)) {
+            if ($gender !== '' && ! in_array($gender, ['male', 'female'], true)) {
                 $rowErrors[] = "Invalid gender: {$genderRaw} (expected Male/Female)";
             }
+
+            // Empty gender is unknown, not a value — store NULL so the
+            // members_gender_check constraint (allows NULL) is satisfied.
+            $gender = $gender === '' ? null : $gender;
 
             $phone = $this->sanitizePhone($phoneRaw);
 
@@ -215,13 +218,24 @@ class ImportCsv extends Command
                         // Null = NULL is never true in SQL, so we can't
                         // use updateOrCreate. Match on (branch_id,
                         // first_name, last_name, date_of_birth) instead.
-                        $existing = Member::where('branch_id', $branch->id)
+                        // date_of_birth may be NULL (diocese CSVs without
+                        // DOB), so the dob constraint is applied only when
+                        // present, and we require the existing member to
+                        // also have no phone (avoids collapsing a phone-
+                        // bearing member with the same name).
+                        $existing = Member::withTrashed()
+                            ->where('branch_id', $branch->id)
                             ->where('first_name', $entry['first_name'])
                             ->where('last_name', $entry['last_name'])
-                            ->where('date_of_birth', $entry['date_of_birth'])
+                            ->whereNull('phone')
+                            ->when($entry['date_of_birth'], fn ($q) => $q->where('date_of_birth', $entry['date_of_birth']))
                             ->first();
 
                         if ($existing) {
+                            if ($existing->trashed()) {
+                                $existing->restore();
+                            }
+
                             $stats['adults_skipped']++;
                         } else {
                             Member::create([
@@ -321,19 +335,23 @@ class ImportCsv extends Command
         }
 
         // ── Create cells (members assigned later by cell leaders) ────
-        $this->line('');
-        $this->info(' ── Setting up cells ...');
+        // Only for profiles that organise attendance around cells (wis).
+        // Diocese profiles with cells disabled (e.g. mcgh) skip this.
+        if (Diocese::capability('cells.enabled', true)) {
+            $this->line('');
+            $this->info(' ── Setting up cells ...');
 
-        $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
+            $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
 
-        foreach ($cellNames as $name) {
-            Cell::firstOrCreate(
-                ['branch_id' => $branch->id, 'name' => $name],
-                ['description' => null, 'is_active' => true],
-            );
+            foreach ($cellNames as $name) {
+                Cell::firstOrCreate(
+                    ['branch_id' => $branch->id, 'name' => $name],
+                    ['description' => null, 'is_active' => true],
+                );
+            }
+
+            $this->line(' ✓ Created / found '.count($cellNames).' cells');
         }
-
-        $this->line(' ✓ Created / found '.count($cellNames).' cells');
 
         $this->showSummary($stats);
 

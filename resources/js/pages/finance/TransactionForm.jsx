@@ -60,7 +60,7 @@ export default function TransactionForm() {
         .catch(() => navigate('/finance'))
         .finally(() => setFetching(false))
     }
-  }, [id, isEdit])
+  }, [id, isEdit, navigate])
 
   const set = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }))

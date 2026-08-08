@@ -1,15 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @php
+        $appTitle = \App\Diocese\Diocese::string('app.title', 'WIS-CMS');
+        $appName  = \App\Diocese\Diocese::string('app_name', 'WIS-CMS');
+        $tagline  = \App\Diocese\Diocese::string('tagline', '');
+        $logo     = \App\Diocese\Diocese::string('logo', '/images/wis-logo.png');
+        $logoWebp = \App\Diocese\Diocese::string('logo_webp', $logo);
+        $favicon  = \App\Diocese\Diocese::string('favicon', '/favicon.png');
+        $favFile  = public_path(ltrim($favicon, '/'));
+        $favVer   = is_file($favFile) ? filemtime($favFile) : 0;
+    @endphp
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@yield('title', 'Dashboard') — WIS-CMS</title>
+    <title>@yield('title', 'Dashboard') — {{ $appTitle }}</title>
 
-    {{-- Favicon — auto-busts cache when file changes --}}
-    @php $favVer = filemtime(public_path('favicon.png')); @endphp
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}?v={{ $favVer }}" />
-    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="{{ asset('favicon.ico') }}?v={{ $favVer }}" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}?v={{ $favVer }}" />
+    {{-- Favicon — auto-busts cache when the profile's file changes --}}
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset($favicon) }}?v={{ $favVer }}" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="{{ asset($favicon) }}?v={{ $favVer }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset($favicon) }}?v={{ $favVer }}" />
+
+    {{-- Profile branding for the SPA --}}
+    @include('partials.app-meta', [
+        'appTitle' => $appTitle,
+        'appName'  => $appName,
+        'tagline'  => $tagline,
+        'logo'     => $logo,
+        'logoWebp' => $logoWebp,
+        'favicon'  => $favicon,
+    ])
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,15 +58,15 @@
             <div class="flex items-center h-16 px-3 flex-shrink-0 gap-2"
                  style="border-bottom: 1px solid rgba(255,255,255,0.07)">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <img src="/images/wis-logo.png" alt="WIS Logo"
+                    <img src="{{ asset($logo) }}" alt="{{ $appTitle }} Logo"
                          class="w-9 h-9 object-contain flex-shrink-0" />
                     <div class="min-w-0">
                         <div class="text-white text-sm font-bold leading-tight truncate"
                              style="font-family: 'Playfair Display', serif">
-                            WIS-CMS
+                            {{ $appTitle }}
                         </div>
                         <div class="text-[10px] leading-tight truncate" style="color: rgba(255,255,255,0.4)">
-                            Methodist Church Ghana
+                            {{ $appName }}
                         </div>
                     </div>
                 </div>

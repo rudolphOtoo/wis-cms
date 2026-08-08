@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Diocese\Diocese;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\CreateAttendanceSessionRequest;
 use App\Http\Requests\Attendance\MarkAttendanceRequest;
+use App\Http\Requests\Attendance\MarkHeadcountRequest;
 use App\Http\Resources\AttendanceSessionResource;
 use App\Models\AttendanceRecord;
 use App\Models\AttendanceSession;
@@ -15,6 +17,7 @@ use App\Models\Children;
 use App\Models\Department;
 use App\Models\ServiceType;
 use App\Services\AttendanceStatsService;
+use App\Support\AttendanceCounts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,15 +58,10 @@ class AttendanceController extends Controller
         $scope = $this->resolveScope($request);
 
         $query = AttendanceSession::query()
-            // PERF FIX: 'records' must be eager-loaded here so that
-            // AttendanceSession::getAdultCountAttribute() and
-            // getChildrenCountAttribute() use the in-memory collection
-            // (zero extra queries) rather than falling back to a per-session
-            // COUNT query (2 queries × N rows = N+1 on every page load).
-            ->withCount([
-                'records as adult_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('member_id'),
-                'records as children_count' => fn ($q) => $q->where('is_present', true)->whereNotNull('child_id'),
-            ])
+            // PERF: the counts come from the pre-aggregated
+            // attendance_session_counts view (one eager-load query, no
+            // N+1), mode-agnostic for register vs headcount sessions.
+            ->with('counts')
             ->with(['serviceType', 'recorder', 'branch'])
             ->orderByDesc('service_date');
 
@@ -128,6 +126,7 @@ class AttendanceController extends Controller
             'department_id' => $departmentId,
             'cell_id' => $cellId,
             'service_date' => $validated['service_date'],
+            'attendance_mode' => $validated['attendance_mode'] ?? Diocese::capability('attendance.default_mode', 'register'),
             'notes' => $validated['notes'] ?? null,
             'recorded_by' => $request->user()->id,
         ]);
@@ -147,6 +146,18 @@ class AttendanceController extends Controller
     {
         $session = AttendanceSession::with(['serviceType', 'recorder', 'records', 'branch'])->findOrFail($id);
         $serviceType = $session->serviceType;
+
+        // Headcount sessions have no per-person roster — the frontend
+        // renders the door tally (Men / Women / Children) from the session's
+        // stored counts instead.
+        if ($session->attendance_mode === 'headcount') {
+            return response()->json([
+                'data' => [
+                    'session' => new AttendanceSessionResource($session),
+                    'people' => [],
+                ],
+            ]);
+        }
 
         if ($serviceType->type === 'children') {
             // Load from the cell's children roster when linked to the
@@ -260,6 +271,32 @@ class AttendanceController extends Controller
     }
 
     /**
+     * POST /api/attendance/sessions/{id}/headcount
+     *
+     * Saves the door tally for a headcount session. Register-mode sessions
+     * are rejected here — they go through /mark with per-person records.
+     */
+    public function markHeadcount(MarkHeadcountRequest $request, string $id): JsonResponse
+    {
+        $session = AttendanceSession::findOrFail($id);
+
+        $session->update([
+            'male_count' => $request->validated('male_count'),
+            'female_count' => $request->validated('female_count'),
+            'children_count' => $request->validated('children_count'),
+        ]);
+
+        activity()->causedBy($request->user())
+            ->performedOn($session)
+            ->log("Recorded headcount for session {$session->service_date}");
+
+        return response()->json([
+            'message' => 'Attendance saved successfully.',
+            'data' => new AttendanceSessionResource($session->load('counts', 'serviceType', 'recorder', 'branch')),
+        ]);
+    }
+
+    /**
      * GET /api/attendance/stats
      *
      * PERF-06 FIX: Delegates to AttendanceStatsService, which uses a single
@@ -300,15 +337,12 @@ class AttendanceController extends Controller
         $branchId = $request->user()->branch_id;
         $perPage = $request->integer('per_page', 20);
 
-        // Single query — no N+1. Uses FILTER clauses for adult/children split.
+        // Single query — no N+1. Counts come from the index-scoped LATERAL
+        // aggregation, so the adult/children split works for BOTH register
+        // and headcount sessions without re-scanning every attendance record.
         $rows = DB::table('attendance_sessions as s')
+            ->leftJoinLateral(AttendanceCounts::subquery('s'), 'c')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-            ->leftJoin('attendance_records as ar', function ($join) {
-                $join->on('ar.session_id', '=', 's.id')
-                    ->whereNull('ar.deleted_at')
-                    ->where('ar.is_present', '=', true);
-            })
-            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
             ->where('s.branch_id', $branchId)
             ->where(function ($q) {
                 $q->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
@@ -330,9 +364,9 @@ class AttendanceController extends Controller
             }))
             ->select([
                 's.service_date',
-                DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),
-                DB::raw('COUNT(*) FILTER (WHERE ar.child_id  IS NOT NULL) AS children_count'),
-                DB::raw('COUNT(*) FILTER (WHERE ar.id IS NOT NULL) AS total_count'),
+                DB::raw('SUM(c.adult_count) AS adult_count'),
+                DB::raw('SUM(c.children_count) AS children_count'),
+                DB::raw('SUM(c.total_count) AS total_count'),
             ])
             ->groupBy('s.service_date')
             ->orderByDesc('s.service_date')

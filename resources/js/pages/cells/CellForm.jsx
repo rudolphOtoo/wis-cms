@@ -47,7 +47,7 @@ export default function CellForm() {
       })
       .catch(() => navigate('/cells'))
       .finally(() => setFetching(false))
-  }, [id, isEdit])
+  }, [id, isEdit, navigate])
 
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value

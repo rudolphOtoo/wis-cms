@@ -26,7 +26,7 @@ export default function ChildDetail() {
       .then(res => setChild(res.data.data))
       .catch(() => navigate('/children'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, navigate])
 
   const handleDelete = async () => {
     if (!(await confirm(`Remove ${child.full_name} from the children's register?`))) return

@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 
 export default function ChangePassword() {
   const navigate = useNavigate()
-  const { user, updateUser, hasRole } = useAuth()
+  const { user, updateUser } = useAuth()
   const forced = Boolean(user?.must_change_password)
 
   const [form, setForm] = useState({ current_password: '', new_password: '', new_password_confirmation: '' })

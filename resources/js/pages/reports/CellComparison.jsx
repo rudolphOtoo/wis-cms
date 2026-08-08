@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getCellComparisonReport, downloadCellComparisonPdf, downloadCellComparisonXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -46,7 +46,9 @@ export default function CellComparison() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   const sortedCells = data?.cells ? [...data.cells].sort((a, b) => b.member_count - a.member_count) : []
   const chartData = sortedCells.map(c => ({ name: c.name, members: c.member_count }))

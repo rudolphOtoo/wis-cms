@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Diocese\Diocese;
 use App\Models\Branch;
 use Illuminate\Database\Seeder;
 
@@ -15,17 +16,17 @@ class BranchSeeder extends Seeder
      * exists, attributes are left untouched (production may have
      * edited address/phone/email via the UI; we don't clobber).
      *
-     * For multi-branch Methodist Ghana deploys, customize CHURCH_NAME
-     * in .env or duplicate this seeder per branch.
+     * The branch identity is profile-driven, with per-install overrides
+     * via CHURCH_NAME / CHURCH_LOCATION in .env.
      */
     public function run(): void
     {
-        $churchName = env('CHURCH_NAME', 'Wesleyan International Society');
+        $churchName = env('CHURCH_NAME', Diocese::referenceData('branch.name', 'Wesleyan International Society'));
 
         $branch = Branch::firstOrCreate(
             ['name' => $churchName],
             [
-                'location' => env('CHURCH_LOCATION', 'Kumasi, Ghana'),
+                'location' => env('CHURCH_LOCATION', Diocese::referenceData('branch.location', 'Kumasi, Ghana')),
                 'address' => null,
                 'phone' => null,
                 'email' => null,
