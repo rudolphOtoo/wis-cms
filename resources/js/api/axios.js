@@ -21,7 +21,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('wis_token')
       localStorage.removeItem('wis_user')
-      window.location.href = '/login'
+      const onAuthPage = ['/login', '/forgot-password', '/reset-password']
+        .includes(window.location.pathname)
+      // Avoid a reload loop when an unauthenticated request fires from an
+      // auth page (e.g. bootstrap during the login screen) — just reject and
+      // let the page render.
+      if (!onAuthPage) {
+        window.location.href = '/login'
+      }
       return Promise.reject(error)
     }
 

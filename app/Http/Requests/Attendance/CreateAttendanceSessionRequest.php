@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Attendance;
 
+use App\Diocese\Diocese;
 use App\Models\Cell;
 use App\Models\Department;
 use App\Models\ServiceType;
@@ -18,6 +19,13 @@ class CreateAttendanceSessionRequest extends FormRequest
         }
 
         if ($user->hasAnyRole(['super_admin', 'pastor', 'secretary'])) {
+            return true;
+        }
+
+        // Headcount sessions are church-wide — any permitted user (e.g. an
+        // usher tallying at the door) can open one without leading a cell
+        // or department.
+        if ($this->effectiveMode() === 'headcount') {
             return true;
         }
 
@@ -45,6 +53,7 @@ class CreateAttendanceSessionRequest extends FormRequest
             'service_type_id' => ['required', 'uuid', 'exists:service_types,id'],
             'service_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'attendance_mode' => ['nullable', 'string', 'in:register,headcount'],
             'department_id' => [
                 'nullable',
                 'uuid',
@@ -75,6 +84,18 @@ class CreateAttendanceSessionRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            if ($this->effectiveMode() === 'headcount') {
+                // Church-wide tally — never scoped to a cell or department.
+                if ($this->input('department_id') || $this->input('cell_id')) {
+                    $validator->errors()->add(
+                        'cell_id',
+                        'Headcount attendance is church-wide and cannot be scoped to a cell or department.'
+                    );
+                }
+
+                return;
+            }
+
             if ($this->input('department_id') && $this->input('cell_id')) {
                 $validator->errors()->add(
                     'cell_id',
@@ -101,5 +122,14 @@ class CreateAttendanceSessionRequest extends FormRequest
                 );
             }
         });
+    }
+
+    /**
+     * The recording mode for this session: explicit request value, else the
+     * active profile's soft default.
+     */
+    public function effectiveMode(): string
+    {
+        return $this->input('attendance_mode', Diocese::capability('attendance.default_mode', 'register'));
     }
 }
