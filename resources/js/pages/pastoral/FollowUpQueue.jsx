@@ -18,7 +18,7 @@ export default function FollowUpQueue() {
     try {
       const res = await getPastoralFollowUps()
       setFollowUps(res.data.data)
-    } catch (_e) {
+    } catch {
       toast.error('Failed to load follow-ups.')
     } finally {
       setLoading(false)

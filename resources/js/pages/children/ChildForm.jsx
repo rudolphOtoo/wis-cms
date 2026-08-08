@@ -70,7 +70,7 @@ export default function ChildForm() {
         .catch(() => navigate('/children'))
         .finally(() => setFetching(false))
     }
-  }, [id, isEdit])
+  }, [id, isEdit, navigate])
 
   const set = (field) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
