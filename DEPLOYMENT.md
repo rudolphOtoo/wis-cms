@@ -137,6 +137,12 @@ migrations + `ProductionSeeder` for that profile and imports a profile-declared
 snapshot (`database/church-data-mcgh.json` if the diocese provides one) —
 a diocese install never receives another church's membership data.
 
+A diocese member CSV (`MCC_Members.csv`) placed at the repo root ships in
+the image and is imported automatically on first boot via the same
+idempotent `import:csv` pipeline WIS uses (see `DIOCESE_SETUP.md` step 7).
+The import is skipped when the file is absent, so images without data boot
+normally.
+
 For a complete diocese onboarding runbook (Docker path), see
 [`DIOCESE_SETUP.md`](./DIOCESE_SETUP.md).
 
