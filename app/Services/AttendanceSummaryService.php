@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Cell;
 use App\Models\Member;
+use App\Support\AttendanceCounts;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -72,13 +73,9 @@ class AttendanceSummaryService
             ->count();
 
         $query = DB::table('attendance_sessions as s')
+            ->leftJoinLateral(AttendanceCounts::subquery('s'), 'c')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-            ->leftJoin('attendance_records as ar', function ($join) {
-                $join->on('ar.session_id', '=', 's.id')
-                    ->whereNull('ar.deleted_at')
-                    ->where('ar.is_present', '=', true);
-            })
-            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
+            ->leftJoin('cells as cell', 's.cell_id', '=', 'cell.id')
             ->where('s.branch_id', $branchId)
             ->where('s.service_date', '>=', $from)
             ->where('s.service_date', '<=', $to)
@@ -92,13 +89,12 @@ class AttendanceSummaryService
             ->select([
                 's.service_date',
                 's.cell_id',
-                DB::raw("COALESCE(c.name, 'Unassigned') AS cell_name"),
-                DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),
-                DB::raw('COUNT(*) FILTER (WHERE ar.child_id IS NOT NULL) AS children_count'),
+                DB::raw("COALESCE(cell.name, 'Unassigned') AS cell_name"),
+                'c.adult_count',
+                'c.children_count',
             ])
-            ->groupBy('s.service_date', 's.cell_id', 'c.name')
             ->orderByDesc('s.service_date')
-            ->orderBy('c.name');
+            ->orderBy('cell.name');
 
         if ($cellId) {
             $query->where('s.cell_id', $cellId);
