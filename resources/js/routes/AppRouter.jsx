@@ -1,6 +1,7 @@
 import { lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './ProtectedRoute'
+import CapabilityGate  from './CapabilityGate'
 import AppLayout     from '../components/layout/AppLayout'
 
 // ── Auth pages: loaded eagerly — the user hits these before the app shell ──
@@ -53,6 +54,7 @@ const Reminders        = lazy(() => import('../pages/reminders/Reminders'))
 const Submissions      = lazy(() => import('../pages/submissions/Submissions'))
 const PastoralNotes    = lazy(() => import('../pages/pastoral/PastoralNotes'))
 const FollowUpQueue    = lazy(() => import('../pages/pastoral/FollowUpQueue'))
+const Confirmations    = lazy(() => import('../pages/confirmations/Confirmations'))
 
 export default function AppRouter() {
   return (
@@ -86,10 +88,10 @@ export default function AppRouter() {
             <Route path="/departments/:id"      element={<DepartmentDetail />} />
             <Route path="/departments/:id/edit" element={<DepartmentForm />} />
 
-            <Route path="/cells"                element={<CellsPage />} />
-            <Route path="/cells/new"            element={<CellForm />} />
-            <Route path="/cells/:id"            element={<CellDetail />} />
-            <Route path="/cells/:id/edit"       element={<CellForm />} />
+            <Route path="/cells"                element={<CapabilityGate path="cells.enabled"><CellsPage /></CapabilityGate>} />
+            <Route path="/cells/new"            element={<CapabilityGate path="cells.enabled"><CellForm /></CapabilityGate>} />
+            <Route path="/cells/:id"            element={<CapabilityGate path="cells.enabled"><CellDetail /></CapabilityGate>} />
+            <Route path="/cells/:id/edit"       element={<CapabilityGate path="cells.enabled"><CellForm /></CapabilityGate>} />
 
             <Route path="/attendance"           element={<AttendancePage />} />
             <Route path="/attendance/new"       element={<NewSession />} />
@@ -124,6 +126,7 @@ export default function AppRouter() {
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/pastoral-notes" element={<PastoralNotes />} />
             <Route path="/pastoral/follow-ups" element={<FollowUpQueue />} />
+            <Route path="/confirmations" element={<CapabilityGate path="modules.confirmations"><Confirmations /></CapabilityGate>} />
           </Route>
         </Route>
 

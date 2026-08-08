@@ -28,6 +28,12 @@ class MarkAttendanceRequest extends FormRequest
             return false;
         }
 
+        // Headcount sessions have no per-person roster — tallies are saved
+        // via the dedicated /headcount endpoint.
+        if ($session->attendance_mode === 'headcount') {
+            return false;
+        }
+
         if ($session->cell_id) {
             return Cell::where('id', $session->cell_id)
                 ->where('leader_user_id', $user->id)
@@ -54,6 +60,13 @@ class MarkAttendanceRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            // If the base rules already failed (e.g. a non-UUID person_id),
+            // skip the DB membership check — querying with malformed ids
+            // would throw a raw SQL error (500) instead of a clean 422.
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
             $session = AttendanceSession::find($this->route('id'));
             if (! $session) {
                 return;

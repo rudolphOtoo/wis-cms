@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AttendanceSession extends Model
 {
@@ -21,13 +22,18 @@ class AttendanceSession extends Model
 
     protected $fillable = [
         'branch_id', 'service_type_id', 'department_id', 'cell_id',
-        'service_date', 'notes', 'recorded_by', 'follow_up_status', 'follow_up_sent_at',
+        'service_date', 'notes', 'attendance_mode', 'male_count', 'female_count', 'children_count',
+        'recorded_by', 'follow_up_status', 'follow_up_sent_at',
     ];
 
     protected function casts(): array
     {
         return [
             'service_date' => 'date',
+            'attendance_mode' => 'string',
+            'male_count' => 'integer',
+            'female_count' => 'integer',
+            'children_count' => 'integer',
             'follow_up_sent_at' => 'datetime',
         ];
     }
@@ -99,25 +105,44 @@ class AttendanceSession extends Model
         return $this->hasMany(AttendanceRecord::class, 'session_id');
     }
 
+    public function counts(): HasOne
+    {
+        return $this->hasOne(AttendanceSessionCount::class, 'session_id');
+    }
+
     // ─── Computed attributes ───────────────────────────────────────────────
 
     /**
      * Count of present adult (member) attendees for this session.
+     *
+     * Mode-aware: register sessions derive the count from per-person
+     * attendance_records; headcount sessions use the stored male+female
+     * tally.
      *
      * PERF-01 FIX — relation-aware computation:
      * The previous implementation always called $this->records() (a new query
      * builder), which fired a fresh COUNT(*) per session even when the caller
      * had already eager-loaded the relation with ->with('records').
      *
-     * Now: if 'records' is already loaded in memory, we filter the collection
-     * in PHP (zero extra queries). Only when 'records' has NOT been loaded do
-     * we fall back to a targeted COUNT query — this covers single-session
-     * show endpoints that deliberately don't eager-load all records.
+     * Now: if 'counts' (the pre-aggregated view) or 'records' is already
+     * loaded in memory, we read from the in-memory data (zero extra
+     * queries). Only when neither has been loaded do we fall back to a
+     * targeted COUNT query — this covers single-session show endpoints
+     * that deliberately don't eager-load.
      *
-     * Contract for callers: always ->with('records') when iterating sessions.
+     * Contract for callers: always ->with('counts') (or ->with('records'))
+     * when iterating sessions.
      */
     public function getAdultCountAttribute(): int
     {
+        if ($this->relationLoaded('counts')) {
+            return (int) ($this->counts?->adult_count ?? 0);
+        }
+
+        if ($this->attendance_mode === 'headcount') {
+            return (int) $this->male_count + (int) $this->female_count;
+        }
+
         if ($this->relationLoaded('records')) {
             return $this->records
                 ->filter(fn (AttendanceRecord $r) => $r->member_id !== null && $r->is_present)
@@ -133,10 +158,20 @@ class AttendanceSession extends Model
     /**
      * Count of present children attendees for this session.
      *
-     * @see getAdultCountAttribute() for the relationLoaded rationale.
+     * @see getAdultCountAttribute() for the mode-aware, relation-loaded rationale.
      */
     public function getChildrenCountAttribute(): int
     {
+        if ($this->relationLoaded('counts')) {
+            return (int) ($this->counts?->children_count ?? 0);
+        }
+
+        if ($this->attendance_mode === 'headcount') {
+            // NOTE: read the raw attribute, not $this->children_count —
+            // this accessor shadows the stored column and would recurse.
+            return (int) ($this->getAttributes()['children_count'] ?? 0);
+        }
+
         if ($this->relationLoaded('records')) {
             return $this->records
                 ->filter(fn (AttendanceRecord $r) => $r->child_id !== null && $r->is_present)
@@ -151,6 +186,10 @@ class AttendanceSession extends Model
 
     public function getTotalCountAttribute(): int
     {
+        if ($this->relationLoaded('counts')) {
+            return (int) ($this->counts?->total_count ?? 0);
+        }
+
         return $this->adult_count + $this->children_count;
     }
 }
