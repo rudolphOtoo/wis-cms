@@ -69,6 +69,7 @@ Profile strings use dotted keys stored **literally**.
 |---|---|---|
 | `app:data-migrate --import` | ✅ default input | ✅ with `--input=database/church-data-mcgh.json` (absent on fresh install → seeds reference data only) |
 | `import:csv WIS_Ayeduase.csv` | ✅ | ❌ never |
+| `import:csv MCC_Members.csv` | ❌ never | ✅ only when present in the image (member roster ships at repo root; idempotent upsert on every boot) |
 | Other profiles | unknown slug → reference data only, warns to stderr | — |
 
 ## Tests

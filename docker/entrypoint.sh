@@ -29,6 +29,13 @@ if [ "$1" = "php-fpm" ]; then
             # `app:data-migrate --export`); absent on a fresh install, so
             # reference data is seeded and nothing WIS is imported.
             php artisan app:data-migrate --import --input=database/church-data-mcgh.json
+            # Diocese member roster ships in the image (same headerless
+            # format as the WIS CSV). Only imported when present — the
+            # upsert pipeline is idempotent, so re-running on every boot
+            # never duplicates.
+            if [ -f MCC_Members.csv ]; then
+                php artisan import:csv MCC_Members.csv
+            fi
             ;;
         *)
             echo "Unknown DIOCESE_PROFILE '${profile}' — skipping diocese-specific imports." >&2

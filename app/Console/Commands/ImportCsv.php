@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Diocese\Diocese;
 use App\Models\Branch;
 use App\Models\Cell;
 use App\Models\Children;
@@ -36,12 +37,12 @@ class ImportCsv extends Command
         // Use the explicit --branch option if given; otherwise resolve
         // to the first existing branch so the admin user (attached to
         // whichever branch already exists) can see the data immediately.
-        // Only create "Ayeduase-Wis" when no branch exists at all.
+        // Only create a profile branch when no branch exists at all.
         $branchName = $this->option('branch');
 
         if (! $branchName) {
             $existing = Branch::first();
-            $branchName = $existing ? $existing->name : 'Ayeduase-Wis';
+            $branchName = $existing ? $existing->name : (Diocese::referenceData('branch.name') ?: 'Ayeduase-Wis');
         }
 
         $branch = Branch::firstOrCreate(
@@ -321,19 +322,23 @@ class ImportCsv extends Command
         }
 
         // ── Create cells (members assigned later by cell leaders) ────
-        $this->line('');
-        $this->info(' ── Setting up cells ...');
+        // Only for profiles that organise attendance around cells (wis).
+        // Diocese profiles with cells disabled (e.g. mcgh) skip this.
+        if (Diocese::capability('cells.enabled', true)) {
+            $this->line('');
+            $this->info(' ── Setting up cells ...');
 
-        $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
+            $cellNames = ['Faithfulness', 'Patience 1', 'Patience 2', 'Love', 'Joy', 'Peace'];
 
-        foreach ($cellNames as $name) {
-            Cell::firstOrCreate(
-                ['branch_id' => $branch->id, 'name' => $name],
-                ['description' => null, 'is_active' => true],
-            );
+            foreach ($cellNames as $name) {
+                Cell::firstOrCreate(
+                    ['branch_id' => $branch->id, 'name' => $name],
+                    ['description' => null, 'is_active' => true],
+                );
+            }
+
+            $this->line(' ✓ Created / found '.count($cellNames).' cells');
         }
-
-        $this->line(' ✓ Created / found '.count($cellNames).' cells');
 
         $this->showSummary($stats);
 
