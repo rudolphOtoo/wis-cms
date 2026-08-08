@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getSession, markAttendance } from '../../api/attendance'
+import { getSession, markAttendance, markHeadcount } from '../../api/attendance'
+
+const MAX_TALLY_COUNT = 100000
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -10,11 +12,45 @@ const cardBase = {
   boxShadow: '0 4px 12px rgba(13,31,60,0.05)',
 }
 
+// Memoized roster row: only re-renders when THIS person's attendance state
+// changes, not on every keystroke/toggle across a multi-hundred-row list.
+const PersonRow = memo(function PersonRow({ person, onToggle }) {
+  return (
+    <div className="flex items-center justify-between gap-3 transition-colors"
+         style={{ padding:'12px 16px',borderTop:'1px solid var(--color-surface-border)'}}>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
+             style={{ backgroundColor: person.is_present ? '#dcfce7' : '#e1e2e5',
+                     color: person.is_present ? '#15803d' : '#44474f',
+                     border:'1px solid var(--color-surface-border)'}}>
+          {person.name.charAt(0)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold truncate" style={{ fontSize:'17px',color:'var(--color-navy)' }}>{person.name}</h3>
+          <p className="truncate" style={{ fontSize:'12px',color:'#747780' }}>{person.member_number ?? person.class ?? ''}</p>
+        </div>
+      </div>
+      <button onClick={() => onToggle(person.id)}
+              className="flex items-center justify-center gap-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex-shrink-0 w-[100px] md:w-[160px]"
+              style={{ padding:'12px',fontWeight:600,fontSize:'13px',
+                      backgroundColor: person.is_present ? '#2e7d32' : '#e1e2e5',
+                      color: person.is_present ? 'white' : '#44474f'}}>
+        {person.is_present ? (
+          <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>PRESENT</>
+        ) : (
+          <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>ABSENT</>
+        )}
+      </button>
+    </div>
+  )
+})
+
 export default function TakeAttendance() {
   const navigate    = useNavigate()
   const { id }      = useParams()
   const [session,   setSession]   = useState(null)
   const [people,    setPeople]    = useState([])
+  const [tally,     setTally]     = useState({ male: 0, female: 0, children: 0 })
   const [loading,   setLoading]   = useState(true)
   const [saving,    setSaving]    = useState(false)
   const [search,    setSearch]    = useState('')
@@ -24,38 +60,58 @@ export default function TakeAttendance() {
     setLoading(true)
     try {
       const res = await getSession(id)
-      setSession(res.data.data.session)
+      const sess = res.data.data.session
+      setSession(sess)
       setPeople(res.data.data.people.map(p => ({ ...p })))
+      setTally({
+        male: sess.male_count ?? 0,
+        female: sess.female_count ?? 0,
+        children: sess.children_count ?? 0,
+      })
     } catch {
       navigate('/attendance')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, navigate])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const togglePerson = (personId) => {
+  const togglePerson = useCallback((personId) => {
     setPeople(prev => prev.map(p =>
       p.id === personId ? { ...p, is_present: !p.is_present } : p
     ))
     setSaved(false)
-  }
+  }, [])
 
-  const markAll = (present) => {
+  const markAll = useCallback((present) => {
     setPeople(prev => prev.map(p => ({ ...p, is_present: present })))
+    setSaved(false)
+  }, [])
+
+  const setTallyField = (field) => (e) => {
+    const value = Math.min(MAX_TALLY_COUNT, Math.max(0, parseInt(e.target.value, 10) || 0))
+    setTally(prev => ({ ...prev, [field]: value }))
     setSaved(false)
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const records = people.map(p => ({
-        person_id:  p.id,
-        type:       p.type,
-        is_present: p.is_present,
-      }))
-      await markAttendance(id, { records })
+      if (session?.attendance_mode === 'headcount') {
+        await markHeadcount(id, {
+          male_count: tally.male,
+          female_count: tally.female,
+          children_count: tally.children,
+        })
+      } else {
+        const records = people.map(p => ({
+          person_id:  p.id,
+          type:       p.type,
+          is_present: p.is_present,
+        }))
+        await markAttendance(id, { records })
+      }
       setSaved(true)
     } catch {
       toast.error('Failed to save attendance. Please try again.')
@@ -64,9 +120,11 @@ export default function TakeAttendance() {
     }
   }
 
-  const presentCount = people.filter(p => p.is_present).length
-  const absentCount  = people.filter(p => !p.is_present).length
-  const total        = people.length
+  const headcount    = session?.attendance_mode === 'headcount'
+  const tallyTotal   = tally.male + tally.female + tally.children
+  const presentCount = headcount ? tallyTotal : people.filter(p => p.is_present).length
+  const absentCount  = headcount ? 0 : people.filter(p => !p.is_present).length
+  const total        = headcount ? tallyTotal : people.length
   const completion   = total > 0 ? Math.round((presentCount / total) * 100) : 0
 
   const filtered = people.filter(p =>
@@ -159,7 +217,40 @@ export default function TakeAttendance() {
         ))}
       </div>
 
+      {/* Headcount tally — door count by group (mcgh diocese) */}
+      {headcount && (
+        <div style={{...cardBase, padding:'24px'}}>
+          <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+            <div>
+              <h3 className="font-bold" style={{fontSize:'18px',color:'var(--color-navy)'}}>Door Tally</h3>
+              <p className="text-sm" style={{color:'#6b7280'}}>Enter the count for each group. The total updates live.</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-full px-5 py-2.5"
+                 style={{backgroundColor:'#ffdcc1',color:'#693c0a',border:'1px solid #fcb87d'}}>
+              <span style={{fontSize:'18px'}}><span className="font-bold">{tallyTotal}</span> people</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { key:'male',     label:'Men',      hint:'Adult males',   color:'#2563eb' },
+              { key:'female',   label:'Women',    hint:'Adult females', color:'#db2777' },
+              { key:'children', label:'Children', hint:'Under 18',      color:'#d97706' },
+            ].map(f => (
+              <div key={f.key} style={{border:'1px solid var(--color-surface-border)',borderRadius:'14px',padding:'18px',backgroundColor:'#fafbfc'}}>
+                <label className="block text-sm font-semibold mb-0.5" style={{color:'#374151'}}>{f.label}</label>
+                <p className="text-xs mb-3" style={{color:'#9ca3af'}}>{f.hint}</p>
+                <input type="number" min="0" max={MAX_TALLY_COUNT} value={tally[f.key]}
+                       onChange={setTallyField(f.key)}
+                       className="input-field" style={{fontSize:'28px',fontWeight:700,textAlign:'center',color:f.color}}/>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
+      {!headcount && (
       <div style={{...cardBase, padding:'16px 24px'}}>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -179,8 +270,10 @@ export default function TakeAttendance() {
           </div>
         </div>
       </div>
+      )}
 
       {/* People list — big toggle buttons */}
+      {!headcount && (
       <div style={{...cardBase, overflow:'hidden'}}>
         <div className="flex justify-between items-center"
              style={{padding:'12px 24px',backgroundColor:'#f2f3f6',borderBottom:'1px solid var(--color-surface-border)'}}>
@@ -193,33 +286,7 @@ export default function TakeAttendance() {
         ) : (
           <div>
             {filtered.map(person => (
-              <div key={person.id}
-                   className="flex items-center justify-between gap-3 transition-colors"
-                   style={{padding:'12px 16px',borderTop:'1px solid var(--color-surface-border)'}}>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
-                       style={{backgroundColor: person.is_present ? '#dcfce7' : '#e1e2e5',
-                               color: person.is_present ? '#15803d' : '#44474f',
-                               border:'1px solid var(--color-surface-border)'}}>
-                    {person.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold truncate" style={{fontSize:'17px',color:'var(--color-navy)'}}>{person.name}</h3>
-                    <p className="truncate" style={{fontSize:'12px',color:'#747780'}}>{person.member_number ?? person.class ?? ''}</p>
-                  </div>
-                </div>
-                <button onClick={() => togglePerson(person.id)}
-                        className="flex items-center justify-center gap-1.5 rounded-xl shadow-sm transition-all active:scale-95 flex-shrink-0 w-[100px] md:w-[160px]"
-                        style={{padding:'12px',fontWeight:600,fontSize:'13px',
-                                backgroundColor: person.is_present ? '#2e7d32' : '#e1e2e5',
-                                color: person.is_present ? 'white' : '#44474f'}}>
-                  {person.is_present ? (
-                    <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>PRESENT</>
-                  ) : (
-                    <><svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/></svg>ABSENT</>
-                  )}
-                </button>
-              </div>
+              <PersonRow key={person.id} person={person} onToggle={togglePerson} />
             ))}
           </div>
         )}
@@ -243,6 +310,7 @@ export default function TakeAttendance() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Mobile bottom spacer — gives the fixed save bar clearance
           so the last member rows aren't covered when scrolled to bottom.
