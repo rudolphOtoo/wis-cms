@@ -2,11 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Diocese\Diocese;
 use App\Models\FinanceCategory;
 use Illuminate\Database\Seeder;
 
 /**
- * WIS Methodist Ghana finance categories.
+ * Finance categories come from the active profile's reference_data.
  *
  * INCOME list and order are dictated by the council. display_order
  * drives the dropdown so secretaries see Tithe and Offertory first
@@ -21,24 +22,9 @@ class FinanceCategorySeeder extends Seeder
 {
     public function run(): void
     {
-        $income = [
-            ['name' => 'Tithe',                              'description' => 'Individual tithe contributions'],
-            ['name' => 'Offertory',                          'description' => 'General Sunday offertory collection'],
-            ['name' => 'Sunday School Offertory',            'description' => 'Sunday school class offerings'],
-            ['name' => 'Methodist Development Fund (MDF)',   'description' => 'Connexional development levy'],
-            ['name' => 'Welfare',                            'description' => 'Welfare fund contributions from members'],
-            ['name' => 'Thanksgiving',                       'description' => 'Thanksgiving offerings'],
-            ['name' => 'Day Born Offering',                  'description' => 'Day-born / birthday offerings'],
-            ['name' => 'Scholarship Fund',                   'description' => 'Scholarship and education support contributions'],
-            ['name' => 'Pledges Redemption',                 'description' => 'Redemption of pledges made'],
-            ['name' => 'Harvest',                            'description' => 'Harvest thanksgiving offerings'],
-            ['name' => 'Children Harvest',                   'description' => 'Harvest thanksgiving offerings children'],
-            ['name' => 'Mens Harvest',                       'description' => 'Harvest thanksgiving offerings mens'],
-            ['name' => 'Womens Harvest',                     'description' => 'Harvest thanksgiving offerings womens'],
-            ['name' => 'Others',                             'description' => 'Other miscellaneous income'],
-        ];
+        $categories = Diocese::referenceData('finance_categories', []);
 
-        foreach ($income as $i => $row) {
+        foreach (($categories['income'] ?? []) as $i => $row) {
             FinanceCategory::updateOrCreate(
                 ['name' => $row['name'], 'type' => 'income'],
                 [
@@ -49,31 +35,13 @@ class FinanceCategorySeeder extends Seeder
             );
         }
 
-        // EXPENSE - preserve existing categories. Council added "Allowance"
-        // (paid OUT to clergy/staff). Others kept as-is for now; ordering
-        // chosen so the council-added Allowance sits at top and existing
-        // ones follow alphabetically afterward.
-        $expense = [
-            ['name' => 'Allowance',     'description' => 'Allowances paid to clergy and staff',          'order' => 1],
-            ['name' => 'Communication', 'description' => 'Phone, SMS, and internet costs',               'order' => 10],
-            ['name' => 'Events',        'description' => 'Event planning and execution costs',           'order' => 11],
-            ['name' => 'Maintenance',   'description' => 'Building and equipment maintenance',           'order' => 12],
-            ['name' => 'Other Expense', 'description' => 'Miscellaneous expenses',                       'order' => 13],
-            ['name' => 'Outreach',      'description' => 'Evangelism and outreach activities',           'order' => 14],
-            ['name' => 'Salaries',      'description' => 'Staff and worker remuneration',                'order' => 15],
-            ['name' => 'Stationery',    'description' => 'Office and administrative supplies',           'order' => 16],
-            ['name' => 'Transport',     'description' => 'Travel and transport costs',                   'order' => 17],
-            ['name' => 'Utilities',     'description' => 'Electricity, water, and other utilities',      'order' => 18],
-            ['name' => 'Welfare',       'description' => 'Member welfare and support payments',          'order' => 19],
-        ];
-
-        foreach ($expense as $row) {
+        foreach (($categories['expense'] ?? []) as $row) {
             FinanceCategory::updateOrCreate(
                 ['name' => $row['name'], 'type' => 'expense'],
                 [
                     'description' => $row['description'],
                     'is_active' => true,
-                    'display_order' => $row['order'],
+                    'display_order' => $row['order'] ?? 0,
                 ]
             );
         }

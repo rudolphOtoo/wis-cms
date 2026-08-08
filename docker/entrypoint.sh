@@ -13,9 +13,29 @@ wait_for_db() {
 
 wait_for_db
 
+# DIOCESE_PROFILE is frozen at app boot (default: wis). Diocese-specific data
+# must never leak across installs, so the WIS member CSV and the WIS church-data
+# snapshot only run for the 'wis' profile.
+profile="${DIOCESE_PROFILE:-wis}"
+
 if [ "$1" = "php-fpm" ]; then
-    php artisan app:data-migrate --import
-    php artisan import:csv WIS_Ayeduase.csv
+    case "$profile" in
+        wis)
+            php artisan app:data-migrate --import
+            php artisan import:csv WIS_Ayeduase.csv
+            ;;
+        mcgh)
+            # A diocese drops its own exported snapshot here (created via
+            # `app:data-migrate --export`); absent on a fresh install, so
+            # reference data is seeded and nothing WIS is imported.
+            php artisan app:data-migrate --import --input=database/church-data-mcgh.json
+            ;;
+        *)
+            echo "Unknown DIOCESE_PROFILE '${profile}' — skipping diocese-specific imports." >&2
+            php artisan app:data-migrate --import
+            ;;
+    esac
+
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getPortalProfile, getPortalGiving, getPortalAttendance } from '../../api/portal'
+import { appMeta } from '../../diocese/registry'
 
 const fmt = (n) => `GHS ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -25,6 +26,7 @@ const CAT_ICONS = ['savings', 'redeem', 'hands']
 export default function Portal() {
   const { logout } = useAuth()
   const [tab, setTab] = useState('giving')
+  const meta = appMeta()
 
   const [profile,    setProfile]    = useState(null)
   const [giving,     setGiving]     = useState(null)
@@ -72,8 +74,8 @@ export default function Portal() {
       <header className="shadow-sm" style={{backgroundColor:'var(--color-navy)'}}>
         <div className="flex justify-between items-center max-w-5xl mx-auto px-6 h-16">
           <div className="flex items-center gap-3">
-            <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-8 h-8 object-contain" />
-            <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-gold-light)'}}>WIS-CMS</h1>
+            <img src={meta.logoWebp || meta.logo || '/images/wis-logo.png'} alt={`${meta.appName || 'WIS'} Logo`} className="w-8 h-8 object-contain" />
+            <h1 className="font-bold" style={{fontFamily:'var(--font-display)',fontSize:'22px',color:'var(--color-gold-light)'}}>{meta.appTitle || 'WIS-CMS'}</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 pr-4" style={{borderRight:'1px solid rgba(255,255,255,0.1)'}}>

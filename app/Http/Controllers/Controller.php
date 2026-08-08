@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Diocese\Diocese;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 abstract class Controller
@@ -10,17 +11,32 @@ abstract class Controller
 
     /**
      * Return the church logo as an embedded base64 data URI for PDF
-     * headers, or null when the logo file is missing. All PDFs share the
-     * same branding; passing null simply omits the image.
+     * headers, or null when the logo file is missing. The logo path comes
+     * from the active diocese profile (Diocese::string('logo')) so every
+     * PDF inherits the install's branding; passing null simply omits the
+     * image.
      */
     protected function pdfLogoPath(): ?string
     {
-        $logoFile = public_path('images/wis-logo.png');
+        $logoPath = Diocese::string('logo');
 
-        if (! file_exists($logoFile)) {
+        if (! $logoPath) {
             return null;
         }
 
-        return 'data:image/png;base64,'.base64_encode(file_get_contents($logoFile));
+        // Already an embedded or absolute asset — pass through as-is.
+        if (str_starts_with($logoPath, 'data:') || str_starts_with($logoPath, 'http')) {
+            return $logoPath;
+        }
+
+        $logoFile = public_path(ltrim($logoPath, '/'));
+
+        if (! is_file($logoFile)) {
+            return null;
+        }
+
+        $mime = mime_content_type($logoFile) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode(file_get_contents($logoFile));
     }
 }

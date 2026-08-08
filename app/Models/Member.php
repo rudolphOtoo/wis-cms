@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Diocese\Contracts\MemberNumberGenerator;
 use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,32 +39,18 @@ class Member extends Model
 
     /**
      * Auto-generate member number atomically.
-     * Uses pessimistic row-level lock to prevent race conditions
-     * when multiple members are created simultaneously.
+     *
+     * The numbering scheme is a per-profile STRATEGY (see
+     * App\Diocese\Contracts\MemberNumberGenerator). The default WIS
+     * implementation keeps the original WIS-{year}-{0001} format and uses a
+     * pessimistic row-level lock to prevent race conditions when multiple
+     * members are created simultaneously.
      */
     protected static function booted(): void
     {
         static::creating(function (Member $member) {
             if (empty($member->member_number)) {
-                $year = now()->format('Y');
-
-                DB::transaction(function () use ($member, $year) {
-                    // Acquire row lock on the highest-numbered member this year
-                    // withTrashed: soft-deleted members KEEP their member_number,
-                    // so we must consider them when generating the next number to
-                    // avoid collisions with the (still present, soft-deleted) row.
-                    $last = static::withTrashed()
-                        ->where('member_number', 'like', "WIS-{$year}-%")
-                        ->orderByDesc('member_number')
-                        ->lockForUpdate()
-                        ->first();
-
-                    $nextNumber = $last
-                        ? ((int) substr($last->member_number, -4)) + 1
-                        : 1;
-
-                    $member->member_number = 'WIS-'.$year.'-'.str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-                });
+                $member->member_number = DB::transaction(fn () => app(MemberNumberGenerator::class)->generate($member));
             }
         });
     }

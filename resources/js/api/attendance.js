@@ -7,3 +7,4 @@ export const getSundayAttendance   = (params, signal) => api.get('/attendance/su
 export const createSession         = (data)           => api.post('/attendance/sessions', data)
 export const getSession            = (id)             => api.get(`/attendance/sessions/${id}`)
 export const markAttendance        = (id, data)       => api.post(`/attendance/sessions/${id}/mark`, data)
+export const markHeadcount         = (id, data)       => api.post(`/attendance/sessions/${id}/headcount`, data)
