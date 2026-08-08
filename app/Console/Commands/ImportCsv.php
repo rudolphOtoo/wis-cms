@@ -92,9 +92,7 @@ class ImportCsv extends Command
 
             $dob = null;
 
-            if (empty($dobRaw)) {
-                $rowErrors[] = 'Empty date of birth';
-            } else {
+            if (! empty($dobRaw)) {
                 try {
                     $dob = Carbon::createFromFormat('d-m-Y', $dobRaw);
                     $dob->startOfDay();
@@ -105,9 +103,13 @@ class ImportCsv extends Command
 
             $gender = strtolower($genderRaw);
 
-            if (! in_array($gender, ['male', 'female'], true)) {
+            if ($gender !== '' && ! in_array($gender, ['male', 'female'], true)) {
                 $rowErrors[] = "Invalid gender: {$genderRaw} (expected Male/Female)";
             }
+
+            // Empty gender is unknown, not a value — store NULL so the
+            // members_gender_check constraint (allows NULL) is satisfied.
+            $gender = $gender === '' ? null : $gender;
 
             $phone = $this->sanitizePhone($phoneRaw);
 
@@ -216,13 +218,24 @@ class ImportCsv extends Command
                         // Null = NULL is never true in SQL, so we can't
                         // use updateOrCreate. Match on (branch_id,
                         // first_name, last_name, date_of_birth) instead.
-                        $existing = Member::where('branch_id', $branch->id)
+                        // date_of_birth may be NULL (diocese CSVs without
+                        // DOB), so the dob constraint is applied only when
+                        // present, and we require the existing member to
+                        // also have no phone (avoids collapsing a phone-
+                        // bearing member with the same name).
+                        $existing = Member::withTrashed()
+                            ->where('branch_id', $branch->id)
                             ->where('first_name', $entry['first_name'])
                             ->where('last_name', $entry['last_name'])
-                            ->where('date_of_birth', $entry['date_of_birth'])
+                            ->whereNull('phone')
+                            ->when($entry['date_of_birth'], fn ($q) => $q->where('date_of_birth', $entry['date_of_birth']))
                             ->first();
 
                         if ($existing) {
+                            if ($existing->trashed()) {
+                                $existing->restore();
+                            }
+
                             $stats['adults_skipped']++;
                         } else {
                             Member::create([

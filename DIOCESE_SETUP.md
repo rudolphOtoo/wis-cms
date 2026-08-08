@@ -194,7 +194,10 @@ on first boot** — exactly how WIS ships `WIS_Ayeduase.csv`.
 
 1. Convert the diocese's member export to the same headerless CSV format:
    `last_name, first_name, dob, gender, phone` (dates `DD-MM-YYYY`, gender
-   `Male`/`Female`, one Ghana phone per row).
+   `Male`/`Female`, one Ghana phone per row). `dob` and `gender` are
+   **optional** — leave them empty when the diocese roster does not record
+   them (unknown gender is stored as `NULL`). `phone` may also be empty;
+   such members are matched by `(branch, first, last)` on re-import instead.
 2. Save it at the repo root as **`MCC_Members.csv`** and commit it.
    (`docker/entrypoint.sh` only imports it when present, so images without
    the file boot normally.)
