@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { sendMessage, previewRecipients } from '../../api/messages'
@@ -45,11 +45,14 @@ export default function Compose() {
     getDepartments().then(res => setDepartments(res.data.data))
   }, [])
 
+  const formRef = useRef(form)
+  useEffect(() => { formRef.current = form })
+
   useEffect(() => {
-    if (form.recipient_group === 'individual') { setCount(null); return }
+    if (formRef.current.recipient_group === 'individual') { setCount(null); return }
     setCount('loading')
     const t = setTimeout(() => {
-      previewRecipients(form)
+      previewRecipients(formRef.current)
         .then(res => setCount(res.data.data.count))
         .catch(() => setCount(null))
     }, 300)

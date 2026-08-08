@@ -11,6 +11,7 @@ use App\Models\Cell;
 use App\Models\Transaction;
 use App\Services\AttendanceSummaryService;
 use App\Services\MemberWelfareService;
+use App\Support\AttendanceCounts;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -74,9 +75,9 @@ class ReportsController extends Controller
     //
     // DATA-QUALITY NOTES
     //
-    //   1. Sessions with zero attendance_records are EXCLUDED from
-    //      every metric. The inner join to attendance_records means
-    //      a session where no one was marked present-or-absent
+    //   1. Sessions with zero recorded data are EXCLUDED from
+    //      every metric (records_total = 0 in the attendance_session_counts
+    //      view). A session where no one was marked present-or-absent
     //      simply doesn't appear. This is correct: such sessions
     //      have no information content about attendance rate.
     //
@@ -117,15 +118,17 @@ class ReportsController extends Controller
         // Postgres date_trunc gives us week-start or month-start as a
         // DATE - perfect for bucketing. Pass the unit as a literal,
         // never a user-supplied value (we validated 'week'|'month').
-        $bucket = "DATE_TRUNC('{$groupBy}', service_date)::date";
+        // Columns are table-qualified because the attendance_session_counts
+        // view also carries service_date / service_type_id.
+        $bucket = "DATE_TRUNC('{$groupBy}', attendance_sessions.service_date)::date";
 
         // Pass A: per-bucket aggregates (drives the chart)
         // Branch scoping handled by BelongsToBranch trait on AttendanceSession.
         $base = AttendanceSession::query()
-            ->whereBetween('service_date', [$from, $to]);
+            ->whereBetween('attendance_sessions.service_date', [$from, $to]);
 
         if ($serviceTypeFilter) {
-            $base->where('service_type_id', $serviceTypeFilter);
+            $base->where('attendance_sessions.service_type_id', $serviceTypeFilter);
         }
 
         // Sunday cell meetings count toward Sunday Adult Service.
@@ -136,20 +139,25 @@ class ReportsController extends Controller
         // DOW: Postgres EXTRACT day-of-week, 0=Sunday.
         $effectiveType = "CASE
             WHEN service_types.slug = 'cell_meeting'
-                 AND EXTRACT(DOW FROM service_date) = 0
+                 AND EXTRACT(DOW FROM attendance_sessions.service_date) = 0
             THEN 'Sunday Adult Service'
             ELSE service_types.name
         END";
 
         $rows = (clone $base)
-            ->join('attendance_records', 'attendance_sessions.id', '=', 'attendance_records.session_id')
+            // Counts come from the index-scoped LATERAL aggregation, which
+            // resolves present/total for BOTH register and headcount sessions.
+            // Sessions with no recorded data (records_total = 0) stay excluded —
+            // they carry no information about attendance.
+            ->leftJoinLateral(AttendanceCounts::subquery('attendance_sessions'), 'c')
             ->join('service_types', 'attendance_sessions.service_type_id', '=', 'service_types.id')
+            ->where('c.records_total', '>', 0)
             ->select([
                 DB::raw("{$bucket} AS period_start"),
                 DB::raw("{$effectiveType} AS service_type_name"),
                 DB::raw('COUNT(DISTINCT attendance_sessions.id) AS sessions_count'),
-                DB::raw('COUNT(attendance_records.id) AS records_total'),
-                DB::raw('SUM(CASE WHEN attendance_records.is_present THEN 1 ELSE 0 END) AS records_present'),
+                DB::raw('SUM(c.records_total) AS records_total'),
+                DB::raw('SUM(c.total_count) AS records_present'),
             ])
             ->groupBy(DB::raw('period_start'), DB::raw($effectiveType))
             ->orderBy('period_start')

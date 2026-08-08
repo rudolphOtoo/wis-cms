@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAttendanceTrendsReport, downloadAttendanceTrendsPdf, downloadAttendanceTrendsXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import {
@@ -104,7 +104,9 @@ export default function AttendanceTrends() {
     }
   }
 
-  useEffect(() => { load() }, [])  // initial load only; user clicks Update for changes
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   const chartData = data?.rows ? pivotForChart(data.rows) : []
   const stNames = data?.rows ? serviceTypeNames(data.rows) : []

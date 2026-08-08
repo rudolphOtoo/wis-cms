@@ -55,7 +55,7 @@ export default function CellDetail() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, navigate])
 
   useEffect(() => { fetchData() }, [fetchData])
 

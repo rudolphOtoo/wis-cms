@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
+import { loadDiocese, capability, appMeta } from '../../diocese/registry'
 import {
   LayoutDashboard, Users, GraduationCap, ClipboardCheck,
   Building2, Home, UserPlus, MessageSquare, Gift, Bell, FileText,
-  UserCog, ScrollText, MessageCircle, Heart,
+  UserCog, ScrollText, MessageCircle, Heart, BadgeCheck,
   Wallet, TrendingUp, TrendingDown, BarChart2, LineChart,
   ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
 } from 'lucide-react'
@@ -39,7 +40,7 @@ const MAIN_NAV = [
   { to: '/children',          label: 'Children',    icon: GraduationCap,   permission: 'view children' },
   { to: '/attendance',        label: 'Attendance',  icon: ClipboardCheck,  permission: 'view attendance', hideForRoles: ['cell_leader'] },
   { to: '/departments',       label: 'Departments', icon: Building2,       permission: 'view departments' },
-  { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells',      hideForRoles: ['cell_leader'] },
+  { to: '/cells',             label: 'Cells',       icon: Home,            permission: 'view cells',      hideForRoles: ['cell_leader'], capability: 'cells.enabled' },
   { to: '/visitors',          label: 'Visitors',    icon: UserPlus,        permission: 'view visitors' },
   { to: '/communication',     label: 'Messages',    icon: MessageSquare,   permission: 'view messages' },
   { to: '/birthdays',         label: 'Birthdays',   icon: Gift,            permission: 'view birthday messages',  hideForRoles: ['cell_leader'] },
@@ -47,6 +48,7 @@ const MAIN_NAV = [
   { to: '/admin/submissions', label: 'Submissions', icon: FileText, permission: 'view member submissions' },
   { to: '/pastoral-notes',    label: 'Pastoral Notes', icon: Heart,  permission: 'view pastoral notes' },
   { to: '/pastoral/follow-ups', label: 'Follow-ups',  icon: Heart,   permission: 'view pastoral notes' },
+  { to: '/confirmations',     label: 'Confirmations', icon: BadgeCheck, permission: 'view members', capability: 'modules.confirmations' },
 ]
 
 const FINANCE_NAV = [
@@ -202,13 +204,23 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
   const isDesktop        = useIsDesktop()
   const [collapsed, setCollapsed] = useState(false)
 
+  // Re-render once the diocese profile arrives so capability-gated items
+  // (e.g. Cells for a non-cell diocese) settle after the eager bootstrap.
+  const [, setDioceseReady] = useState(false)
+  useEffect(() => { loadDiocese().finally(() => setDioceseReady(true)) }, [])
+
   // isCollapsed is ONLY true on desktop viewports — mobile always renders fully.
   // raw `collapsed` is still used for the CSS width class because that already
   // uses the md: prefix to scope the narrow width to desktop.
   const isCollapsed = collapsed && isDesktop
 
+  const meta = appMeta()
+
   const visibleMain    = MAIN_NAV.filter(i => {
     if (i.hideForRoles?.some(r => hasRole(r))) return false
+    // Capability gates sit alongside permissions: a disabled capability
+    // hides the item even when the user holds the underlying permission.
+    if (i.capability && !capability(i.capability, true)) return false
     return !i.permission || can(i.permission)
   })
   const visibleFinance = FINANCE_NAV.filter(i => can(i.permission))
@@ -243,8 +255,8 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
       >
         <div className={`flex items-center gap-3 min-w-0 flex-1 ${isCollapsed ? 'justify-center' : ''}`}>
           <img
-            src="/images/wis-logo.png"
-            alt="WIS Logo"
+            src={meta.logoWebp || meta.logo || '/images/wis-logo.png'}
+            alt={`${meta.appTitle || 'WIS'} Logo`}
             className={`object-contain flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
           />
           {!isCollapsed && (
@@ -253,10 +265,10 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }) {
                 className="text-white text-sm font-bold leading-tight truncate"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                WIS-CMS
+                {meta.appTitle || 'WIS-CMS'}
               </div>
               <div className="text-[10px] leading-tight truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Methodist Church Ghana
+                {meta.appName || 'WIS-CMS'}
               </div>
             </div>
           )}

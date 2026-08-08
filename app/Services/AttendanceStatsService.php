@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AttendanceSession;
+use App\Support\AttendanceCounts;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -51,19 +52,17 @@ class AttendanceStatsService
      */
     public function getStats(string $branchId, array $cellIds = [], array $departmentIds = []): array
     {
-        // ─── Q1: Unified aggregation — one query, two FILTER columns ──────────
-        // Single LEFT JOIN on attendance_records with FILTER clauses for adult
-        // vs children counts. This replaces the previous two-query approach
-        // (adult + children) merged in PHP, reducing query count from 2 to 1
-        // while PostgreSQL handles the conditional aggregation natively.
+        // ─── Q1: Unified aggregation — one query over the counts LATERAL ────
+        // The LATERAL join resolves adult/children/total per session for both
+        // register and headcount modes while staying index-scoped to the
+        // sessions already narrowed by branch/date (the attendance_session_counts
+        // view would re-scan every attendance record on every read). Left-joining
+        // the service types + cells keeps Sunday-scope filtering and the cell
+        // breakdown.
         $sessionAggregates = DB::table('attendance_sessions as s')
+            ->leftJoinLateral(AttendanceCounts::subquery('s'), 'c')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-            ->leftJoin('attendance_records as ar', function ($join) {
-                $join->on('ar.session_id', '=', 's.id')
-                    ->whereNull('ar.deleted_at')
-                    ->where('ar.is_present', '=', true);
-            })
-            ->leftJoin('cells as c', 's.cell_id', '=', 'c.id')
+            ->leftJoin('cells as cell', 's.cell_id', '=', 'cell.id')
             ->where('s.branch_id', $branchId)
             ->where(function ($q) {
                 $q->whereIn('st.type', ['adult', 'children'])
@@ -85,11 +84,10 @@ class AttendanceStatsService
                 's.cell_id',
                 'st.name AS service_type_name',
                 'st.type AS service_type',
-                DB::raw("COALESCE(c.name, 'Unassigned') AS cell_name"),
-                DB::raw('COUNT(*) FILTER (WHERE ar.member_id IS NOT NULL) AS adult_count'),
-                DB::raw('COUNT(*) FILTER (WHERE ar.child_id IS NOT NULL) AS children_count'),
+                DB::raw("COALESCE(cell.name, 'Unassigned') AS cell_name"),
+                'c.adult_count',
+                'c.children_count',
             ])
-            ->groupBy('s.service_date', 's.cell_id', 'st.name', 'st.type', 'c.name')
             ->orderByDesc('s.service_date')
             ->get();
 

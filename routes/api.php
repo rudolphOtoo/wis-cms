@@ -64,6 +64,11 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::post('change-password', [AuthController::class, 'changePassword']);
     });
 
+    // App bootstrap: authenticated user + active diocese profile (key,
+    // label, capabilities, strings). The frontend stores this to drive
+    // branding and capability flags without extra calls.
+    Route::get('bootstrap', [AuthController::class, 'bootstrap']);
+
     Route::get('dashboard', [DashboardController::class, 'index']);
 
     // MEMBERS
@@ -145,6 +150,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::middleware('permission:create attendance')->group(function () {
         Route::post('attendance/sessions', [AttendanceController::class, 'createSession']);
         Route::post('attendance/sessions/{id}/mark', [AttendanceController::class, 'markAttendance']);
+        Route::post('attendance/sessions/{id}/headcount', [AttendanceController::class, 'markHeadcount']);
     });
 
     // FINANCE

@@ -5,6 +5,7 @@ import { getServiceTypes, createSession } from '../../api/attendance'
 import { getDepartments } from '../../api/departments'
 import { getCells } from '../../api/cells'
 import { useAuth } from '../../context/AuthContext'
+import { loadDiocese, capability } from '../../diocese/registry'
 
 export default function NewSession() {
   const navigate = useNavigate()
@@ -14,6 +15,7 @@ export default function NewSession() {
   const isCellLeader = hasRole('cell_leader') && notAdmin
   const isLeader = isDeptLeader || isCellLeader
 
+  const [headcount, setHeadcount] = useState(false)
   const [serviceTypes, setServiceTypes] = useState([])
   const [myDepartments, setMyDepartments] = useState([])
   const [myCells, setMyCells] = useState([])
@@ -29,11 +31,16 @@ export default function NewSession() {
   const [errors,   setErrors]   = useState({})
 
   useEffect(() => {
+    let cancelled = false
     Promise.all([
+      loadDiocese(),
       getServiceTypes().then(res => res.data.data),
       isDeptLeader ? getDepartments().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
       isCellLeader ? getCells().then(res => res.data.data).catch(() => []) : Promise.resolve([]),
-    ]).then(([types, depts, cells]) => {
+    ]).then(([, types, depts, cells]) => {
+      if (cancelled) return
+      const isHeadcount = capability('attendance.default_mode') === 'headcount'
+      setHeadcount(isHeadcount)
       setServiceTypes(types)
       setMyDepartments(depts)
       setMyCells(cells)
@@ -53,7 +60,10 @@ export default function NewSession() {
           cell_id: cells.length === 1 ? cells[0].id : '',
         }))
       }
-    }).finally(() => setFetching(false))
+    }).finally(() => {
+      if (!cancelled) setFetching(false)
+    })
+    return () => { cancelled = true }
   }, [isDeptLeader, isCellLeader])
 
   const set = (field) => (e) => {
@@ -101,10 +111,14 @@ export default function NewSession() {
         </button>
         <div>
           <h2 className="text-xl font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
-            {isCellLeader ? 'Record Cell Meeting' : isDeptLeader ? 'Record Department Meeting' : 'Take Attendance'}
+            {headcount ? 'Record Attendance'
+              : isCellLeader ? 'Record Cell Meeting'
+              : isDeptLeader ? 'Record Department Meeting'
+              : 'Take Attendance'}
           </h2>
           <p className="text-sm" style={{color:'#6b7280'}}>
-            {isCellLeader ? 'Record attendance for your cell meeting'
+            {headcount ? 'Tally the congregation by group, then record the counts'
+              : isCellLeader ? 'Record attendance for your cell meeting'
               : isDeptLeader ? 'Record attendance for your department meeting'
               : 'Select the service and date to begin'}
           </p>
@@ -112,8 +126,8 @@ export default function NewSession() {
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-4">
-        {/* Department picker — dept leaders only */}
-        {isDeptLeader && (
+        {/* Department picker — dept leaders only (register mode) */}
+        {!headcount && isDeptLeader && (
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
               Department *
@@ -135,8 +149,8 @@ export default function NewSession() {
           </div>
         )}
 
-        {/* Cell picker — cell leaders only */}
-        {isCellLeader && (
+        {/* Cell picker — cell leaders only (register mode) */}
+        {!headcount && isCellLeader && (
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>
               Cell *

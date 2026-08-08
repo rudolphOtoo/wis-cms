@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getIncomeByCategoryReport, downloadIncomeByCategoryPdf, downloadIncomeByCategoryXlsx } from '../../api/reports'
 import DownloadReportMenu from '../../components/reports/DownloadReportMenu'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -82,7 +82,9 @@ export default function IncomeByCategory() {
     }
   }
 
-  useEffect(() => { load() }, [])  // initial load only; user clicks Update for changes
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load })
+  useEffect(() => { loadRef.current() }, [])
 
   const chartData = data?.rows ? pivotForChart(data.rows) : []
   const categoryNames = data?.summary?.category_totals?.map(c => c.category_name) ?? []

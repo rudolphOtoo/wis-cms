@@ -51,7 +51,7 @@ export default function Dashboard() {
       .finally(() => { if (mounted) setLoading(false) })
 
     return () => { mounted = false; controller.abort() }
-  }, [])
+  }, [navigate])
 
   // Fix #2 — DashboardSkeleton replaces the full-page spinner
   if (loading) return <DashboardSkeleton />

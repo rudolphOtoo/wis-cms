@@ -49,7 +49,7 @@ export default function MemberDetail() {
       .then(res => setMember(res.data.data))
       .catch(() => navigate('/members'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, navigate])
 
   const fetchGiving = useCallback(async (year) => {
     setGivingLoad(true)
@@ -64,9 +64,13 @@ export default function MemberDetail() {
     }
   }, [id])
 
+  // Stable boolean snapshot of the permission — `can` itself is recreated
+  // every render, so using it directly in deps would refetch on each render.
+  const canViewFinance = can('view finance')
+
   useEffect(() => {
-    if (can('view finance')) fetchGiving()
-  }, [fetchGiving])
+    if (canViewFinance) fetchGiving()
+  }, [fetchGiving, canViewFinance])
 
   const handleDownload = async () => {
     setDownloading(true)
@@ -288,7 +292,7 @@ export default function MemberDetail() {
                           </tr>
                         </thead>
                         <tbody>
-                          {giving.transactions.map((t, i) => {
+                          {giving.transactions.map((t) => {
                             const b = badgeFor(t.category)
                             return (
                               <tr key={t.id} style={{borderBottom:'1px solid var(--color-surface-border)'}}>
@@ -388,7 +392,7 @@ function PromoteModal({ member, onClose, onSuccess }) {
   }
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* clipboard may be blocked */ }
   }
 
   return (
@@ -511,7 +515,7 @@ function LoginAccountModal({ member, onClose, onSuccess }) {
   }
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+    try { await navigator.clipboard.writeText(tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* clipboard may be blocked */ }
   }
 
   return (

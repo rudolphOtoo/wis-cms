@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 import { login as loginApi, logout as logoutApi } from '../api/auth'
 
 const AuthContext = createContext(null)
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    try { await logoutApi() } catch (_) {}
+    try { await logoutApi() } catch { /* local session must still clear */ }
     localStorage.removeItem('wis_token')
     localStorage.removeItem('wis_user')
     setToken(null)
@@ -42,8 +42,8 @@ export function AuthProvider({ children }) {
     setUser(newUser)
   }
 
-  const hasRole       = (role)       => user?.roles?.includes(role)
-  const hasPermission = (permission) => user?.permissions?.includes(permission)
+  const hasRole       = useCallback((role)       => user?.roles?.includes(role), [user])
+  const hasPermission = useCallback((permission) => user?.permissions?.includes(permission), [user])
 
   return (
     <AuthContext.Provider value={{

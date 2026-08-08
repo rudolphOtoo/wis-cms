@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { appMeta } from '../../diocese/registry'
 
 export default function Login() {
   const { login, loading, error, isAuthenticated, hasRole, user } = useAuth()
@@ -8,6 +9,7 @@ export default function Login() {
   const [form, setForm]     = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const panelRef = useRef(null)
+  const meta = appMeta()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -26,7 +28,7 @@ export default function Login() {
         navigate(isPureMember ? '/portal' : '/dashboard', { replace: true })
       }
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, user, hasRole, navigate])
 
   useEffect(() => {
     const handler = (e) => {
@@ -58,7 +60,7 @@ export default function Login() {
           && !roles.includes('super_admin')
         navigate(isPureMember ? '/portal' : '/dashboard', { replace: true })
       }
-    } catch (_) {}
+    } catch { /* error is already surfaced via context state */ }
   }
 
   return (
@@ -90,16 +92,16 @@ export default function Login() {
         <div className="relative z-10 flex-grow flex flex-col items-center justify-center text-center login-fade">
           {/* Logo tile */}
           <div className="mb-2 flex items-center justify-center">
-            <img src="/images/wis-logo.png" alt="Wesleyan International Society Logo" className="w-24 h-24 object-contain" />
+            <img src={meta.logoWebp || meta.logo || '/images/wis-logo.png'} alt={`${meta.appName || 'WIS'} Logo`} className="w-24 h-24 object-contain" />
           </div>
 
           <h1 className="font-bold mb-1"
               style={{fontFamily:'var(--font-display)',fontSize:'48px',lineHeight:'60px',letterSpacing:'-0.02em',color:'var(--color-gold-light)'}}>
-            WIS-CMS
+            {meta.appTitle || 'WIS-CMS'}
           </h1>
           <p className="italic"
              style={{fontFamily:'var(--font-display)',fontSize:'24px',lineHeight:'32px',color:'rgba(255,255,255,0.8)'}}>
-            With God all things are possible
+            {meta.tagline || 'With God all things are possible'}
           </p>
           <div className="mt-10 rounded-full"
                style={{width:'64px',height:'4px',backgroundColor:'rgba(201,168,76,0.40)'}} />
@@ -108,7 +110,7 @@ export default function Login() {
         {/* Footer */}
         <footer className="relative z-10 text-center md:text-left mt-auto">
           <p style={{fontSize:'14px',letterSpacing:'0.05em',color:'rgba(255,255,255,0.6)'}}>
-            Methodist Church Ghana — Wesleyan International Society
+            {meta.appName || 'WIS-CMS'}
           </p>
         </footer>
       </section>
