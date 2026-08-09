@@ -4,15 +4,15 @@ services:
     container_name: wis_cms_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: wis_cms
-      POSTGRES_USER: wis_admin
-      POSTGRES_PASSWORD: wis_secret_2024
+      POSTGRES_DB: ${DB_DATABASE:-wis_cms}
+      POSTGRES_USER: ${DB_USERNAME:-wis_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
     ports:
       - "5433:5432"
     volumes:
-      - wis_postgres_data:/var/lib/postgresql/data
+      - ${DIOCESE_PROFILE:-wis}_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wis_admin -d wis_cms"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-wis_admin} -d ${DB_DATABASE:-wis_cms}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,9 +27,9 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: wis_cms
-      DB_USERNAME: wis_admin
-      DB_PASSWORD: wis_secret_2024
+      DB_DATABASE: ${DB_DATABASE:-wis_cms}
+      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
     depends_on:
       postgres:
@@ -61,9 +61,9 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: wis_cms
-      DB_USERNAME: wis_admin
-      DB_PASSWORD: wis_secret_2024
+      DB_DATABASE: ${DB_DATABASE:-wis_cms}
+      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     depends_on:
@@ -80,9 +80,9 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: wis_cms
-      DB_USERNAME: wis_admin
-      DB_PASSWORD: wis_secret_2024
+      DB_DATABASE: ${DB_DATABASE:-wis_cms}
+      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
     command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
@@ -91,3 +91,4 @@ services:
 
 volumes:
   wis_postgres_data:
+  mcgh_postgres_data:
