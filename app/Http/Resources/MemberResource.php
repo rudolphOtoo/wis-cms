@@ -28,6 +28,7 @@ class MemberResource extends JsonResource
             'is_baptised' => $this->is_baptised,
             'baptism_date' => $this->baptism_date?->format('Y-m-d'),
             'status' => $this->status,
+            'date_of_death' => $this->date_of_death?->format('Y-m-d'),
             'photo_path' => $this->photo_path,
             'notes' => $this->notes,
             'branch_id' => $this->branch_id,

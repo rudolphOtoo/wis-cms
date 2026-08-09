@@ -36,6 +36,10 @@ class UpdateMemberRequest extends FormRequest
             'is_baptised' => ['boolean'],
             'baptism_date' => ['nullable', 'date'],
             'status' => ['in:active,inactive,transferred,deceased'],
+            'date_of_death' => [
+                'nullable', 'date', 'before_or_equal:today',
+                Rule::requiredIf(fn () => $this->input('status') === 'deceased'),
+            ],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
