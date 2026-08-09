@@ -38,6 +38,7 @@ services:
       test: ["CMD", "pgrep", "-f", "php-fpm: master process"]
       interval: 10s
       timeout: 5s
+      start_period: 120s
       retries: 5
 
   webserver:
