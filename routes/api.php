@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
+use App\Http\Controllers\Api\LifeEventController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MemberSubmissionController;
 use App\Http\Controllers\Api\MemberSubmissionWebhookController;
@@ -82,6 +83,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     });
     Route::middleware('permission:create members')->post('members', [MemberController::class, 'store']);
     Route::middleware('permission:edit members')->put('members/{id}', [MemberController::class, 'update']);
+    Route::middleware('permission:edit members')->post('members/{id}/mark-deceased', [MemberController::class, 'markDeceased']);
     Route::middleware('permission:delete members')->delete('members/{id}', [MemberController::class, 'destroy']);
 
     // VISITORS
@@ -172,6 +174,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/attendance/summary', [ReportsController::class, 'attendanceSummary']);
         Route::get('reports/members/welfare', [ReportsController::class, 'memberWelfare']);
         Route::get('reports/cells/comparison', [ReportsController::class, 'cellComparison']);
+        Route::get('reports/life-events/year', [ReportsController::class, 'lifeEventsYear']);
 
         // Report exports — PDF + XLSX downloads (gated by 'export reports')
         Route::get('reports/finance/income-by-category/export-pdf', [ReportsController::class, 'incomeByCategoryPdf'])->middleware('permission:export reports');
@@ -186,6 +189,8 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reports/members/welfare/export-xlsx', [ReportsController::class, 'memberWelfareXlsx'])->middleware('permission:export reports');
         Route::get('reports/cells/comparison/export-pdf', [ReportsController::class, 'cellComparisonPdf'])->middleware('permission:export reports');
         Route::get('reports/cells/comparison/export-xlsx', [ReportsController::class, 'cellComparisonXlsx'])->middleware('permission:export reports');
+        Route::get('reports/life-events/year/export-pdf', [ReportsController::class, 'lifeEventsYearPdf'])->middleware('permission:export reports');
+        Route::get('reports/life-events/year/export-xlsx', [ReportsController::class, 'lifeEventsYearXlsx'])->middleware('permission:export reports');
 
         // Birthday messages
         Route::get('birthdays/settings', [BirthdayController::class, 'showSettings'])
@@ -285,6 +290,19 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::middleware('permission:delete pastoral notes')->group(function () {
         // Pastors/admins only — gated by PastoralNotePolicy::delete
         Route::delete('pastoral-notes/{id}', [PastoralNoteController::class, 'destroy']);
+    });
+
+    // LIFE EVENTS — recorded deaths (linked to a member, marks them
+    // 'deceased') and births (baby + mother details) for year-end review.
+    Route::middleware('permission:view life events')->group(function () {
+        Route::get('life-events/stats', [LifeEventController::class, 'stats']);
+        Route::get('life-events', [LifeEventController::class, 'index']);
+        Route::get('life-events/{id}', [LifeEventController::class, 'show']);
+    });
+    Route::middleware('permission:manage life events')->group(function () {
+        Route::post('life-events', [LifeEventController::class, 'store']);
+        Route::put('life-events/{id}', [LifeEventController::class, 'update']);
+        Route::delete('life-events/{id}', [LifeEventController::class, 'destroy']);
     });
 
     // MEMBER PORTAL — scoped to the authenticated member's own data

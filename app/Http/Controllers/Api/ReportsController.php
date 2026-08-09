@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceSession;
 use App\Models\Branch;
 use App\Models\Cell;
+use App\Models\LifeEvent;
 use App\Models\Transaction;
 use App\Services\AttendanceSummaryService;
 use App\Services\MemberWelfareService;
@@ -1252,6 +1253,206 @@ class ReportsController extends Controller
             foreach ($data['summary']['flag_counts'] as $flag => $count) {
                 $writer->addRow(Row::fromValues(["Flag: {$flag}", $count]));
             }
+
+            $writer->close();
+        }, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // LIFE EVENTS — YEAR IN REVIEW
+    // ──────────────────────────────────────────────────────────────────
+
+    // GET /api/reports/life-events/year
+    //
+    // Year-end roll-up of recorded deaths and births for the whole church
+    // announcement: "these people left us" and "these children were born".
+    //
+    // Query params:
+    //   year (optional, default: current year)
+    public function lifeEventsYear(Request $request): JsonResponse
+    {
+        return response()->json($this->buildLifeEventsYearData($request));
+    }
+
+    /**
+     * Build the life-events-year dataset. Used by JSON, PDF, and XLSX
+     * export endpoints. Branch scoping handled by the BelongsToBranch
+     * trait on LifeEvent.
+     */
+    protected function buildLifeEventsYearData(Request $request): array
+    {
+        $validated = $request->validate([
+            'year' => 'nullable|integer|min:1900|max:2100',
+        ]);
+
+        $year = (int) ($validated['year'] ?? now()->year);
+
+        $events = LifeEvent::with('member')
+            ->whereYear('event_date', $year)
+            ->orderBy('event_date')
+            ->get();
+
+        $monthly = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $monthly[$m] = [
+                'month' => $m,
+                'label' => Carbon::create($year, $m, 1)->format('F'),
+                'deaths' => 0,
+                'births' => 0,
+            ];
+        }
+
+        $deaths = [];
+        $births = [];
+
+        foreach ($events as $event) {
+            $month = (int) $event->event_date->month;
+
+            if ($event->type === 'death') {
+                $deaths[] = [
+                    'name' => trim("{$event->first_name} {$event->last_name}")
+                        ?: ($event->member?->full_name ?? 'Member'),
+                    'month' => $month,
+                    'month_label' => $monthly[$month]['label'],
+                    'event_date' => $event->event_date->format('Y-m-d'),
+                    'burial_date' => $event->burial_date?->format('Y-m-d'),
+                    'notes' => $event->notes,
+                ];
+                $monthly[$month]['deaths']++;
+            } else {
+                $births[] = [
+                    'name' => trim("{$event->first_name} {$event->last_name}"),
+                    'father_name' => trim("{$event->father_first_name} {$event->father_last_name}"),
+                    'mother_name' => trim("{$event->mother_first_name} {$event->mother_last_name}"),
+                    'month' => $month,
+                    'month_label' => $monthly[$month]['label'],
+                    'event_date' => $event->event_date->format('Y-m-d'),
+                    'notes' => $event->notes,
+                ];
+                $monthly[$month]['births']++;
+            }
+        }
+
+        return [
+            'year' => $year,
+            'period' => [
+                'from' => "{$year}-01-01",
+                'to' => "{$year}-12-31",
+            ],
+            'totals' => [
+                'deaths' => count($deaths),
+                'births' => count($births),
+            ],
+            'monthly' => array_values($monthly),
+            'deaths' => $deaths,
+            'births' => $births,
+        ];
+    }
+
+    // GET /api/reports/life-events/year/export-pdf
+    public function lifeEventsYearPdf(Request $request)
+    {
+        $data = $this->buildLifeEventsYearData($request);
+        $branch = Branch::find($request->user()->branch_id);
+
+        $pdf = Pdf::loadView('pdf.report-life-events', [
+            'data' => $data,
+            'branchName' => $branch?->name ?? 'Wesleyan International Society',
+            'logoPath' => $this->pdfLogoPath(),
+            'generatedAt' => now()->format('F j, Y \\a\\t g:i a'),
+        ]);
+
+        return $pdf->download("life-events-year-{$data['year']}.pdf");
+    }
+
+    // GET /api/reports/life-events/year/export-xlsx
+    public function lifeEventsYearXlsx(Request $request)
+    {
+        $data = $this->buildLifeEventsYearData($request);
+        $year = $data['year'];
+        $branch = Branch::find($request->user()->branch_id);
+        $branchName = $branch?->name ?? 'Wesleyan International Society';
+        $filename = "life-events-year-{$year}.xlsx";
+
+        $titleStyle = new Style(fontBold: true, fontSize: 16);
+        $sectionStyle = new Style(fontBold: true, fontSize: 13);
+        $headerStyle = new Style(fontBold: true, fontSize: 11, backgroundColor: 'FFD9E1F2');
+        $boldStyle = new Style(fontBold: true);
+
+        return new StreamedResponse(function () use (
+            $data, $branchName, $year,
+            $titleStyle, $sectionStyle, $headerStyle, $boldStyle,
+        ) {
+            $options = new XlsxOptions(DEFAULT_COLUMN_WIDTH: 18);
+            $writer = new Writer($options);
+            $writer->openToFile('php://output');
+
+            // ── SECTION 1: REPORT HEADER ──────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle([$branchName], $titleStyle));
+            $writer->addRow(Row::fromValuesWithStyle(["Year in Review — Life Events ({$year})"], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValues(['Report Date:', now()->format('F j, Y')]));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 2: EXECUTIVE SUMMARY ──────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['EXECUTIVE SUMMARY'], $sectionStyle));
+            $writer->addRow(Row::fromValues(['']));
+            $writer->addRow(Row::fromValuesWithStyle(['Total Deaths', $data['totals']['deaths']], $boldStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Total Births', $data['totals']['births']], $boldStyle));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 3: MONTHLY BREAKDOWN ──────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['MONTHLY BREAKDOWN'], $sectionStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Month', 'Deaths', 'Births'], $headerStyle));
+            foreach ($data['monthly'] as $month) {
+                $writer->addRow(Row::fromValues([
+                    $month['label'],
+                    $month['deaths'],
+                    $month['births'],
+                ]));
+            }
+            $writer->addRow(Row::fromValuesWithStyle([
+                'TOTAL', $data['totals']['deaths'], $data['totals']['births'],
+            ], $boldStyle));
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 4: DEATHS ─────────────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['THOSE WHO LEFT US'], $sectionStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Date of Death', 'Burial Date', 'Name', 'Notes'], $headerStyle));
+            if (empty($data['deaths'])) {
+                $writer->addRow(Row::fromValues(['None recorded for this year.']));
+            }
+            foreach ($data['deaths'] as $death) {
+                $writer->addRow(Row::fromValues([
+                    Carbon::parse($death['event_date'])->format('F j, Y'),
+                    $death['burial_date']
+                        ? Carbon::parse($death['burial_date'])->format('F j, Y')
+                        : '',
+                    $death['name'],
+                    $death['notes'] ?? '',
+                ]));
+            }
+            $writer->addRow(Row::fromValues(['']));
+
+            // ── SECTION 5: BIRTHS ─────────────────────────────────────
+            $writer->addRow(Row::fromValuesWithStyle(['THOSE WHO WERE BORN'], $sectionStyle));
+            $writer->addRow(Row::fromValuesWithStyle(['Date of Birth', 'Baby', 'Father', 'Mother', 'Notes'], $headerStyle));
+            if (empty($data['births'])) {
+                $writer->addRow(Row::fromValues(['None recorded for this year.']));
+            }
+            foreach ($data['births'] as $birth) {
+                $writer->addRow(Row::fromValues([
+                    Carbon::parse($birth['event_date'])->format('F j, Y'),
+                    $birth['name'],
+                    $birth['father_name'],
+                    $birth['mother_name'],
+                    $birth['notes'] ?? '',
+                ]));
+            }
+            $writer->addRow(Row::fromValues(['']));
 
             $writer->close();
         }, 200, [
