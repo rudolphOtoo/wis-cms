@@ -18,6 +18,9 @@ export const getAttendanceSummaryReport = (params) =>
 export const getMemberWelfareReport = (params) =>
   api.get('/reports/members/welfare', { params })
 
+export const getLifeEventsYearReport = (params) =>
+  api.get('/reports/life-events/year', { params })
+
 // Downloads — return Blob responses for browser download
 
 export const downloadIncomeByCategoryPdf = (params) =>
@@ -55,3 +58,9 @@ export const downloadCellComparisonPdf = (params) =>
 
 export const downloadCellComparisonXlsx = (params) =>
   api.get('/reports/cells/comparison/export-xlsx', { params, responseType: 'blob' })
+
+export const downloadLifeEventsYearPdf = (params) =>
+  api.get('/reports/life-events/year/export-pdf', { params, responseType: 'blob' })
+
+export const downloadLifeEventsYearXlsx = (params) =>
+  api.get('/reports/life-events/year/export-xlsx', { params, responseType: 'blob' })

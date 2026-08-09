@@ -15,3 +15,4 @@ export const exportMembers = (params) =>
   api.get('/members/export', { params, responseType: 'blob' })
 export const promoteMemberToLeader = (id, data) => api.post(`/members/${id}/promote-to-leader`, data)
 export const createMemberLogin = (id, data) => api.post(`/members/${id}/create-login`, data)
+export const markMemberDeceased = (id, data) => api.post(`/members/${id}/mark-deceased`, data)

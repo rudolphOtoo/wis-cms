@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader, createMemberLogin } from '../../api/members'
+import { getMember, getMemberGiving, downloadGivingStatement, promoteMemberToLeader, createMemberLogin, markMemberDeceased } from '../../api/members'
 import { getCells } from '../../api/cells'
 import { getDepartments } from '../../api/departments'
 import { usePermission } from '../../hooks/usePermission'
@@ -34,6 +34,11 @@ export default function MemberDetail() {
   const navigate = useNavigate()
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [deceasedOpen, setDeceasedOpen] = useState(false)
+  const [deceasedDate, setDeceasedDate] = useState('')
+  const [deceasedBurialDate, setDeceasedBurialDate] = useState('')
+  const [deceasedSubmitting, setDeceasedSubmitting] = useState(false)
+  const [deceasedErr, setDeceasedErr] = useState('')
   const { can }  = usePermission()
 
   const [member,  setMember]  = useState(null)
@@ -91,6 +96,26 @@ export default function MemberDetail() {
     }
   }
 
+  const handleMarkDeceased = async (e) => {
+    e.preventDefault()
+    setDeceasedSubmitting(true)
+    setDeceasedErr('')
+    try {
+      await markMemberDeceased(id, {
+        date_of_death: deceasedDate,
+        burial_date: deceasedBurialDate || null,
+      })
+      toast.success('Member marked as deceased.')
+      setDeceasedOpen(false)
+      const res = await getMember(id)
+      setMember(res.data.data)
+    } catch (err) {
+      setDeceasedErr(err?.response?.data?.message || 'Could not mark as deceased.')
+    } finally {
+      setDeceasedSubmitting(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-24">
       <svg className="animate-spin w-8 h-8" style={{color:'var(--color-navy)'}} fill="none" viewBox="0 0 24 24">
@@ -133,6 +158,17 @@ export default function MemberDetail() {
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             Edit Profile
+          </button>
+        )}
+        {can('edit members') && member.status !== 'deceased' && (
+          <button onClick={() => { setDeceasedDate(''); setDeceasedBurialDate(''); setDeceasedErr(''); setDeceasedOpen(true) }}
+                  className="gap-2 inline-flex items-center"
+                  style={{padding:'10px 24px', backgroundColor:'#fdf2f8', color:'#9d174d', border:'1px solid #fbcfe8', borderRadius:'8px', fontWeight:600}}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            Mark as Deceased
           </button>
         )}
         {can('manage users') && !member.has_user_account && (
@@ -196,6 +232,7 @@ export default function MemberDetail() {
                 ['Join Date', member.join_date],
                 ['Baptised', member.is_baptised ? 'Yes' : 'No'],
                 ['Address', member.address],
+                ...(member.status === 'deceased' ? [['Date of Death', member.date_of_death]] : []),
               ].map(([label, value, cap]) => (
                 <div key={label}>
                   <p className="uppercase mb-1" style={{fontSize:'11px',fontWeight:700,letterSpacing:'0.03em',color:'#747780'}}>{label}</p>
@@ -334,6 +371,42 @@ export default function MemberDetail() {
       {loginOpen && (
         <LoginAccountModal member={member} onClose={() => setLoginOpen(false)}
                            onSuccess={() => { setLoginOpen(false); window.location.reload() }} />
+      )}
+
+      {deceasedOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{backgroundColor:'rgba(0,0,0,0.5)'}}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold" style={{fontFamily:'var(--font-display)',color:'var(--color-navy)'}}>
+              Mark as Deceased
+            </h3>
+            <p className="text-xs mt-1" style={{color:'#6b7280'}}>
+              Records {member.full_name} as deceased and adds a death entry to the Life Events register.
+            </p>
+            <form onSubmit={handleMarkDeceased} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>Date of Death *</label>
+                <input type="date" className="input-field" value={deceasedDate} onChange={e => setDeceasedDate(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>Date of Burial</label>
+                <input type="date" className="input-field" value={deceasedBurialDate} onChange={e => setDeceasedBurialDate(e.target.value)} />
+              </div>
+              {deceasedErr && <p className="text-xs" style={{color:'#dc2626'}}>{deceasedErr}</p>}
+              <div className="flex items-center justify-end gap-3 pt-2" style={{borderTop:'1px solid var(--color-surface-border)'}}>
+                <button type="button" onClick={() => setDeceasedOpen(false)}
+                        className="px-5 py-2 rounded-lg text-sm font-semibold"
+                        style={{backgroundColor:'white',border:'1px solid var(--color-surface-border)',color:'#374151'}}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={deceasedSubmitting}
+                        className="px-6 py-2 rounded-lg text-sm font-semibold"
+                        style={{backgroundColor:'#9d174d',color:'white'}}>
+                  {deceasedSubmitting ? 'Saving...' : 'Mark as Deceased'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )
