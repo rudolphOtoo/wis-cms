@@ -56,7 +56,7 @@ Profile strings use dotted keys stored **literally**.
 
 | Key | `wis` | `mcgh` |
 |---|---|---|
-| `permissions` | 55 (full set) | same 55 |
+| `permissions` | 57 (full set) | same 57 |
 | `roles` | 9 | same 9 (name/permissions parity) |
 | `service_types` | 8 (incl. Cell Meeting, Department Meeting) | 6 (church-wide services only) |
 | `finance_categories` | 25 (14 income / 11 expense) | same 25 |
@@ -80,6 +80,25 @@ Profile strings use dotted keys stored **literally**.
 | Module gate (disabled → no table/route; enabled activates) | `tests/Feature/ConfirmationsModuleTest.php` |
 | Headcount vs register (same stats shape, cross-mode 422s) | `tests/Feature/HeadcountAttendanceTest.php` |
 | Member numbers per profile | `tests/Feature/MemberNumberProfileTest.php` |
+| Life events (death → member status sync, birth, year report + exports, mark-deceased + edit-form sync) | `tests/Feature/LifeEventTest.php` |
+
+---
+
+## Life Events (deaths & births)
+
+Year-end church review data ("those who left us", "those who were born").
+
+| Area | Detail |
+|---|---|
+| Permissions | `view life events`, `manage life events` (both profiles) |
+| Roles | `finance_officer` (steward) records + manages; `pastor`/`secretary` view; `super_admin` all |
+| Death | free-text `first_name`/`last_name` (no member link required); optional `member_id` link; storing with a link atomically sets `member.status=deceased` + `date_of_death` (DB transaction); optional `burial_date` (must be ≥ `event_date`) |
+| Death (one-click) | `POST /api/members/{id}/mark-deceased` under `edit members` — sets status + `date_of_death` and records a death life event; 422 if already deceased |
+| Death (edit form sync) | saving a member with `status=deceased` requires `date_of_death` and creates a death life event if none exists for that member |
+| Birth | baby `first_name`/`last_name` + `father_first_name`/`father_last_name` + `mother_first_name`/`mother_last_name`; optional `member_id` mother link; no member status change |
+| Scoping | `BelongsToBranch` trait — records are branch-scoped; `member_id` must belong to the same branch |
+| Report | `GET /api/reports/life-events/year?year=YYYY` (year totals + monthly breakdown) with PDF/XLSX exports under `export reports` |
+| Frontend | `/life-events` page (Sidebar "Main") + `/reports/life-events/year` "Year in Review" (Sidebar Finance group) |
 
 ---
 

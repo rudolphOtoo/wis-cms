@@ -49,11 +49,13 @@ const AttendanceTrends  = lazy(() => import('../pages/reports/AttendanceTrends')
 const AttendanceSummary = lazy(() => import('../pages/reports/AttendanceSummary'))
 const MemberWelfare    = lazy(() => import('../pages/reports/MemberWelfare'))
 const CellComparison    = lazy(() => import('../pages/reports/CellComparison'))
+const LifeEventsYear    = lazy(() => import('../pages/reports/LifeEventsYear'))
 const Birthdays        = lazy(() => import('../pages/birthdays/Birthdays'))
 const Reminders        = lazy(() => import('../pages/reminders/Reminders'))
 const Submissions      = lazy(() => import('../pages/submissions/Submissions'))
 const PastoralNotes    = lazy(() => import('../pages/pastoral/PastoralNotes'))
 const FollowUpQueue    = lazy(() => import('../pages/pastoral/FollowUpQueue'))
+const LifeEvents       = lazy(() => import('../pages/lifeEvents/LifeEvents'))
 const Confirmations    = lazy(() => import('../pages/confirmations/Confirmations'))
 
 export default function AppRouter() {
@@ -121,11 +123,13 @@ export default function AppRouter() {
             <Route path="/reports/attendance/summary"           element={<AttendanceSummary />} />
             <Route path="/reports/members/welfare"              element={<MemberWelfare />} />
             <Route path="/reports/cells/comparison"             element={<CellComparison />} />
+            <Route path="/reports/life-events/year"             element={<LifeEventsYear />} />
 
             <Route path="/birthdays" element={<Birthdays />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/pastoral-notes" element={<PastoralNotes />} />
             <Route path="/pastoral/follow-ups" element={<FollowUpQueue />} />
+            <Route path="/life-events" element={<LifeEvents />} />
             <Route path="/confirmations" element={<CapabilityGate path="modules.confirmations"><Confirmations /></CapabilityGate>} />
           </Route>
         </Route>

@@ -20,7 +20,7 @@ export default function MemberForm() {
     first_name:'', last_name:'', other_names:'', gender:'',
     date_of_birth:'', phone:'', email:'', address:'',
     occupation:'', marital_status:'', join_date:'',
-    is_baptised: false, baptism_date:'', status:'active', notes:'',
+    is_baptised: false, baptism_date:'', status:'active', date_of_death:'', notes:'',
   })
   const [errors,   setErrors]   = useState({})
   const [loading,  setLoading]  = useState(false)
@@ -47,6 +47,7 @@ export default function MemberForm() {
           is_baptised:   m.is_baptised   ?? false,
           baptism_date:  m.baptism_date  ?? '',
           status:        m.status        ?? 'active',
+          date_of_death: m.date_of_death ?? '',
           notes:         m.notes         ?? '',
         })
       })
@@ -201,6 +202,12 @@ export default function MemberForm() {
               </select>
             </FIELD>
           </div>
+          {form.status === 'deceased' && (
+            <FIELD label="Date of Death" error={errors.date_of_death?.[0]}>
+              <input type="date" className="input-field" value={form.date_of_death}
+                     onChange={set('date_of_death')}/>
+            </FIELD>
+          )}
           <div className="flex items-center gap-3">
             <input type="checkbox" id="is_baptised" checked={form.is_baptised}
                    onChange={set('is_baptised')}

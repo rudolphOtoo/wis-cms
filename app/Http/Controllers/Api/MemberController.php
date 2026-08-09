@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\MarkMemberDeceasedRequest;
 use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Resources\MemberResource;
@@ -12,6 +13,7 @@ use App\Http\Resources\TransactionResource;
 use App\Jobs\SendMemberWelcomeSmsJob;
 use App\Models\Cell;
 use App\Models\Department;
+use App\Models\LifeEvent;
 use App\Models\Member;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -113,7 +115,34 @@ class MemberController extends Controller
     public function update(UpdateMemberRequest $request, string $id): JsonResponse
     {
         $member = Member::query()->findOrFail($id);
-        $member->update($request->validated());
+
+        DB::transaction(function () use ($request, $member) {
+            $member->update($request->validated());
+
+            // When the member is marked deceased via the edit form, keep the
+            // Life Events register in sync: capture the date of death and
+            // record a death life event if one does not already exist.
+            if ($member->status === 'deceased') {
+                $dateOfDeath = $request->validated('date_of_death');
+
+                $hasDeathEvent = LifeEvent::query()
+                    ->where('member_id', $member->id)
+                    ->where('type', 'death')
+                    ->exists();
+
+                if (! $hasDeathEvent && $dateOfDeath) {
+                    LifeEvent::create([
+                        'branch_id' => $member->branch_id,
+                        'recorded_by_user_id' => $request->user()->id,
+                        'type' => 'death',
+                        'event_date' => $dateOfDeath,
+                        'member_id' => $member->id,
+                        'first_name' => $member->first_name,
+                        'last_name' => $member->last_name,
+                    ]);
+                }
+            }
+        });
 
         activity()->causedBy($request->user())
             ->performedOn($member)
@@ -136,6 +165,51 @@ class MemberController extends Controller
             ->log("Deleted member: {$name}");
 
         return response()->json(['message' => 'Member deleted successfully.']);
+    }
+
+    // POST /api/members/{id}/mark-deceased
+    //
+    // One-click "mark as deceased". Atomically sets the member's status to
+    // 'deceased' + date_of_death and records a death life event so the
+    // year-end review stays in sync. Gated by 'edit members' (the secretary's
+    // natural permission) rather than 'manage life events', so the secretary
+    // can do it without touching the finance steward's Life Events page.
+    public function markDeceased(MarkMemberDeceasedRequest $request, string $id): JsonResponse
+    {
+        $member = Member::query()->findOrFail($id);
+
+        if ($member->status === 'deceased') {
+            return response()->json([
+                'message' => 'Member is already marked as deceased.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($member, $request) {
+            $member->update([
+                'status' => 'deceased',
+                'date_of_death' => $request->validated('date_of_death'),
+            ]);
+
+            LifeEvent::create([
+                'branch_id' => $member->branch_id,
+                'recorded_by_user_id' => $request->user()->id,
+                'type' => 'death',
+                'event_date' => $request->validated('date_of_death'),
+                'burial_date' => $request->validated('burial_date'),
+                'member_id' => $member->id,
+                'first_name' => $member->first_name,
+                'last_name' => $member->last_name,
+            ]);
+        });
+
+        activity()->causedBy($request->user())
+            ->performedOn($member)
+            ->log("Marked member as deceased: {$member->full_name}");
+
+        return response()->json([
+            'message' => 'Member marked as deceased.',
+            'data' => new MemberResource($member->fresh()->load('user')),
+        ]);
     }
 
     // GET /api/members/export
