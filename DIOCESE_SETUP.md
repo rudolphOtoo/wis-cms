@@ -154,16 +154,34 @@ docker compose -f docker-compose.deploy.yml exec app php artisan db:seed --class
 
 ## 5. Update path
 
-Pin the image tag so updates are controlled:
+New features ship to your install as a new image — no code checkout, no
+build, no manual migration. Just pull and restart:
 
 ```bash
-export IMAGE_TAG=<version-or-sha>        # default: latest
-docker compose -f docker-compose.deploy.yml pull
-docker compose -f docker-compose.deploy.yml up -d
+docker compose -f docker-compose.deploy.yml up -d --pull always
+```
+
+This fetches the newest `latest` image and recreates the containers; boot
+runs migrations automatically. Your member data is untouched (Postgres
+volume) and the seeders/imports are idempotent, so nothing duplicates.
+
+> **Note:** `up -d` alone will **not** fetch new code — Docker reuses the
+> cached image unless you pass `--pull always` (or run `docker compose -f
+> docker-compose.deploy.yml pull` first).
+
+To receive updates on a controlled release instead of every push to `main`,
+pin the image tag (default `latest` is overwritten on each push):
+
+```bash
+export IMAGE_TAG=<version-or-sha>
+docker compose -f docker-compose.deploy.yml up -d --pull always
 ```
 
 Migrations run automatically on boot. `ProductionSeeder` is re-run each
 boot and is idempotent — it never duplicates or overwrites your data.
+
+> **Tip:** if a new feature introduces extra `.env` settings, add them to
+> your `.env` before pulling, or the container will boot without them.
 
 ## 6. Import the diocese's member data
 
