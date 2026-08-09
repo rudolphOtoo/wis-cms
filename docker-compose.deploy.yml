@@ -24,8 +24,12 @@ services:
     env_file:
       - .env
     environment:
+      DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
+      DB_DATABASE: wis_cms
+      DB_USERNAME: wis_admin
+      DB_PASSWORD: wis_secret_2024
       QUEUE_CONNECTION: database
     depends_on:
       postgres:
@@ -54,8 +58,12 @@ services:
     env_file:
       - .env
     environment:
+      DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
+      DB_DATABASE: wis_cms
+      DB_USERNAME: wis_admin
+      DB_PASSWORD: wis_secret_2024
       QUEUE_CONNECTION: database
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     depends_on:
@@ -69,8 +77,12 @@ services:
     env_file:
       - .env
     environment:
+      DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
+      DB_DATABASE: wis_cms
+      DB_USERNAME: wis_admin
+      DB_PASSWORD: wis_secret_2024
       QUEUE_CONNECTION: database
     command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
