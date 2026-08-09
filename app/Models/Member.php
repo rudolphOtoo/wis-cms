@@ -23,7 +23,7 @@ class Member extends Model
         'other_names', 'gender', 'date_of_birth', 'phone', 'email',
         'address', 'occupation', 'marital_status', 'join_date',
         'is_baptised', 'baptism_date', 'status', 'last_attendance_date',
-        'welfare_flag', 'photo_path', 'notes',
+        'welfare_flag', 'photo_path', 'notes', 'date_of_death',
     ];
 
     protected function casts(): array
@@ -34,6 +34,7 @@ class Member extends Model
             'baptism_date' => 'date',
             'is_baptised' => 'boolean',
             'last_attendance_date' => 'date',
+            'date_of_death' => 'date',
         ];
     }
 

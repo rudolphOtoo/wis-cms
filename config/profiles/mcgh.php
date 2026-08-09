@@ -63,6 +63,7 @@ return [
             'view service reminders', 'manage service reminders',
             'view member submissions', 'manage member submissions',
             'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
+            'view life events', 'manage life events',
         ],
 
         'roles' => [
@@ -75,6 +76,7 @@ return [
                 'view service reminders', 'manage service reminders',
                 'view member submissions', 'manage member submissions',
                 'view pastoral notes', 'create pastoral notes', 'update pastoral notes', 'delete pastoral notes',
+                'view life events',
             ]],
             'secretary' => ['permissions' => [
                 'view members', 'create members', 'edit members', 'export members',
@@ -91,11 +93,13 @@ return [
                 'view service reminders',
                 'view member submissions', 'manage member submissions',
                 'view pastoral notes', 'create pastoral notes', 'update pastoral notes',
+                'view life events',
             ]],
             'finance_officer' => ['permissions' => [
                 'view finance', 'create transactions', 'edit transactions',
                 'delete transactions', 'export finance',
                 'view members', 'view reports', 'export reports',
+                'view life events', 'manage life events',
             ]],
             'department_leader' => ['permissions' => [
                 'view members', 'view departments', 'manage department members',
