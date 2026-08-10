@@ -29,7 +29,7 @@ class LifeEventController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = LifeEvent::query()
-            ->with(['member', 'recorder']);
+            ->with(['member', 'fatherMember', 'recorder']);
 
         if ($type = $request->get('type')) {
             $query->where('type', $type);
@@ -49,6 +49,10 @@ class LifeEventController extends Controller
                     ->orWhere('last_name', 'ilike', "%{$search}%")
                     ->orWhere('mother_first_name', 'ilike', "%{$search}%")
                     ->orWhereHas('member', function ($m) use ($search) {
+                        $m->where('first_name', 'ilike', "%{$search}%")
+                            ->orWhere('last_name', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('fatherMember', function ($m) use ($search) {
                         $m->where('first_name', 'ilike', "%{$search}%")
                             ->orWhere('last_name', 'ilike', "%{$search}%");
                     });
@@ -103,7 +107,7 @@ class LifeEventController extends Controller
             'message' => $event->type === 'death'
                 ? 'Death recorded successfully.'
                 : 'Birth recorded successfully.',
-            'data' => new LifeEventResource($event->load(['member', 'recorder'])),
+            'data' => new LifeEventResource($event->load(['member', 'fatherMember', 'recorder'])),
         ], 201);
     }
 
@@ -112,7 +116,7 @@ class LifeEventController extends Controller
      */
     public function show(Request $request, string $id): JsonResponse
     {
-        $event = LifeEvent::with(['member', 'recorder'])->findOrFail($id);
+        $event = LifeEvent::with(['member', 'fatherMember', 'recorder'])->findOrFail($id);
 
         return response()->json(['data' => new LifeEventResource($event)]);
     }
@@ -142,7 +146,7 @@ class LifeEventController extends Controller
 
         return response()->json([
             'message' => 'Life event updated successfully.',
-            'data' => new LifeEventResource($event->load(['member', 'recorder'])),
+            'data' => new LifeEventResource($event->load(['member', 'fatherMember', 'recorder'])),
         ]);
     }
 

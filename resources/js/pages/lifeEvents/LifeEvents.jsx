@@ -59,6 +59,9 @@ export default function LifeEvents() {
   // Birth fields
   const [fatherFirstName, setFatherFirstName] = useState('')
   const [fatherLastName, setFatherLastName] = useState('')
+  const [fatherMemberId, setFatherMemberId] = useState('')
+  const [fatherQuery, setFatherQuery] = useState('')
+  const [fatherOptions, setFatherOptions] = useState([])
   const [motherFirstName, setMotherFirstName] = useState('')
   const [motherLastName, setMotherLastName] = useState('')
   const [motherMemberId, setMotherMemberId] = useState('')
@@ -104,6 +107,13 @@ export default function LifeEvents() {
     deathSearchTimer.current = setTimeout(() => runMemberSearch(value, setMemberQuery, setMemberOptions), 250)
   }
 
+  const fatherSearchTimer = useRef(null)
+  const onFatherSearch = (value) => {
+    setFatherQuery(value)
+    clearTimeout(fatherSearchTimer.current)
+    fatherSearchTimer.current = setTimeout(() => runMemberSearch(value, setFatherQuery, setFatherOptions), 250)
+  }
+
   const motherSearchTimer = useRef(null)
   const onMotherSearch = (value) => {
     setMotherQuery(value)
@@ -118,10 +128,18 @@ export default function LifeEvents() {
       setMemberOptions([])
       setFirstName(m.first_name)
       setLastName(m.last_name ?? '')
+    } else if (kind === 'father') {
+      setFatherMemberId(m.id)
+      setFatherQuery(m.full_name)
+      setFatherOptions([])
+      setFatherFirstName(m.first_name)
+      setFatherLastName(m.last_name ?? '')
     } else {
       setMotherMemberId(m.id)
       setMotherQuery(m.full_name)
       setMotherOptions([])
+      setMotherFirstName(m.first_name)
+      setMotherLastName(m.last_name ?? '')
     }
   }
 
@@ -137,6 +155,9 @@ export default function LifeEvents() {
     setMemberOptions([])
     setFatherFirstName('')
     setFatherLastName('')
+    setFatherMemberId('')
+    setFatherQuery('')
+    setFatherOptions([])
     setMotherFirstName('')
     setMotherLastName('')
     setMotherMemberId('')
@@ -164,6 +185,8 @@ export default function LifeEvents() {
       setMemberQuery(event.member?.name ?? '')
       setFatherFirstName('')
       setFatherLastName('')
+      setFatherMemberId('')
+      setFatherQuery('')
       setMotherFirstName('')
       setMotherLastName('')
       setMotherMemberId('')
@@ -171,6 +194,8 @@ export default function LifeEvents() {
     } else {
       setFatherFirstName(event.father_first_name ?? '')
       setFatherLastName(event.father_last_name ?? '')
+      setFatherMemberId(event.father_member?.id ?? '')
+      setFatherQuery(event.father_member?.name ?? '')
       setMotherFirstName(event.mother_first_name ?? '')
       setMotherLastName(event.mother_last_name ?? '')
       setMotherMemberId(event.member?.id ?? '')
@@ -196,6 +221,7 @@ export default function LifeEvents() {
         burial_date: type === 'death' ? (burialDate || null) : null,
         notes: notes || null,
         member_id: type === 'death' ? (memberId || null) : (motherMemberId || null),
+        father_member_id: type === 'birth' ? (fatherMemberId || null) : null,
         first_name: firstName,
         last_name: lastName || null,
         father_first_name: type === 'birth' ? (fatherFirstName || null) : null,
@@ -360,6 +386,11 @@ export default function LifeEvents() {
           setFatherFirstName={setFatherFirstName}
           fatherLastName={fatherLastName}
           setFatherLastName={setFatherLastName}
+          fatherMemberId={fatherMemberId}
+          fatherQuery={fatherQuery}
+          fatherOptions={fatherOptions}
+          onFatherSearch={onFatherSearch}
+          onSelectFather={(m) => selectMember(m, 'father')}
           motherFirstName={motherFirstName}
           setMotherFirstName={setMotherFirstName}
           motherLastName={motherLastName}
@@ -420,6 +451,7 @@ function EventModal(props) {
     firstName, setFirstName, lastName, setLastName,
     memberId, memberQuery, memberOptions, onDeathSearch, onSelectMember,
     fatherFirstName, setFatherFirstName, fatherLastName, setFatherLastName,
+    fatherMemberId, fatherQuery, fatherOptions, onFatherSearch, onSelectFather,
     motherFirstName, setMotherFirstName, motherLastName, setMotherLastName,
     motherMemberId, motherQuery, motherOptions, onMotherSearch, onSelectMother,
     submitting, onSubmit, onClose,
@@ -517,6 +549,17 @@ function EventModal(props) {
                   <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>Father Last Name</label>
                   <input type="text" className="input-field" value={fatherLastName} onChange={e => setFatherLastName(e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1.5" style={{color:'#374151'}}>Father (if a member)</label>
+                <MemberCombo
+                  query={fatherQuery}
+                  onSearch={onFatherSearch}
+                  options={fatherOptions}
+                  onSelect={onSelectFather}
+                  selectedId={fatherMemberId}
+                  placeholder="Optional: search member register..."
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
