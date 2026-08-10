@@ -28,6 +28,13 @@ class StoreLifeEventRequest extends FormRequest
                     ->where('branch_id', $this->user()->branch_id)
                     ->whereNull('deleted_at'),
             ],
+            'father_member_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('members', 'id')
+                    ->where('branch_id', $this->user()->branch_id)
+                    ->whereNull('deleted_at'),
+            ],
             // Deaths: the deceased person's name. Births: the baby's name.
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
