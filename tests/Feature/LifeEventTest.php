@@ -295,6 +295,50 @@ class LifeEventTest extends TestCase
         ]);
     }
 
+    public function test_birth_can_link_father_from_the_register(): void
+    {
+        $father = Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'Kwabena',
+            'last_name' => 'Owusu',
+            'gender' => 'male',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$this->token($this->financeOfficer)}")
+            ->postJson('/api/life-events', $this->birthPayload([
+                'father_member_id' => $father->id,
+                'father_first_name' => 'Kwabena',
+                'father_last_name' => 'Owusu',
+            ]))
+            ->assertCreated()
+            ->assertJsonPath('data.father_member_id', $father->id)
+            ->assertJsonPath('data.father_member.name', 'Kwabena Owusu');
+
+        $this->assertDatabaseHas('life_events', [
+            'type' => 'birth',
+            'father_member_id' => $father->id,
+            'father_first_name' => 'Kwabena',
+        ]);
+    }
+
+    public function test_birth_father_member_must_belong_to_same_branch(): void
+    {
+        $otherBranch = Branch::factory()->create();
+        $otherFather = Member::create([
+            'branch_id' => $otherBranch->id,
+            'first_name' => 'Kofi',
+            'last_name' => 'Mensah',
+            'gender' => 'male',
+            'status' => 'active',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$this->token($this->financeOfficer)}")
+            ->postJson('/api/life-events', $this->birthPayload(['father_member_id' => $otherFather->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['father_member_id']);
+    }
+
     // ── Permissions ─────────────────────────────────────────────────────────
 
     public function test_usher_cannot_record_a_life_event(): void
@@ -443,6 +487,36 @@ class LifeEventTest extends TestCase
         $this->assertCount(1, $response->json('deaths'));
         $this->assertSame('Kwame Owusu', $response->json('deaths.0.name'));
         $this->assertCount(2, $response->json('births'));
+    }
+
+    public function test_year_report_falls_back_to_father_member_name(): void
+    {
+        $father = Member::create([
+            'branch_id' => $this->branch->id,
+            'first_name' => 'Kwabena',
+            'last_name' => 'Owusu',
+            'gender' => 'male',
+            'status' => 'active',
+        ]);
+
+        LifeEvent::factory()->birth()->create([
+            'branch_id' => $this->branch->id,
+            'recorded_by_user_id' => $this->financeOfficer->id,
+            'event_date' => '2026-02-20',
+            'first_name' => 'Adwoa',
+            'father_member_id' => $father->id,
+            'father_first_name' => null,
+            'father_last_name' => null,
+            'mother_first_name' => 'Ama',
+            'mother_last_name' => 'Owusu',
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$this->token($this->financeOfficer)}")
+            ->getJson('/api/reports/life-events/year?year=2026')
+            ->assertOk();
+
+        $this->assertSame('Kwabena Owusu', $response->json('births.0.father_name'));
+        $this->assertSame('Ama Owusu', $response->json('births.0.mother_name'));
     }
 
     public function test_year_report_requires_view_finance(): void

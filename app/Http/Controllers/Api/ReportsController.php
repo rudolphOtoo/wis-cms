@@ -1290,7 +1290,7 @@ class ReportsController extends Controller
 
         $year = (int) ($validated['year'] ?? now()->year);
 
-        $events = LifeEvent::with('member')
+        $events = LifeEvent::with(['member', 'fatherMember'])
             ->whereYear('event_date', $year)
             ->orderBy('event_date')
             ->get();
@@ -1325,7 +1325,8 @@ class ReportsController extends Controller
             } else {
                 $births[] = [
                     'name' => trim("{$event->first_name} {$event->last_name}"),
-                    'father_name' => trim("{$event->father_first_name} {$event->father_last_name}"),
+                    'father_name' => trim("{$event->father_first_name} {$event->father_last_name}")
+                        ?: ($event->fatherMember?->full_name ?? ''),
                     'mother_name' => trim("{$event->mother_first_name} {$event->mother_last_name}"),
                     'month' => $month,
                     'month_label' => $monthly[$month]['label'],

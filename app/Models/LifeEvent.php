@@ -18,7 +18,7 @@ class LifeEvent extends Model
 
     protected $fillable = [
         'branch_id', 'recorded_by_user_id', 'type', 'event_date', 'burial_date',
-        'member_id', 'first_name', 'last_name',
+        'member_id', 'father_member_id', 'first_name', 'last_name',
         'father_first_name', 'father_last_name',
         'mother_first_name', 'mother_last_name', 'notes',
     ];
@@ -34,6 +34,11 @@ class LifeEvent extends Model
     public function member()
     {
         return $this->belongsTo(Member::class);
+    }
+
+    public function fatherMember()
+    {
+        return $this->belongsTo(Member::class, 'father_member_id');
     }
 
     public function recorder()
