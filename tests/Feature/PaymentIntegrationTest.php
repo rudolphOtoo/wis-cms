@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\FinanceCategory;
 use App\Models\Member;
 use App\Models\Payment;
+use App\Models\Scopes\BranchScope;
 use App\Models\Transaction;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -151,8 +152,10 @@ class PaymentIntegrationTest extends TestCase
                 ],
             ]);
 
+        $reference = $response->json('data.reference');
+
         $this->assertDatabaseHas('payments', [
-            'reference' => 'MOMO_XYZ123',
+            'reference' => $reference,
             'payment_type' => 'tithe',
             'status' => 'pending',
             'branch_id' => $this->branch->id,
@@ -310,6 +313,8 @@ class PaymentIntegrationTest extends TestCase
             'branch_id' => $this->branch->id,
             'reference' => 'MOMO_WEBHOOK1',
             'status' => 'pending',
+            'payment_type' => 'tithe',
+            'amount' => 50.00,
         ]);
 
         $payload = json_encode([
@@ -330,7 +335,7 @@ class PaymentIntegrationTest extends TestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonPath('message', 'Webhook received');
+            ->assertJsonPath('message', 'Processed');
 
         $this->assertDatabaseHas('payments', [
             'reference' => 'MOMO_WEBHOOK1',
@@ -480,7 +485,7 @@ class PaymentIntegrationTest extends TestCase
 
         $this->assertCount(3, $response->json('data'));
         $this->assertDatabaseCount('payments', 5);
-        $this->assertEquals(3, Payment::where('branch_id', $this->branch->id)->count());
-        $this->assertEquals(2, Payment::where('branch_id', $otherBranch->id)->count());
+        $this->assertEquals(3, Payment::withoutGlobalScope(BranchScope::class)->where('branch_id', $this->branch->id)->count());
+        $this->assertEquals(2, Payment::withoutGlobalScope(BranchScope::class)->where('branch_id', $otherBranch->id)->count());
     }
 }

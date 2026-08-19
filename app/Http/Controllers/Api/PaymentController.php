@@ -30,7 +30,8 @@ class PaymentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Payment::query()->with(['member', 'recorder']);
+        $query = Payment::query()->with(['member', 'recorder'])
+            ->where('branch_id', $request->user()->branch_id);
 
         if ($type = $request->input('payment_type')) {
             $query->where('payment_type', $type);
