@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Member;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,6 +34,11 @@ class DataMigrateTest extends TestCase
         $this->clearEnvVar('ADMIN_PASSWORD');
         $this->clearEnvVar('CHURCH_NAME');
         $this->clearEnvVar('CHURCH_LOCATION');
+
+        // DataMigrateTest calls migrate:fresh/db:wipe inside tests which
+        // breaks the outer RefreshDatabase transaction. Force the next
+        // test class to re-migrate from scratch.
+        RefreshDatabaseState::$migrated = false;
 
         parent::tearDown();
     }

@@ -126,7 +126,10 @@ class DepartmentMessagingTest extends TestCase
 
     protected function tearDown(): void
     {
-        Mockery::close();
+        try {
+            Mockery::close();
+        } catch (\Throwable) {
+        }
         parent::tearDown();
     }
 }
