@@ -33,13 +33,15 @@ class HeadcountAttendanceTest extends TestCase
 
     protected function serviceType(): ServiceType
     {
-        return ServiceType::create([
-            'branch_id' => $this->branch->id,
-            'name' => 'Sunday Adult Service',
-            'slug' => 'sunday_adult',
-            'type' => 'adult',
-            'is_active' => true,
-        ]);
+        return ServiceType::firstOrCreate(
+            ['slug' => 'sunday_adult'],
+            [
+                'branch_id' => $this->branch->id,
+                'name' => 'Sunday Adult Service',
+                'type' => 'adult',
+                'is_active' => true,
+            ]
+        );
     }
 
     protected function usherToken(): string
