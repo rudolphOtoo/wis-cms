@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\Payments\PaymentGatewayManager;
 use App\Support\PhoneNormalizer;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -19,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PaymentGatewayManager::class);
     }
 
     /**
@@ -46,6 +47,16 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiters(): void
     {
+        // ── Payment webhook ────────────────────────────────────────────────
+        //
+        // Paystack retries failed webhook deliveries automatically, so we
+        // allow generous throughput: 30 requests per minute from any IP.
+        RateLimiter::for('payment-webhook', function (Request $request): array {
+            return [
+                Limit::perMinute(30)->by($request->ip()),
+            ];
+        });
+
         // ── Password-reset flow ───────────────────────────────────────────────
         //
         // Applied to both POST /auth/forgot-password and /auth/reset-password.
