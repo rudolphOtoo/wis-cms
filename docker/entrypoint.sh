@@ -13,6 +13,12 @@ wait_for_db() {
 
 wait_for_db
 
+# Auto-generate APP_KEY if not set (first boot without manual key:generate)
+if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
+    echo "APP_KEY is empty — generating a new key..."
+    php artisan key:generate --force
+fi
+
 # DIOCESE_PROFILE is frozen at app boot (default: wis). Diocese-specific data
 # must never leak across installs, so the WIS member CSV and the WIS church-data
 # snapshot only run for the 'wis' profile.

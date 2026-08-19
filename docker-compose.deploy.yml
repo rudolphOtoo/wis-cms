@@ -31,6 +31,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
+      SESSION_SECURE_COOKIE: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +66,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
+      SESSION_SECURE_COOKIE: "false"
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     depends_on:
       app:
@@ -84,6 +86,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
       QUEUE_CONNECTION: database
+      SESSION_SECURE_COOKIE: "false"
     command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
       app:
@@ -91,4 +94,3 @@ services:
 
 volumes:
   wis_postgres_data:
-  mcgh_postgres_data:
