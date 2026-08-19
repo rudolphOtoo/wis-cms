@@ -8,7 +8,7 @@ import {
   Building2, Home, UserPlus, MessageSquare, Gift, Bell, FileText,
   UserCog, ScrollText, MessageCircle, Heart, BadgeCheck, ClipboardList,
   Wallet, TrendingUp, TrendingDown, BarChart2, LineChart,
-  ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
+  Smartphone, ChevronDown, ChevronLeft, ChevronRight, X, LogOut,
 } from 'lucide-react'
 
 // ── Breakpoint hook — mirrors Tailwind's md: threshold (768 px) ───────────────
@@ -54,6 +54,7 @@ const MAIN_NAV = [
 
 const FINANCE_NAV = [
   { to: '/finance',                             label: 'Overview',        icon: Wallet,       permission: 'view finance' },
+  { to: '/finance/payments',                    label: 'Online Payments', icon: Smartphone,   permission: 'view payments' },
   { to: '/reports/finance/income-by-category',  label: 'Income',          icon: TrendingUp,   permission: 'view finance' },
   { to: '/reports/finance/expense-by-category', label: 'Expenses',        icon: TrendingDown, permission: 'view finance' },
   { to: '/reports/cells/comparison',            label: 'Cell Comparison', icon: BarChart2,    permission: 'view finance' },

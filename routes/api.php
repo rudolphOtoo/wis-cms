@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\MemberSubmissionController;
 use App\Http\Controllers\Api\MemberSubmissionWebhookController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\PastoralNoteController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ServiceReminderController;
@@ -56,6 +58,16 @@ Route::prefix('auth')->group(function () {
 Route::post('/webhooks/member-submission',
     [MemberSubmissionWebhookController::class, 'store']
 )->middleware('throttle:intake-webhook');
+
+// ─────────────────────────────────────────────────────────────────
+// PAYMENT WEBHOOKS (no Sanctum — verified via Paystack HMAC signature)
+//
+// Rate-limited to prevent abuse. A human paying once needs exactly
+// 1 hit; Paystack retries webhook deliveries automatically.
+// ─────────────────────────────────────────────────────────────────
+Route::post('/webhooks/payments/paystack',
+    [PaymentWebhookController::class, 'handle']
+)->middleware('throttle:payment-webhook');
 
 Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(function () {
 
@@ -303,6 +315,14 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::post('life-events', [LifeEventController::class, 'store']);
         Route::put('life-events/{id}', [LifeEventController::class, 'update']);
         Route::delete('life-events/{id}', [LifeEventController::class, 'destroy']);
+    });
+
+    // ONLINE PAYMENTS
+    Route::post('payments/initialize', [PaymentController::class, 'store']);
+    Route::get('payments/verify/{reference}', [PaymentController::class, 'verify']);
+    Route::middleware('permission:view payments')->group(function () {
+        Route::get('payments/history', [PaymentController::class, 'index']);
+        Route::get('payments/stats', [PaymentController::class, 'stats']);
     });
 
     // MEMBER PORTAL — scoped to the authenticated member's own data
