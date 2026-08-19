@@ -57,6 +57,8 @@ const PastoralNotes    = lazy(() => import('../pages/pastoral/PastoralNotes'))
 const FollowUpQueue    = lazy(() => import('../pages/pastoral/FollowUpQueue'))
 const LifeEvents       = lazy(() => import('../pages/lifeEvents/LifeEvents'))
 const Confirmations    = lazy(() => import('../pages/confirmations/Confirmations'))
+const PaymentsPage     = lazy(() => import('../pages/finance/Payments'))
+const GivePage         = lazy(() => import('../pages/give/GivePage'))
 
 export default function AppRouter() {
   return (
@@ -66,6 +68,9 @@ export default function AppRouter() {
         <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
+
+        {/* Public giving page — no auth required, linkable from any device */}
+        <Route path="/give" element={<GivePage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/portal"          element={<Portal />} />
@@ -100,6 +105,7 @@ export default function AppRouter() {
             <Route path="/attendance/:id"       element={<TakeAttendance />} />
 
             <Route path="/finance"              element={<FinancePage />} />
+            <Route path="/finance/payments"     element={<PaymentsPage />} />
             <Route path="/finance/new"          element={<TransactionForm />} />
             <Route path="/finance/:id/edit"     element={<TransactionForm />} />
 

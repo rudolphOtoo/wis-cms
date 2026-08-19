@@ -338,11 +338,13 @@ class DataMigrateTest extends TestCase
 
         // Exclude service_types because migrations seed Cell Meeting and
         // Department Meeting — re-importing them would cause a duplicate
-        // key conflict.
+        // key conflict. Exclude role/permission tables because the payment
+        // permissions migration seeds them on migrate:fresh, causing a
+        // primary key collision when the export data is re-imported.
         $this->artisan('app:data-migrate', [
             '--export' => true,
             '--output' => $this->tempJson,
-            '--exclude-tables' => 'service_types',
+            '--exclude-tables' => 'service_types,permissions,roles,role_has_permissions,model_has_roles,model_has_permissions',
         ])->assertSuccessful();
 
         $this->wipe();

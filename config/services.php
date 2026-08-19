@@ -45,6 +45,12 @@ return [
         ],
     ],
 
+    'paystack' => [
+        'secret' => env('PAYSTACK_SECRET_KEY'),
+        'public' => env('PAYSTACK_PUBLIC_KEY'),
+        'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
+    ],
+
     'google_form_webhook' => [
         // Shared secret required in the X-Webhook-Secret header on
         // POST /api/webhooks/member-submission. Generated once, stored
