@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Member;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,8 +13,6 @@ use Tests\TestCase;
 
 class DataMigrateTest extends TestCase
 {
-    use RefreshDatabase;
-
     private string $tempJson;
 
     protected function setUp(): void
@@ -35,9 +32,11 @@ class DataMigrateTest extends TestCase
         $this->clearEnvVar('CHURCH_NAME');
         $this->clearEnvVar('CHURCH_LOCATION');
 
-        // DataMigrateTest calls migrate:fresh/db:wipe inside tests which
-        // breaks the outer RefreshDatabase transaction. Force the next
-        // test class to re-migrate from scratch.
+        // DataMigrateTest manually calls migrate:fresh inside each test method
+        // instead of using the RefreshDatabase trait. Without this reset, the
+        // static $migrated flag remains true from any prior RefreshDatabase
+        // test class, causing the NEXT RefreshDatabase class to skip
+        // migrate:fresh and inherit our seeded/dirty database state.
         RefreshDatabaseState::$migrated = false;
 
         parent::tearDown();
