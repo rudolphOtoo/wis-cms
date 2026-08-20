@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Exceptions\TransientSmsException;
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -16,7 +18,11 @@ use Illuminate\Support\Facades\Log;
  *   - Phone format: Ghana LOCAL ('0241234567'), NOT international
  *   - All HTTP responses are JSON
  *
- * Endpoint: POST https://api.mnotify.com/api/sms/quick
+ * Endpoints:
+ *   - POST /sms/quick           — immediate OR scheduled single/bulk SMS
+ *   - GET  /scheduled           — list all scheduled SMS jobs
+ *   - POST /scheduled/{id}      — update a scheduled SMS
+ *   - DELETE /scheduled/{id}    — cancel a scheduled SMS
  *
  * Reference: https://readthedocs.mnotify.com
  *
@@ -30,44 +36,175 @@ use Illuminate\Support\Facades\Log;
 class MnotifySmsService
 {
     /**
-     * Send a single SMS via mNotify.
+     * Send a single SMS via mNotify (immediate delivery).
      *
      * @throws TransientSmsException when the failure is retry-worthy
      */
     public function send(string $phone, string $message): bool
     {
-        // Safety gate: never fire real SMS from local or testing environments
-        // by default. Tests disable the flag to exercise the HTTP path.
-        if (config('services.mnotify.dry_run', app()->environment('local', 'testing'))) {
-            Log::info("[DEV DRY-RUN] SMS intercepted for {$phone}: {$message}");
+        if ($this->shouldDryRun($phone, $message)) {
+            return true;
+        }
+
+        $apiKey = $this->getApiKey();
+        if ($apiKey === null) {
+            return false;
+        }
+
+        $response = $this->postSmsQuick($apiKey, $phone, $message, false);
+
+        return $this->evaluateSendResponse($response, $phone);
+    }
+
+    /**
+     * Schedule an SMS for future delivery via mNotify.
+     *
+     * Returns the mNotify job ID (string) on success for local tracking.
+     * Returns null on permanent failure (bad request, auth error).
+     * Throws TransientSmsException on retry-worthy network/server errors.
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function schedule(string $phone, string $message, Carbon $scheduledAt): ?string
+    {
+        if ($this->shouldDryRun($phone, $message)) {
+            return 'dry-run-'.bin2hex(random_bytes(4));
+        }
+
+        $apiKey = $this->getApiKey();
+        if ($apiKey === null) {
+            return null;
+        }
+
+        $response = $this->postSmsQuick($apiKey, $phone, $message, true, $scheduledAt);
+
+        return $this->evaluateScheduleResponse($response, $phone);
+    }
+
+    /**
+     * Cancel a previously scheduled SMS on mNotify.
+     *
+     * Returns true on success, false on permanent failure.
+     * Throws TransientSmsException on retry-worthy errors.
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function cancelScheduled(string $mnotifyJobId): bool
+    {
+        if ($this->isDryRunMode()) {
+            Log::info("[DEV DRY-RUN] Cancel scheduled SMS #{$mnotifyJobId}");
 
             return true;
         }
 
-        $apiKey = config('services.mnotify.api_key');
+        $apiKey = $this->getApiKey();
+        if ($apiKey === null) {
+            return false;
+        }
 
-        // No key configured (dev / pre-launch): permanent failure.
-        // Retrying won't help - the key will still be missing.
-        if (! $apiKey) {
-            Log::warning("mNotify API key not configured — SMS to {$phone} not sent.");
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled/{$mnotifyJobId}?key={$apiKey}";
+
+        try {
+            $response = Http::timeout(15)->delete($endpoint);
+        } catch (ConnectionException $e) {
+            Log::warning("mNotify network failure cancelling #{$mnotifyJobId}: ".$e->getMessage());
+            throw new TransientSmsException('mNotify network failure: '.$e->getMessage(), 0, $e);
+        }
+
+        if ($response->serverError()) {
+            throw new TransientSmsException('mNotify server error: HTTP '.$response->status());
+        }
+
+        if (! $response->successful()) {
+            Log::error("mNotify cancel rejected (HTTP {$response->status()}) for #{$mnotifyJobId}: ".$response->body());
 
             return false;
         }
 
-        $endpoint = rtrim(config('services.mnotify.base_url'), '/').'/sms/quick?key='.$apiKey;
+        $body = $response->json();
+
+        return ($body['status'] ?? null) === 'success';
+    }
+
+    /**
+     * Update a previously scheduled SMS on mNotify (change message
+     * body and/or schedule datetime).
+     *
+     * Returns true on success, false on permanent failure.
+     * Throws TransientSmsException on retry-worthy errors.
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function updateScheduled(string $mnotifyJobId, string $phone, string $message, Carbon $scheduledAt): bool
+    {
+        if ($this->isDryRunMode()) {
+            Log::info("[DEV DRY-RUN] Update scheduled SMS #{$mnotifyJobId} for {$phone}");
+
+            return true;
+        }
+
+        $apiKey = $this->getApiKey();
+        if ($apiKey === null) {
+            return false;
+        }
+
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled/{$mnotifyJobId}?key={$apiKey}";
 
         try {
             $response = Http::asJson()
                 ->timeout(15)
                 ->post($endpoint, [
+                    'sender' => config('services.mnotify.sender_id'),
+                    'message' => $message,
+                    'schedule_date' => $scheduledAt->format('Y-m-d H:i'),
+                ]);
+        } catch (ConnectionException $e) {
+            Log::warning("mNotify network failure updating #{$mnotifyJobId}: ".$e->getMessage());
+            throw new TransientSmsException('mNotify network failure: '.$e->getMessage(), 0, $e);
+        }
+
+        if ($response->serverError()) {
+            throw new TransientSmsException('mNotify server error: HTTP '.$response->status());
+        }
+
+        if (! $response->successful()) {
+            Log::error("mNotify update rejected (HTTP {$response->status()}) for #{$mnotifyJobId}: ".$response->body());
+
+            return false;
+        }
+
+        $body = $response->json();
+
+        return ($body['status'] ?? null) === 'success';
+    }
+
+    // ─── Internal helpers ─────────────────────────────────────────
+
+    /**
+     * Build and send the POST /sms/quick request.
+     */
+    protected function postSmsQuick(
+        string $apiKey,
+        string $phone,
+        string $message,
+        bool $isSchedule,
+        ?Carbon $scheduledAt = null,
+    ): Response {
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/').'/sms/quick?key='.$apiKey;
+
+        try {
+            return Http::asJson()
+                ->timeout(15)
+                ->post($endpoint, [
                     'recipient' => [$this->normalise($phone)],
                     'sender' => config('services.mnotify.sender_id'),
                     'message' => $message,
-                    'is_schedule' => false,
-                    'schedule_date' => '',
+                    'is_schedule' => $isSchedule,
+                    'schedule_date' => $isSchedule && $scheduledAt
+                        ? $scheduledAt->format('Y-m-d H:i')
+                        : '',
                 ]);
         } catch (ConnectionException $e) {
-            // Network failure / timeout / DNS error - retry-worthy.
             Log::warning("mNotify transient network failure for {$phone}: ".$e->getMessage());
             throw new TransientSmsException(
                 'mNotify network failure: '.$e->getMessage(),
@@ -75,24 +212,24 @@ class MnotifySmsService
                 $e
             );
         }
+    }
 
-        // HTTP-level error: 5xx is transient (mNotify backend issue),
-        // 4xx is permanent (our request was rejected).
+    /**
+     * Evaluate the response from an immediate send request.
+     */
+    protected function evaluateSendResponse(Response $response, string $phone): bool
+    {
         if ($response->serverError()) {
             Log::warning("mNotify HTTP {$response->status()} for {$phone}: ".$response->body());
-            throw new TransientSmsException(
-                'mNotify server error: HTTP '.$response->status()
-            );
+            throw new TransientSmsException('mNotify server error: HTTP '.$response->status());
         }
 
         if (! $response->successful()) {
-            // 4xx range - permanent (auth, invalid number, etc.)
             Log::error("mNotify SMS rejected (HTTP {$response->status()}) for {$phone}: ".$response->body());
 
             return false;
         }
 
-        // 2xx response. mNotify still reports status in body.
         $body = $response->json();
         if (($body['status'] ?? null) === 'success') {
             return true;
@@ -101,6 +238,80 @@ class MnotifySmsService
         Log::error("mNotify SMS rejected by provider for {$phone}: ".json_encode($body));
 
         return false;
+    }
+
+    /**
+     * Evaluate the response from a schedule request.
+     *
+     * Extracts the mNotify job ID from the response summary.
+     */
+    protected function evaluateScheduleResponse(Response $response, string $phone): ?string
+    {
+        if ($response->serverError()) {
+            Log::warning("mNotify HTTP {$response->status()} scheduling for {$phone}: ".$response->body());
+            throw new TransientSmsException('mNotify server error: HTTP '.$response->status());
+        }
+
+        if (! $response->successful()) {
+            Log::error("mNotify schedule rejected (HTTP {$response->status()}) for {$phone}: ".$response->body());
+
+            return null;
+        }
+
+        $body = $response->json();
+        if (($body['status'] ?? null) === 'success') {
+            // mNotify returns the scheduled job ID in summary.id
+            $jobId = $body['summary']['id'] ?? $body['id'] ?? null;
+
+            if ($jobId !== null) {
+                return (string) $jobId;
+            }
+
+            // Some mNotify responses use 'job_id' or nested 'data'
+            return (string) ($body['job_id'] ?? $body['data']['id'] ?? $body['summary']['job_id'] ?? '');
+        }
+
+        Log::error("mNotify schedule rejected by provider for {$phone}: ".json_encode($body));
+
+        return null;
+    }
+
+    /**
+     * Determine if a dry-run should intercept this send.
+     */
+    protected function shouldDryRun(string $phone, string $message): bool
+    {
+        if (config('services.mnotify.dry_run', app()->environment('local', 'testing'))) {
+            Log::info("[DEV DRY-RUN] SMS intercepted for {$phone}: {$message}");
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if the service is in dry-run mode (without phone/message context).
+     */
+    protected function isDryRunMode(): bool
+    {
+        return config('services.mnotify.dry_run', app()->environment('local', 'testing'));
+    }
+
+    /**
+     * Get the API key, logging a warning if missing.
+     */
+    protected function getApiKey(): ?string
+    {
+        $apiKey = config('services.mnotify.api_key');
+
+        if (! $apiKey) {
+            Log::warning('mNotify API key not configured — SMS not sent.');
+
+            return null;
+        }
+
+        return $apiKey;
     }
 
     /**
