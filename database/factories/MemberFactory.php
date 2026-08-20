@@ -26,4 +26,12 @@ class MemberFactory extends Factory
     {
         return $this->state(fn () => ['status' => 'inactive']);
     }
+
+    public function deceased(): static
+    {
+        return $this->state(fn () => [
+            'status' => 'deceased',
+            'date_of_death' => now()->subDay()->toDateString(),
+        ]);
+    }
 }
