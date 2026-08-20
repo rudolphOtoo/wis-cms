@@ -107,7 +107,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'current_password' => ['required', 'string'],
-            'new_password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->mixedCase()->numbers()->uncompromised()],
+            'new_password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
         if (! Hash::check($request->current_password, $request->user()->password)) {
@@ -152,7 +152,7 @@ class AuthController extends Controller
         $request->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', PasswordRule::min(10)->letters()->mixedCase()->numbers()->uncompromised()],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
         $status = Password::reset(
