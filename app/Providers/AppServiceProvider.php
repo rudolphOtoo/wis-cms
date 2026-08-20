@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configurePasswordRules();
+
         // Point the password-reset email link at the SPA's reset screen,
         // carrying the token + email as query params for the React form.
         ResetPassword::createUrlUsing(function (mixed $notifiable, string $token): string {
@@ -37,6 +40,30 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->configureRateLimiters();
+    }
+
+    /**
+     * Define the global default password validation rules.
+     *
+     * In production the full rule set is enforced (mixed case, symbols,
+     * HaveIBeenPwned check). In non-production environments the data-leak
+     * check is relaxed so developers can set common test passwords.
+     *
+     * The .env toggle `ENABLE_PWNED_PASSWORD_CHECK` allows overriding the
+     * default: set it to `true` to force the check even in non-production,
+     * or `false` to disable it even in production (e.g. offline desktop).
+     */
+    protected function configurePasswordRules(): void
+    {
+        Password::defaults(function () {
+            $rule = Password::min(10)->letters()->mixedCase()->numbers();
+
+            $forcePwned = config('services.pwned_password_check', false);
+
+            $shouldCheck = $forcePwned || $this->app->isProduction();
+
+            return $shouldCheck ? $rule->uncompromised() : $rule;
+        });
     }
 
     /**

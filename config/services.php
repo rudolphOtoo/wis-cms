@@ -58,4 +58,9 @@ return [
         'secret' => env('GOOGLE_FORM_WEBHOOK_SECRET'),
     ],
 
+    // When true, Password::uncompromised() is enforced even in non-production
+    // environments. Useful for staging servers or offline desktops that need
+    // the check disabled: set ENABLE_PWNED_PASSWORD_CHECK=false in .env.
+    'pwned_password_check' => (bool) env('ENABLE_PWNED_PASSWORD_CHECK', false),
+
 ];
