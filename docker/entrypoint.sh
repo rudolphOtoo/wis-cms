@@ -52,6 +52,12 @@ if [ "$1" = "php-fpm" ]; then
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache
+
+    # Pre-schedule dynamic SMS automations (birthdays, service reminders)
+    # on mNotify's remote API so they deliver even when the church desktop
+    # is powered off. Expires any past-due messages that were never sent.
+    echo "Syncing rolling SMS automations..."
+    php artisan sms:sync-rolling-automations
 fi
 
 exec "$@"
