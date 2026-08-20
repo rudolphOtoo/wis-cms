@@ -94,6 +94,41 @@ class Member extends Model
         return $this->hasMany(PastoralNote::class);
     }
 
+    // ── Query Scopes ────────────────────────────────────────────────────────
+
+    /**
+     * Active, non-soft-deleted members.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active')->whereNull('deleted_at');
+    }
+
+    /**
+     * Members eligible for SMS broadcasts: active, alive, with a phone number.
+     *
+     * This scope is the single source of truth for automated messaging
+     * pipelines (birthday greetings, service reminders, attendance
+     * follow-ups, ad-hoc broadcasts). Any query that feeds into the
+     * SMS dispatch pipeline MUST use this scope.
+     */
+    public function scopeEligibleForSms($query)
+    {
+        return $query->where('status', 'active')
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->whereNull('deleted_at');
+    }
+
+    /**
+     * Deceased members — kept for historical records but excluded from
+     * all automated communications.
+     */
+    public function scopeDeceased($query)
+    {
+        return $query->where('status', 'deceased');
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim(preg_replace('/\\s+/', ' ', "{$this->first_name} {$this->other_names} {$this->last_name}"));

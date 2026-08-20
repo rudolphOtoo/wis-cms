@@ -44,3 +44,16 @@ Schedule::command('reminders:send')->hourly();
 // Weekly welfare flag recomputation — runs Sunday evening after services.
 // Computes attendance-based welfare flags for all active members per branch.
 Schedule::command('welfare:compute')->weeklyOn(0, '20:00');
+
+// Retry failed mNotify API calls from the offline pending queue.
+// Runs every 5 minutes; idempotent and safe to re-run. Picks up
+// scheduled SMS that couldn't be pushed to mNotify due to network
+// issues and retries them.
+Schedule::command('sync:pending-schedules')->everyFiveMinutes();
+
+// Rolling pre-scheduler: push dynamic SMS automations (birthdays,
+// service reminders) to mNotify's remote queue for offline resilience.
+// Runs daily at 05:00, before the 07:00 birthday send. Supplemented
+// by the entrypoint.sh boot-time run which ensures14 days are always
+// queued after a container restart.
+Schedule::command('sms:sync-rolling-automations')->dailyAt('05:00');
