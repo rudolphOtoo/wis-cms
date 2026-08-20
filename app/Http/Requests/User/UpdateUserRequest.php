@@ -38,14 +38,11 @@ class UpdateUserRequest extends FormRequest
             ],
 
             // MEDIUM-03 FIX: enforce password complexity on admin-set passwords.
-            // uncompromised() checks HaveIBeenPwned; remove if offline deployment.
+            // Environment-aware rules via Password::defaults() — uncompromised()
+            // is only enforced in production (or when ENABLE_PWNED_PASSWORD_CHECK=true).
             'password' => [
                 'nullable',
-                Password::min(10)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->uncompromised(),
+                Password::defaults(),
                 'confirmed',
             ],
 
