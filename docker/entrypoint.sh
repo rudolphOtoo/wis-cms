@@ -56,10 +56,17 @@ if [ "$1" = "php-fpm" ]; then
     # Pre-schedule dynamic SMS automations (birthdays, service reminders)
     # on mNotify's remote API so they deliver even when the church desktop
     # is powered off. Expires any past-due messages that were never sent.
+    # Requires MNOTIFY_DRY_RUN=false in the deployment env — with live sends
+    # configured these commands run unattended on every boot; otherwise they
+    # no-op safely.
     # Non-fatal: if the API is unreachable or the key is missing the app
     # must still boot — the daily cron will retry on the next cycle.
     echo "Syncing rolling SMS automations..."
     php artisan sms:sync-rolling-automations || echo "WARNING: SMS sync skipped (will retry on next cron cycle)"
+
+    # Drain any pushes that failed previously (network down at last boot).
+    # Non-fatal: the every-5-minutes cron retries this continuously.
+    php artisan sync:pending-schedules || echo "WARNING: pending schedule drain skipped"
 fi
 
 exec "$@"

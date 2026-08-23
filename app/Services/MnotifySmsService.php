@@ -260,15 +260,45 @@ class MnotifySmsService
 
         $body = $response->json();
         if (($body['status'] ?? null) === 'success') {
-            // mNotify returns the scheduled job ID in summary.id
-            $jobId = $body['summary']['id'] ?? $body['id'] ?? null;
+            // mNotify returns the scheduled job ID in summary._id (V2 API),
+            // with legacy shapes falling back to id / summary.id.
+            $summary = $body['summary'] ?? null;
+            $jobId = null;
+
+            if (is_array($summary)) {
+                // Bulk responses wrap jobs in a list: summary[0]._id
+                if (array_is_list($summary)) {
+                    $jobId = $summary[0]['_id']
+                        ?? $summary[0]['id']
+                        ?? $summary[0]['job_id']
+                        ?? null;
+                } else {
+                    $jobId = $summary['_id']
+                        ?? $summary['id']
+                        ?? $summary['job_id']
+                        ?? null;
+                }
+            }
+
+            $jobId = $jobId
+                ?? ($body['_id'] ?? null)
+                ?? ($body['id'] ?? null)
+                ?? ($body['job_id'] ?? null)
+                ?? ($body['data']['id'] ?? null)
+                ?? ($body['data']['_id'] ?? null);
 
             if ($jobId !== null) {
                 return (string) $jobId;
             }
 
-            // Some mNotify responses use 'job_id' or nested 'data'
-            return (string) ($body['job_id'] ?? $body['data']['id'] ?? $body['summary']['job_id'] ?? '');
+            // Accepted but no parseable job ID — log the raw body so new
+            // response shapes surface in logs instead of silent failures.
+            Log::warning('mNotify schedule accepted but no job ID found in response', [
+                'phone' => $phone,
+                'response_body' => $response->body(),
+            ]);
+
+            return '';
         }
 
         Log::error("mNotify schedule rejected by provider for {$phone}: ".json_encode($body));
