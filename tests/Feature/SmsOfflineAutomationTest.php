@@ -380,6 +380,10 @@ class SmsOfflineAutomationTest extends TestCase
     {
         Http::fake();
 
+        // Simulate a dry-run deployment: without MNOTIFY_DRY_RUN=false the
+        // command must refuse to run under testing even with an API key set.
+        config(['services.mnotify.dry_run' => true]);
+
         $this->artisan('sms:sync-rolling-automations')
             ->expectsOutputToContain('Skipping')
             ->assertSuccessful();
