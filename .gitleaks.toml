@@ -1,0 +1,55 @@
+# Gitleaks configuration — WIS-CMS
+#
+# Extends gitleaks' built-in rules (AWS keys, Paystack sk_live/sk_test,
+# generic API keys, private keys, high-entropy tokens) with patterns for
+# the credentials actually used by this project.
+#
+# Local run:   gitleaks git --pre-commit --staged --redact -v
+# Full repo:   gitleaks detect --redact -v
+
+[extend]
+useDefault = true
+
+# mNotify API key assignments (the August 2026 incident vector).
+# Matches real values only — empty/placeholder assignments are safe.
+[[rules]]
+id = "mnotify-api-key"
+description = "mNotify API key hardcoded in a tracked file"
+regex = '''(?i)mnotify[_-]?api[_-]?key[ \t]*=[ \t]*["']?[A-Za-z0-9][A-Za-z0-9_\-]{15,}'''
+keywords = ["mnotify"]
+
+# Laravel APP_KEY baked into any tracked file (session/PII encryption root).
+[[rules]]
+id = "laravel-app-key"
+description = "Laravel APP_KEY baked into a tracked file"
+regex = '''(?i)^APP_KEY=base64:[A-Za-z0-9+/]{20,}={0,2}'''
+keywords = ["APP_KEY"]
+
+# Google Form intake webhook shared secret (48-hex by convention).
+[[rules]]
+id = "gform-webhook-secret"
+description = "Member intake webhook secret hardcoded in a tracked file"
+regex = '''(?i)GOOGLE_FORM_WEBHOOK_SECRET[ \t]*=[ \t]*["']?[a-f0-9]{24,}'''
+keywords = ["GOOGLE_FORM_WEBHOOK_SECRET"]
+
+[rules.mnotify-api-key.allowlist]
+paths = '''(^|/)\.env\.example$'''
+
+[rules.laravel-app-key.allowlist]
+paths = '''(^|/)\.env\.example$'''
+
+[rules.gform-webhook-secret.allowlist]
+paths = '''(^|/)\.env\.example$'''
+
+# Test fixtures intentionally use short fake values; the length floors
+# above keep them out of findings. Extend allowlists here if a future
+# fixture trips a default rule — never weaken a regex to silence one.
+
+[allowlist]
+description = "Known-safe documentation & fixture placeholders"
+regexes = [
+    '''(?i)your-mnotify-api-key''',
+    '''(?i)your[_-]?api[_-]?key[_-]?here''',
+    # Dummy webhook secret used consistently across intake docs/examples
+    '''a1b2c3d4e5f6g7h8''',
+]

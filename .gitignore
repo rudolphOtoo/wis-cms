@@ -45,3 +45,19 @@ yarn-error.log
 # Deployment env docs must never carry real values (see security incident 2026-08)
 .env.deploy.md
 *.deploy.env
+
+# ── Secret hygiene (hardened after the Aug 2026 leak) ──────────────
+# All env-file iterations; only the annotated template is tracked.
+.env*
+!.env.example
+# Private keys / certificates / keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+# Deployment secret manifests
+*secret*
+*credential*
+!.gitleaks.toml
+!config/services.example.php
