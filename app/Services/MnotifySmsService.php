@@ -143,6 +143,140 @@ class MnotifySmsService
             return true;
         }
 
+        return $this->putScheduledUpdate($mnotifyJobId, [
+            'sender' => config('services.mnotify.sender_id'),
+            'message' => $message,
+            // mNotify only accepts schedule times between 7am and 7pm
+            'schedule_date' => $scheduledAt->format('Y-m-d H:i'),
+        ]);
+    }
+
+    /**
+     * Defuse a scheduled SMS by pushing its send date far into the
+     * future, so it can never fire while it still exists remotely.
+     *
+     * This is the operational fallback for cancelling jobs while
+     * mNotify's DELETE /scheduled/{id} endpoint is unavailable
+     * (currently returns HTTP 500 server-side). Credits are only
+     * charged on actual dispatch, so a dormant year-2099 job costs
+     * nothing and members never receive the message.
+     *
+     * Returns true on success, false on permanent failure.
+     * Throws TransientSmsException on retry-worthy errors.
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function defuseScheduled(string $mnotifyJobId): bool
+    {
+        if ($this->isDryRunMode()) {
+            Log::info("[DEV DRY-RUN] Defuse scheduled SMS #{$mnotifyJobId}");
+
+            return true;
+        }
+
+        return $this->putScheduledUpdate($mnotifyJobId, [
+            // mNotify requires sender + message on every update, even
+            // when only moving the date.
+            'sender' => config('services.mnotify.sender_id'),
+            'message' => '(cancelled)',
+            // mNotify only accepts schedule times between 7am and 7pm
+            'schedule_date' => '2099-12-31 07:00',
+        ]);
+    }
+
+    /**
+     * Resolve the authoritative remote handle for a scheduled SMS.
+     *
+     * mNotify's scheduling response returns a job reference that does
+     * NOT match the numeric `_id` used by GET /scheduled (and required
+     * by DELETE/PUT /scheduled/{id}). Cancellations driven by locally
+     * stored IDs therefore fail against the live API. This method lists
+     * the remote schedule once per process and matches a delivery to
+     * its remote row by exact date_time + message body; when several
+     * identical messages were pushed in one batch (the normal case for
+     * branch-wide reminders), candidates are consumed positionally.
+     *
+     * Returns null when no unconsumed remote match exists (job already
+     * dispatched/purged, or the listing is unreachable).
+     */
+    public function resolveScheduledJobId(string $messageBody, Carbon $scheduledAt): ?string
+    {
+        $this->loadRemoteSchedule();
+
+        $dateTime = $scheduledAt->format('Y-m-d H:i:s');
+        $needle = trim($messageBody);
+
+        foreach ($this->remoteScheduleCache as $job) {
+            if (($job['date_time'] ?? null) !== $dateTime) {
+                continue;
+            }
+
+            if (trim((string) ($job['message'] ?? '')) !== $needle) {
+                continue;
+            }
+
+            $id = (string) ($job['_id'] ?? '');
+
+            if ($id !== '' && ! in_array($id, $this->consumedRemoteIds, true)) {
+                $this->consumedRemoteIds[] = $id;
+
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /** @var list<array<string, mixed>> */
+    protected array $remoteScheduleCache = [];
+
+    protected bool $remoteScheduleLoaded = false;
+
+    /** @var list<string> */
+    protected array $consumedRemoteIds = [];
+
+    protected function loadRemoteSchedule(): void
+    {
+        if ($this->remoteScheduleLoaded) {
+            return;
+        }
+
+        $this->remoteScheduleLoaded = true;
+
+        try {
+            $apiKey = $this->getApiKey();
+            if ($apiKey === null) {
+                return;
+            }
+
+            $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled?key={$apiKey}";
+            $response = Http::timeout(30)->get($endpoint);
+
+            if (! $response->successful()) {
+                Log::warning('mNotify schedule listing unavailable (HTTP '.$response->status().')');
+
+                return;
+            }
+
+            $jobs = $response->json('summary');
+            $this->remoteScheduleCache = is_array($jobs) ? array_values($jobs) : [];
+        } catch (ConnectionException $e) {
+            Log::warning('mNotify schedule listing unreachable: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Send a PUT update for an existing scheduled SMS.
+     *
+     * NOTE: per-item operations use PUT /scheduled/{id}. The older
+     * POST verb is rejected with HTTP 405 by the current API.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    protected function putScheduledUpdate(string $mnotifyJobId, array $payload): bool
+    {
         $apiKey = $this->getApiKey();
         if ($apiKey === null) {
             return false;
@@ -153,11 +287,7 @@ class MnotifySmsService
         try {
             $response = Http::asJson()
                 ->timeout(15)
-                ->post($endpoint, [
-                    'sender' => config('services.mnotify.sender_id'),
-                    'message' => $message,
-                    'schedule_date' => $scheduledAt->format('Y-m-d H:i'),
-                ]);
+                ->put($endpoint, $payload);
         } catch (ConnectionException $e) {
             Log::warning("mNotify network failure updating #{$mnotifyJobId}: ".$e->getMessage());
             throw new TransientSmsException('mNotify network failure: '.$e->getMessage(), 0, $e);
