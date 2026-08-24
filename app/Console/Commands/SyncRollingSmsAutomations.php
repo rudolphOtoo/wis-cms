@@ -227,7 +227,13 @@ class SyncRollingSmsAutomations extends Command
 
     /**
      * Idempotency check: has this event already been scheduled
-     * (or dispatched) for the given date?
+     * (or dispatched) for the given date — or was it explicitly
+     * cancelled/defused?
+     *
+     * Live statuses prevent duplicate pushes on repeated runs.
+     * Cancelled statuses act as tombstones so a re-run never
+     * resurrects a delivery an admin deliberately cancelled or
+     * that the system defused against mNotify.
      */
     protected function isAlreadyScheduled(
         string $sourceType,
@@ -243,6 +249,8 @@ class SyncRollingSmsAutomations extends Command
                 ScheduledSmsDelivery::STATUS_PENDING_API,
                 ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
                 ScheduledSmsDelivery::STATUS_DISPATCHED,
+                ScheduledSmsDelivery::STATUS_CANCELLED,
+                ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE,
             ]);
 
         if ($phone !== null) {

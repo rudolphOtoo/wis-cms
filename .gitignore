@@ -41,3 +41,7 @@ yarn-error.log
 *.swo
 *~
 *.sql
+
+# Deployment env docs must never carry real values (see security incident 2026-08)
+.env.deploy.md
+*.deploy.env

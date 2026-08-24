@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\TransientSmsException;
 use App\Models\PendingRemoteSchedule;
 use App\Models\ScheduledSmsDelivery;
 use App\Services\MnotifySmsService;
@@ -115,13 +116,59 @@ class SyncPendingRemoteSchedules extends Command
     {
         $payload = $item->payload;
         $sms = app(MnotifySmsService::class);
+        $jobId = (string) $payload['mnotify_job_id'];
 
-        $sms->cancelScheduled($payload['mnotify_job_id']);
+        // Resolve the authoritative remote listing handle (push-time
+        // references don't match mNotify's numeric _ids).
+        if ($item->scheduled_sms_delivery_id) {
+            $delivery = ScheduledSmsDelivery::find($item->scheduled_sms_delivery_id);
+
+            if ($delivery && $delivery->message_body && $delivery->scheduled_at) {
+                $resolved = $sms->resolveScheduledJobId($delivery->message_body, $delivery->scheduled_at);
+
+                if ($resolved !== null) {
+                    $jobId = $resolved;
+
+                    if ($resolved !== $payload['mnotify_job_id']) {
+                        $delivery->update(['mnotify_job_id' => $resolved]);
+                    }
+                }
+            }
+        }
+
+        try {
+            $cancelled = $sms->cancelScheduled($jobId);
+
+            if (! $cancelled) {
+                // DELETE permanently refused (404 gone / 405 rejected /
+                // already dispatched) — defusal is the last resort
+                // before accepting a local-only cancellation.
+                $cancelled = $sms->defuseScheduled($jobId);
+            }
+        } catch (TransientSmsException $e) {
+            // DELETE endpoint outage (HTTP 500 / network). Try defusing
+            // before giving up; if defusal also fails transiently the
+            // original error propagates so this item stays queued and
+            // is retried on the next sync cycle.
+            try {
+                $cancelled = $sms->defuseScheduled($jobId);
+            } catch (TransientSmsException) {
+                throw $e;
+            }
+
+            if (! $cancelled) {
+                throw $e;
+            }
+        }
 
         if ($item->scheduled_sms_delivery_id) {
             $delivery = ScheduledSmsDelivery::find($item->scheduled_sms_delivery_id);
             if ($delivery && $delivery->isCancellable()) {
-                $delivery->markCancelled();
+                if ($cancelled) {
+                    $delivery->markCancelledRemote();
+                } else {
+                    $delivery->markCancelled();
+                }
             }
         }
     }

@@ -26,6 +26,8 @@ class ScheduledSmsDelivery extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const STATUS_CANCELLED_REMOTE = 'cancelled_remote';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
@@ -77,6 +79,11 @@ class ScheduledSmsDelivery extends Model
         return $query->where('status', self::STATUS_SCHEDULED_REMOTE);
     }
 
+    public function scopeCancelledRemote($query)
+    {
+        return $query->where('status', self::STATUS_CANCELLED_REMOTE);
+    }
+
     public function scopeActive($query)
     {
         return $query->whereIn('status', [self::STATUS_PENDING_API, self::STATUS_SCHEDULED_REMOTE]);
@@ -116,6 +123,14 @@ class ScheduledSmsDelivery extends Model
     public function markCancelled(): void
     {
         $this->update(['status' => self::STATUS_CANCELLED]);
+    }
+
+    public function markCancelledRemote(?array $response = null): void
+    {
+        $this->update([
+            'status' => self::STATUS_CANCELLED_REMOTE,
+            'mnotify_response' => $response,
+        ]);
     }
 
     public function markDispatched(): void

@@ -300,7 +300,7 @@ class SmsSchedulingTest extends TestCase
 
         (new CancelScheduledSmsJob($delivery->id))->handle(app(MnotifySmsService::class));
 
-        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED, $delivery->fresh()->status);
+        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE, $delivery->fresh()->status);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'DELETE'

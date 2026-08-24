@@ -53,6 +53,14 @@ if [ "$1" = "php-fpm" ]; then
     php artisan route:cache
     php artisan view:cache
 
+    # Cancel any remote SMS still queued on mNotify for automations that
+    # were deactivated/deleted while the church PC was off. Runs BEFORE
+    # the rolling sync so ghost reminders never survive a reboot.
+    # Requires MNOTIFY_DRY_RUN=false — otherwise it no-ops safely.
+    # Non-fatal: the daily cron and the admin UI observer retry this.
+    echo "Cancelling remote SMS for deactivated automations..."
+    php artisan sms:cancel-deactivated-reminders --force || echo "WARNING: deactivated-reminder cleanup skipped"
+
     # Pre-schedule dynamic SMS automations (birthdays, service reminders)
     # on mNotify's remote API so they deliver even when the church desktop
     # is powered off. Expires any past-due messages that were never sent.

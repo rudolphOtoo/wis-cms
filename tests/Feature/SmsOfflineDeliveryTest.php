@@ -440,9 +440,9 @@ class SmsOfflineDeliveryTest extends TestCase
         (new CancelScheduledSmsJob($delivery->id))
             ->handle(app(MnotifySmsService::class));
 
-        // Verify: local record marked cancelled.
+        // Verify: local record marked cancelled (remote confirmed).
         $delivery->refresh();
-        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED, $delivery->status);
+        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE, $delivery->status);
 
         // Verify: DELETE request sent to mNotify.
         Http::assertSent(function ($request) {
@@ -507,7 +507,7 @@ class SmsOfflineDeliveryTest extends TestCase
         $this->artisan('sync:pending-schedules', ['--force' => true])->assertSuccessful();
 
         $delivery->refresh();
-        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED, $delivery->status);
+        $this->assertSame(ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE, $delivery->status);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'DELETE'

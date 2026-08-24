@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\ServiceReminderSettings;
+use App\Observers\ServiceReminderSettingsObserver;
 use App\Services\Payments\PaymentGatewayManager;
 use App\Support\PhoneNormalizer;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -29,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ServiceReminderSettings::observe(ServiceReminderSettingsObserver::class);
+
         $this->configurePasswordRules();
 
         // Point the password-reset email link at the SPA's reset screen,
