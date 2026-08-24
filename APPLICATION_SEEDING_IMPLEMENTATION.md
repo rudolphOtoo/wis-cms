@@ -129,7 +129,7 @@ services:
     environment:
       POSTGRES_DB: wis_cms
       POSTGRES_USER: wis_admin
-      POSTGRES_PASSWORD: wis_secret_2024
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set in .env}
     ports:
       - "5433:5432"
     volumes:
