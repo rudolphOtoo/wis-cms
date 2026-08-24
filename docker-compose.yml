@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_DATABASE:-wis_cms}
       POSTGRES_USER: ${DB_USERNAME:-wis_admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     ports:
       - "5433:5432"
     volumes:
@@ -33,7 +33,7 @@ services:
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
-      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
     depends_on:
       postgres:
@@ -71,7 +71,7 @@ services:
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
-      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     depends_on:
@@ -90,7 +90,7 @@ services:
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
-      DB_PASSWORD: ${DB_PASSWORD:-wis_secret_2024}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
     command: php artisan schedule:work
     depends_on:

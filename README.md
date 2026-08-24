@@ -93,7 +93,7 @@ DB_HOST=127.0.0.1
 DB_PORT=5433
 DB_DATABASE=wis_cms
 DB_USERNAME=wis_admin
-DB_PASSWORD=wis_secret_2024
+DB_PASSWORD=<generate-with-openssl-rand-hex-20>
 ```
 
 Start PostgreSQL:
