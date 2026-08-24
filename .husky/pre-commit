@@ -1,1 +1,18 @@
 npx lint-staged
+
+# ── Secret-leak gate (added after the Aug 2026 .env.deploy.md incident) ──
+# Scans STAGED changes for API keys, tokens, private keys, and baked
+# credentials before a commit can be created. Config: .gitleaks.toml
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks git --pre-commit --staged --redact -v --config .gitleaks.toml || {
+        echo ""
+        echo "COMMIT BLOCKED: potential secret detected in staged changes."
+        echo "  - Real secret?  Rotate the credential, then remove it from staging."
+        echo "  - False positive? Add an allowlist entry in .gitleaks.toml."
+        echo "  Never bypass this check with --no-verify without rotating first."
+        exit 1
+    }
+else
+    echo "WARNING: gitleaks not installed — secret scan skipped."
+    echo "  Install with: brew install gitleaks   (recommended for all committers)"
+fi
