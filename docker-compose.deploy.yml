@@ -39,8 +39,10 @@ services:
       test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
       interval: 10s
       timeout: 5s
-      start_period: 120s
-      retries: 5
+      # First boot runs migrations + full roster import before php-fpm
+      # execs; dependents must not time out during that window.
+      start_period: 300s
+      retries: 12
 
   webserver:
     image: ghcr.io/rudolphotoo/wis-cms-webserver:${IMAGE_TAG:-latest}
