@@ -105,7 +105,7 @@ class MnotifySmsService
         $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled/{$mnotifyJobId}?key={$apiKey}";
 
         try {
-            $response = Http::timeout(15)->delete($endpoint);
+            $response = Http::connectTimeout(5)->timeout(10)->delete($endpoint);
         } catch (ConnectionException $e) {
             Log::warning("mNotify network failure cancelling #{$mnotifyJobId}: ".$e->getMessage());
             throw new TransientSmsException('mNotify network failure: '.$e->getMessage(), 0, $e);
@@ -250,7 +250,7 @@ class MnotifySmsService
             }
 
             $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled?key={$apiKey}";
-            $response = Http::timeout(30)->get($endpoint);
+            $response = Http::retry(3, 200, null, false)->connectTimeout(5)->timeout(10)->get($endpoint);
 
             if (! $response->successful()) {
                 Log::warning('mNotify schedule listing unavailable (HTTP '.$response->status().')');
@@ -286,7 +286,8 @@ class MnotifySmsService
 
         try {
             $response = Http::asJson()
-                ->timeout(15)
+                ->connectTimeout(5)
+                ->timeout(10)
                 ->put($endpoint, $payload);
         } catch (ConnectionException $e) {
             Log::warning("mNotify network failure updating #{$mnotifyJobId}: ".$e->getMessage());
@@ -308,6 +309,172 @@ class MnotifySmsService
         return ($body['status'] ?? null) === 'success';
     }
 
+    // ─── Balance check ──────────────────────────────────────────
+
+    /**
+     * Query mNotify for the current account credit balance.
+     *
+     * Returns the numeric balance (e.g. 152.0) on success.
+     * Returns null when the API key is missing, the endpoint is
+     * unreachable, or the response cannot be parsed.
+     *
+     * @throws TransientSmsException on network/server errors (retry-worthy)
+     */
+    public function checkBalance(): ?float
+    {
+        $apiKey = $this->getApiKey();
+        if ($apiKey === null) {
+            return null;
+        }
+
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/balance?key={$apiKey}";
+
+        try {
+            $response = Http::retry(3, 200, null, false)->connectTimeout(5)->timeout(10)->get($endpoint);
+        } catch (ConnectionException $e) {
+            Log::warning('mNotify balance check network failure: '.$e->getMessage());
+            throw new TransientSmsException('mNotify network failure: '.$e->getMessage(), 0, $e);
+        }
+
+        if ($response->serverError()) {
+            throw new TransientSmsException('mNotify server error on balance check: HTTP '.$response->status());
+        }
+
+        if (! $response->successful()) {
+            Log::error('mNotify balance check rejected (HTTP '.$response->status().'): '.$response->body());
+
+            return null;
+        }
+
+        $body = $response->json();
+
+        // mNotify returns balance in summary.balance or top-level balance
+        $balance = $body['summary']['balance']
+            ?? $body['balance']
+            ?? $body['data']['balance']
+            ?? null;
+
+        if ($balance === null) {
+            Log::warning('mNotify balance response missing balance field', ['response' => $body]);
+
+            return null;
+        }
+
+        return (float) $balance;
+    }
+
+    /**
+     * Estimate the number of SMS credits required for a batch of messages.
+     *
+     * Detects encoding per-message:
+     *   - GSM 7-bit (Latin + basic symbols): 160 chars/part1, 153/part 2+
+     *   - UCS-2 (emojis, non-Latin scripts):  70 chars/part1,  67/part 2+
+     *
+     * Church templates frequently contain emojis (🙏🏽, ⛪, ❤️) which
+     * force UCS-2 encoding. Using GSM limits for UCS-2 messages would
+     * undercount segments and cause mid-batch credit depletion.
+     *
+     * Returns the total segments across all messages.
+     */
+    public function estimateCredits(array $messages): int
+    {
+        $totalSegments = 0;
+
+        foreach ($messages as $message) {
+            $totalSegments += $this->estimateMessageSegments($message);
+        }
+
+        return $totalSegments;
+    }
+
+    /**
+     * Query mNotify for delivery reports.
+     *
+     * Returns a flat array of campaign/sending records, each keyed by _id
+     * with fields including 'status', 'message', 'date_time', 'phone', etc.
+     *
+     * Returns [] on network/decode failure (fail-open for reconciliation).
+     *
+     * @see https://developer.mnotify.com/api/campaigns#tag/Campaigns/operation/getCampaigns
+     */
+    public function fetchDeliveryReports(): array
+    {
+        $apiKey = config('services.mnotify.api_key');
+        if (! $apiKey) {
+            return [];
+        }
+
+        $url = config('services.mnotify.base_url', 'https://api.mnotify.com/api').'/reports/campaigns';
+
+        try {
+            $response = Http::retry(3, 200, null, false)->connectTimeout(5)->timeout(10)->get($url, [
+                'key' => $apiKey,
+            ]);
+
+            if ($response->failed()) {
+                return [];
+            }
+
+            $payload = $response->json();
+
+            // mNotify wraps results in 'summary' or returns a flat array
+            return $payload['summary'] ?? (is_array($payload) ? $payload : []);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Estimate the number of SMS segments for a single message,
+     * selecting GSM 7-bit or UCS-2 limits based on content.
+     */
+    protected function estimateMessageSegments(string $message): int
+    {
+        $length = mb_strlen($message);
+        $isUcs2 = $this->isUcs2Message($message);
+
+        if ($isUcs2) {
+            // UCS-2 encoding: 70 chars per single segment, 67 for multi-part
+            return $length <= 70 ? 1 : (int) ceil($length / 67);
+        }
+
+        // GSM 7-bit encoding: 160 chars per single segment, 153 for multi-part
+        return $length <= 160 ? 1 : (int) ceil($length / 153);
+    }
+
+    /**
+     * Detect whether a message requires UCS-2 encoding.
+     *
+     * Returns true if ANY character falls outside the GSM 7-bit
+     * default alphabet + extension table. Common non-GSM characters
+     * in church SMS: emojis (🙏🏽, ❤️, ⛪), em-dash (—), smart quotes.
+     *
+     * GSM 7-bit default charset: @£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ
+     *   ÆæßÉ !"#¤%&'()*+,-./0123456789:;<=>? ¡ABCDEFGHIJKLMNOPQRSTUVWXYZ
+     * GSM 7-bit extension table (each counted as2 length units):
+     *   ^{}\[~]|€
+     */
+    public function isUcs2Message(string $message): bool
+    {
+        // Single-byte ASCII subset of GSM (fast path for pure-ASCII messages)
+        if (preg_match('/^[\x00-\x7F]*$/', $message)) {
+            return false;
+        }
+
+        $gsmDefault = '@£$¥èéùìòÇØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        $gsmExtended = '^{}[~]|€';
+
+        $len = mb_strlen($message);
+        for ($i = 0; $i < $len; $i++) {
+            $char = mb_substr($message, $i, 1);
+            if (strpos($gsmDefault, $char) === false && strpos($gsmExtended, $char) === false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ─── Internal helpers ─────────────────────────────────────────
 
     /**
@@ -324,7 +491,8 @@ class MnotifySmsService
 
         try {
             return Http::asJson()
-                ->timeout(15)
+                ->connectTimeout(5)
+                ->timeout(10)
                 ->post($endpoint, [
                     'recipient' => [$this->normalise($phone)],
                     'sender' => config('services.mnotify.sender_id'),

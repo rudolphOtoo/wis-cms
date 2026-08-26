@@ -249,9 +249,13 @@ class SmsOfflineDeliveryTest extends TestCase
 
         // Inspect the exact JSON payload structure.
         Http::assertSent(function ($request) use ($birthdayDate) {
+            // Skip non-SMS requests (e.g. /balance endpoint)
+            if (! str_contains($request->url(), '/sms/quick')) {
+                return false;
+            }
+
             // Must POST to /sms/quick with API key.
-            $urlOk = str_contains($request->url(), '/sms/quick')
-                && str_contains($request->url(), 'key=test-key');
+            $urlOk = str_contains($request->url(), 'key=test-key');
 
             // Required fields present and correct.
             $fieldsOk = $request['is_schedule'] === true

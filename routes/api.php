@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ServiceReminderController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\SystemAlertController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitorController;
 use App\Http\Middleware\EnsurePasswordChanged;
@@ -83,6 +84,10 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
     Route::get('bootstrap', [AuthController::class, 'bootstrap']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
+
+    // SYSTEM ALERTS
+    Route::get('system-alerts', [SystemAlertController::class, 'index']);
+    Route::post('system-alerts/{id}/acknowledge', [SystemAlertController::class, 'acknowledge']);
 
     // MEMBERS
     Route::middleware('permission:view members')->group(function () {
