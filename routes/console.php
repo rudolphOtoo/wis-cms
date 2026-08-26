@@ -57,3 +57,11 @@ Schedule::command('sync:pending-schedules')->everyFiveMinutes();
 // by the entrypoint.sh boot-time run which ensures14 days are always
 // queued after a container restart.
 Schedule::command('sms:sync-rolling-automations')->dailyAt('05:00');
+
+// Post-delivery reconciliation: query mNotify for actual delivery
+// status of past-due scheduled SMS instead of naively marking them
+// expired. Runs 30 minutes after the rolling sync to allow time for
+// mNotify to process scheduled jobs, and again after the hourly
+// reminder send to reconcile any that just fired.
+Schedule::command('sms:reconcile-remote-statuses')->dailyAt('05:30');
+Schedule::command('sms:reconcile-remote-statuses')->hourlyAt(15);

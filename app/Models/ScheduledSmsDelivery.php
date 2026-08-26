@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Tracks each SMS scheduled via mNotify's remote scheduling API.
  *
- * Lifecycle: pending_api → scheduled_remote → dispatched/cancelled/failed
+ * Lifecycle: pending_api → scheduled_remote → dispatched/cancelled/failed/failed_provider
  */
 class ScheduledSmsDelivery extends Model
 {
@@ -30,6 +30,8 @@ class ScheduledSmsDelivery extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUS_FAILED_PROVIDER = 'failed_provider';
+
     protected $fillable = [
         'branch_id',
         'mnotify_job_id',
@@ -41,6 +43,7 @@ class ScheduledSmsDelivery extends Model
         'source_id',
         'created_by',
         'error_message',
+        'failure_reason',
         'mnotify_response',
     ];
 
@@ -120,6 +123,15 @@ class ScheduledSmsDelivery extends Model
         ]);
     }
 
+    public function markFailedProvider(string $reason, ?array $response = null): void
+    {
+        $this->update([
+            'status' => self::STATUS_FAILED_PROVIDER,
+            'failure_reason' => $reason,
+            'mnotify_response' => $response,
+        ]);
+    }
+
     public function markCancelled(): void
     {
         $this->update(['status' => self::STATUS_CANCELLED]);
@@ -133,9 +145,13 @@ class ScheduledSmsDelivery extends Model
         ]);
     }
 
-    public function markDispatched(): void
+    public function markDispatched(?array $response = null): void
     {
-        $this->update(['status' => self::STATUS_DISPATCHED]);
+        $update = ['status' => self::STATUS_DISPATCHED];
+        if ($response !== null) {
+            $update['mnotify_response'] = $response;
+        }
+        $this->update($update);
     }
 
     public function isCancellable(): bool

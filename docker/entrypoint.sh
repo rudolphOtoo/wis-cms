@@ -75,6 +75,12 @@ if [ "$1" = "php-fpm" ]; then
     # Drain any pushes that failed previously (network down at last boot).
     # Non-fatal: the every-5-minutes cron retries this continuously.
     php artisan sync:pending-schedules || echo "WARNING: pending schedule drain skipped"
+
+    # Reconcile past-due SMS with mNotify's actual delivery report.
+    # Determines whether messages were sent, failed (e.g. insufficient
+    # credits), or are still pending — instead of naively marking them expired.
+    echo "Reconciling remote SMS delivery statuses..."
+    php artisan sms:reconcile-remote-statuses || echo "WARNING: remote status reconciliation skipped"
 fi
 
 exec "$@"

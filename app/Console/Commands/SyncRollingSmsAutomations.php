@@ -7,8 +7,12 @@ use App\Models\BirthdayMessageSettings;
 use App\Models\Member;
 use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderSettings;
+use App\Models\SystemAlert;
+use App\Services\MnotifySmsService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -18,6 +22,12 @@ use Illuminate\Support\Facades\Log;
  * scheduling API up to 14 days in advance. This decouples automated
  * SMS delivery from the local schedule:run cron, ensuring messages
  * deliver even when the church desktop is powered off.
+ *
+ * Pre-Sync Credit Guard:
+ *   Before pushing any batch to mNotify, the command queries the
+ *   account balance. If available credits < required credits, it
+ *   marks the batch as failed_insufficient_credits and aborts —
+ *   preventing silent delivery failures.
  *
  * Runs on:
  *   1. Container boot (docker/entrypoint.sh) — catches up after offline
@@ -35,7 +45,41 @@ class SyncRollingSmsAutomations extends Command
 
     protected $description = 'Pre-schedule dynamic SMS automations to mNotify for offline resilience';
 
+    /**
+     * Atomic lock key — prevents concurrent runs when entrypoint.sh
+     * and the task scheduler both trigger this command simultaneously.
+     * Lock held for 30s (typical run < 10s); acquire waits up to 5s.
+     */
+    private const LOCK_KEY = 'sms_sync_rolling_automations_lock';
+
+    private const LOCK_TTL = 30;
+
+    private const LOCK_WAIT = 5;
+
     public function handle(): int
+    {
+        // ─── Atomic execution lock ───────────────────────────────
+        // Prevents race conditions when container boot (entrypoint.sh)
+        // and the daily cron (05:00) fire simultaneously.
+        $lock = Cache::lock(self::LOCK_KEY, self::LOCK_TTL);
+
+        try {
+            $lock->block(self::LOCK_WAIT);
+        } catch (LockTimeoutException) {
+            $this->warn('Another sms:sync-rolling-automations is already running. Skipping.');
+            Log::info('sms:sync-rolling-automations: skipped — concurrent execution detected');
+
+            return self::SUCCESS;
+        }
+
+        try {
+            return $this->runSync();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    protected function runSync(): int
     {
         // Live-SMS deployments set MNOTIFY_DRY_RUN=false explicitly. When
         // configured for real sends, automations must never silently skip —
@@ -62,8 +106,44 @@ class SyncRollingSmsAutomations extends Command
         $this->line("Rolling SMS sync: pre-scheduling automations for the next {$days} days...");
 
         $expiredCount = $this->expirePastDueDeliveries();
-        $birthdayCount = $this->syncBirthdayAutomations($days);
-        $reminderCount = $this->syncServiceReminderAutomations($days);
+
+        // Collect all deliveries that need to be pushed to mNotify
+        $birthdayIds = $this->collectBirthdayDeliveries($days);
+        $reminderIds = $this->collectServiceReminderDeliveries($days);
+
+        $totalDeliveries = count($birthdayIds) + count($reminderIds);
+
+        if ($totalDeliveries === 0) {
+            $this->info("Sync complete: {$expiredCount} expired, 0 new deliveries to push.");
+
+            Log::info('sms:sync-rolling-automations completed', [
+                'expired' => $expiredCount,
+                'birthdays' => 0,
+                'reminders' => 0,
+                'days' => $days,
+            ]);
+
+            return self::SUCCESS;
+        }
+
+        // ─── Pre-Sync Credit Guard ──────────────────────────────
+        // Query mNotify balance before pushing any jobs to prevent
+        // silent delivery failures when credits are depleted.
+        $sms = app(MnotifySmsService::class);
+        $deliveryIds = array_merge($birthdayIds, $reminderIds);
+        $guardResult = $this->validateCreditsBeforeDispatch($sms, $deliveryIds);
+
+        if ($guardResult === false) {
+            return self::FAILURE;
+        }
+
+        // Credits are sufficient — dispatch all jobs to the queue
+        foreach ($deliveryIds as $deliveryId) {
+            DispatchScheduledSmsToMnotifyJob::dispatch($deliveryId);
+        }
+
+        $birthdayCount = count($birthdayIds);
+        $reminderCount = count($reminderIds);
 
         $this->info("Sync complete: {$expiredCount} expired, {$birthdayCount} birthday(s), {$reminderCount} reminder(s) queued on mNotify.");
 
@@ -75,6 +155,88 @@ class SyncRollingSmsAutomations extends Command
         ]);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Validate that mNotify account has sufficient credits for the batch.
+     *
+     * If credits are insufficient, marks all pending deliveries as
+     * failed and creates a persistent SystemAlert for the admin dashboard.
+     *
+     * PHASE 3: System alerts are created on credit depletion, visible
+     * in the admin UI until acknowledged by an admin.
+     *
+     * Returns true if credits are sufficient, false to abort.
+     */
+    protected function validateCreditsBeforeDispatch(MnotifySmsService $sms, array $deliveryIds): bool
+    {
+        try {
+            $balance = $sms->checkBalance();
+        } catch (\Throwable $e) {
+            $this->warn("  Balance check failed ({$e->getMessage()}). Proceeding with dispatch — mNotify will reject if credits are depleted.");
+            Log::warning('mNotify balance check failed — proceeding with dispatch', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return true;
+        }
+
+        if ($balance === null) {
+            $this->warn('  Could not retrieve mNotify balance. Proceeding with dispatch.');
+            Log::warning('mNotify balance returned null — proceeding with dispatch');
+
+            return true;
+        }
+
+        // Fetch all pending delivery message bodies to estimate credits
+        $deliveries = ScheduledSmsDelivery::whereIn('id', $deliveryIds)->get();
+        $messages = $deliveries->pluck('message_body')->toArray();
+        $requiredCredits = $sms->estimateCredits($messages);
+
+        $this->line("  mNotify balance: {$balance} | Required credits: {$requiredCredits}");
+
+        if ($balance < $requiredCredits) {
+            $this->error("  INSUFFICIENT CREDITS: Available {$balance}, Required {$requiredCredits}. Aborting push.");
+
+            Log::critical('mNotify credit guard: insufficient credits for SMS batch', [
+                'available_credits' => $balance,
+                'required_credits' => $requiredCredits,
+                'delivery_count' => count($deliveryIds),
+                'shortfall' => $requiredCredits - $balance,
+            ]);
+
+            // PHASE 3: Create a persistent system alert for the admin dashboard.
+            // Deduplication: skip if an unacknowledged credit_depletion alert
+            // already exists — prevents duplicate rows across container restarts.
+            $existingAlert = SystemAlert::where('type', SystemAlert::TYPE_CREDIT_DEPLETION)
+                ->whereNull('acknowledged_at')
+                ->exists();
+
+            if (! $existingAlert) {
+                SystemAlert::create([
+                    'type' => SystemAlert::TYPE_CREDIT_DEPLETION,
+                    'title' => 'SMS Credits Depleted',
+                    'message' => "mNotify balance is GH₵ {$balance}, but ".count($deliveryIds)." messages (estimated {$requiredCredits} credits) need to be sent. No SMS were dispatched.",
+                    'meta' => [
+                        'balance' => $balance,
+                        'credits_needed' => $requiredCredits,
+                        'delivery_count' => count($deliveryIds),
+                        'shortfall' => $requiredCredits - $balance,
+                    ],
+                ]);
+            }
+
+            // Mark all collected deliveries as failed
+            ScheduledSmsDelivery::whereIn('id', $deliveryIds)
+                ->update([
+                    'status' => ScheduledSmsDelivery::STATUS_FAILED,
+                    'error_message' => "Insufficient mNotify credits: available {$balance}, required {$requiredCredits}",
+                ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -103,19 +265,23 @@ class SyncRollingSmsAutomations extends Command
     }
 
     /**
-     * Pre-schedule birthday greetings for members with birthdays
-     * in the next N days. Each greeting is scheduled for 07:00 on
-     * the member's birthday via mNotify's remote scheduling API.
+     * Collect birthday greeting deliveries for the next N days.
+     *
+     * Creates ScheduledSmsDelivery records with pending_api status
+     * but does NOT dispatch jobs — the caller handles dispatching
+     * after credit validation.
+     *
+     * Returns array of delivery IDs created.
      */
-    protected function syncBirthdayAutomations(int $days): int
+    protected function collectBirthdayDeliveries(int $days): array
     {
         if (! config('church.birthday.enabled')) {
             $this->line('  Birthday greetings disabled — skipping.');
 
-            return 0;
+            return [];
         }
 
-        $count = 0;
+        $ids = [];
         $today = now()->startOfDay();
         $churchName = config('church.name', 'Wesleyan International Society');
 
@@ -151,24 +317,27 @@ class SyncRollingSmsAutomations extends Command
                     'source_id' => $member->id,
                 ]);
 
-                DispatchScheduledSmsToMnotifyJob::dispatch($delivery->id);
-                $count++;
+                $ids[] = $delivery->id;
             }
         }
 
-        $this->line("  Pre-scheduled {$count} birthday greeting(s).");
+        $this->line('  Collected '.count($ids).' birthday greeting(s) for dispatch.');
 
-        return $count;
+        return $ids;
     }
 
     /**
-     * Pre-schedule service reminders for all active settings
-     * in the next N days. For each day, find settings whose
-     * send_day_of_week matches and push scheduled SMS to mNotify.
+     * Collect service reminder deliveries for the next N days.
+     *
+     * Creates ScheduledSmsDelivery records with pending_api status
+     * but does NOT dispatch jobs — the caller handles dispatching
+     * after credit validation.
+     *
+     * Returns array of delivery IDs created.
      */
-    protected function syncServiceReminderAutomations(int $days): int
+    protected function collectServiceReminderDeliveries(int $days): array
     {
-        $count = 0;
+        $ids = [];
         $today = now()->startOfDay();
 
         for ($i = 0; $i < $days; $i++) {
@@ -214,15 +383,14 @@ class SyncRollingSmsAutomations extends Command
                         'source_id' => $setting->id,
                     ]);
 
-                    DispatchScheduledSmsToMnotifyJob::dispatch($delivery->id);
-                    $count++;
+                    $ids[] = $delivery->id;
                 }
             }
         }
 
-        $this->line("  Pre-scheduled {$count} service reminder(s).");
+        $this->line('  Collected '.count($ids).' service reminder(s) for dispatch.');
 
-        return $count;
+        return $ids;
     }
 
     /**
