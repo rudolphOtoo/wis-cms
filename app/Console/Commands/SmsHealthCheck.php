@@ -65,7 +65,8 @@ class SmsHealthCheck extends Command
             return false;
         }
 
-        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/balance?key={$apiKey}";
+        // mNotify v2 exposes SMS credit balance at /balance/sms (GET).
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/balance/sms?key={$apiKey}";
 
         $start = microtime(true);
 

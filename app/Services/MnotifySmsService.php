@@ -327,7 +327,8 @@ class MnotifySmsService
             return null;
         }
 
-        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/balance?key={$apiKey}";
+        // mNotify v2 exposes SMS credit balance at /balance/sms (GET).
+        $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/balance/sms?key={$apiKey}";
 
         try {
             $response = Http::retry(3, 200, null, false)->connectTimeout(5)->timeout(10)->get($endpoint);
