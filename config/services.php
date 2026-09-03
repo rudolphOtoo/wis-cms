@@ -49,6 +49,11 @@ return [
         'secret' => env('PAYSTACK_SECRET_KEY'),
         'public' => env('PAYSTACK_PUBLIC_KEY'),
         'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
+        // Overridden in tests / self-hosted proxies.
+        'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+        // How far back (minutes) the reconciliation poll rewinds beyond the
+        // newest locally synced payment to absorb Paystack event-timestamp skew.
+        'reconcile_overlap_minutes' => (int) env('PAYSTACK_RECONCILE_OVERLAP_MINUTES', 60),
     ],
 
     'google_form_webhook' => [

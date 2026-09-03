@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\TransientSmsException;
+use App\Models\Payment;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -54,6 +55,39 @@ class MnotifySmsService
         $response = $this->postSmsQuick($apiKey, $phone, $message, false);
 
         return $this->evaluateSendResponse($response, $phone);
+    }
+
+    /**
+     * Send a payment receipt SMS for a successful online payment.
+     *
+     * Uses the payer's MoMo number recorded at payment time. Returns false
+     * (never throws) when no phone is present or mNotify rejects the send,
+     * so the caller can leave the payment flagged sms_pending for retry.
+     */
+    public function sendReceipt(Payment $payment): bool
+    {
+        if (! $payment->momo_number || $payment->status->value !== 'success') {
+            return false;
+        }
+
+        return $this->send(
+            $payment->momo_number,
+            $this->buildReceiptMessage($payment),
+        );
+    }
+
+    /**
+     * Build a short receipt SMS for a successful payment.
+     *
+     * Kept tiny (single GSM-7bit segment where possible) so a full receipt
+     * never burns multiple mNotify credits.
+     */
+    public function buildReceiptMessage(Payment $payment): string
+    {
+        $amount = number_format((float) $payment->amount, 2);
+        $date = $payment->paid_at?->format('d M Y H:i') ?? now()->format('d M Y H:i');
+
+        return "Thank you! We received your {$payment->payment_type->label()} of GHS {$amount} on {$date}. Ref: {$payment->reference}.";
     }
 
     /**

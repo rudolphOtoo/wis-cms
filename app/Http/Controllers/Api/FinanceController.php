@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\PaymentReceived;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreTransactionRequest;
 use App\Http\Requests\Finance\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Branch;
 use App\Models\FinanceCategory;
+use App\Models\Payment;
 use App\Models\Transaction;
 use App\Services\FinanceStatsService;
+use App\Services\ReceiptNumberGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -94,8 +97,14 @@ class FinanceController extends Controller
      */
     public function store(StoreTransactionRequest $request): JsonResponse
     {
+        $validated = $request->validated();
+
+        // Auto-generate receipt number for offline / cash manual entries.
+        $receiptNumber = app(ReceiptNumberGenerator::class)->generate();
+
         $transaction = Transaction::create([
-            ...$request->validated(),
+            ...$validated,
+            'receipt_number' => $receiptNumber,
             'branch_id' => $request->user()->branch_id,
             'recorded_by' => $request->user()->id,
         ]);
@@ -103,6 +112,10 @@ class FinanceController extends Controller
         activity()->causedBy($request->user())
             ->performedOn($transaction)
             ->log("Recorded {$transaction->type} of GHS ".number_format((float) $transaction->amount, 2));
+
+        // Dispatch payment-received event so the SMS receipt listener can
+        // deliver a receipt to the member's phone when available.
+        event(new PaymentReceived($transaction));
 
         return response()->json([
             'message' => 'Transaction recorded successfully.',
@@ -122,6 +135,18 @@ class FinanceController extends Controller
     public function update(UpdateTransactionRequest $request, string $id): JsonResponse
     {
         $transaction = Transaction::findOrFail($id);
+
+        // Immutable ledger guard: transactions auto-generated from successful
+        // online payments cannot be modified by non-Super Admins. This
+        // prevents a finance officer from altering a ledger entry that
+        // corresponds to a confirmed Paystack payment while preserving the
+        // super_admin override for genuine corrections.
+        if ($this->isPaymentLinked($transaction) && ! $request->user()->hasRole('super_admin')) {
+            return response()->json([
+                'message' => 'This transaction was generated from a successful payment and cannot be edited.',
+            ], 403);
+        }
+
         $transaction->update($request->validated());
 
         activity()->causedBy($request->user())
@@ -138,12 +163,35 @@ class FinanceController extends Controller
     public function destroy(Request $request, string $id): JsonResponse
     {
         $transaction = Transaction::findOrFail($id);
+
+        if ($this->isPaymentLinked($transaction) && ! $request->user()->hasRole('super_admin')) {
+            return response()->json([
+                'message' => 'This transaction was generated from a successful payment and cannot be deleted.',
+            ], 403);
+        }
+
         $transaction->delete();
 
         activity()->causedBy($request->user())
             ->log('Deleted transaction of GHS '.number_format($transaction->amount, 2));
 
         return response()->json(['message' => 'Transaction deleted successfully.']);
+    }
+
+    /**
+     * Check whether a ledger Transaction was auto-generated from a successful
+     * online payment (and should therefore be treated as immutable).
+     */
+    private function isPaymentLinked(Transaction $transaction): bool
+    {
+        if ($transaction->reference === null) {
+            return false;
+        }
+
+        return Payment::query()
+            ->where('reference', $transaction->reference)
+            ->where('status', 'success')
+            ->exists();
     }
 
     // GET /api/finance/transactions/export

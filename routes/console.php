@@ -65,3 +65,10 @@ Schedule::command('sms:sync-rolling-automations')->dailyAt('05:00');
 // reminder send to reconcile any that just fired.
 Schedule::command('sms:reconcile-remote-statuses')->dailyAt('05:30');
 Schedule::command('sms:reconcile-remote-statuses')->hourlyAt(15);
+
+// Offline-resilient Paystack reconciliation: poll the cloud transaction
+// ledger for mobile money gifts made while the PC was powered off and
+// back-fill payments + finance ledger entries. Idempotent by Paystack
+// reference. Also flushes any payments flagged sms_pending — receipts the
+// cloud relay could not deliver (Phase 3 fallback) go out on the next run.
+Schedule::command('payments:reconcile-paystack')->everyFiveMinutes();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\PaymentStatus;
+use App\Events\PaymentReceived;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payment\InitializePaymentRequest;
 use App\Http\Resources\PaymentResource;
@@ -170,7 +171,8 @@ class PaymentController extends Controller
     {
         $payment = Payment::where('reference', $reference)->firstOrFail();
 
-        // If already terminal, return current status without calling gateway.
+        // Fast path: if already terminal, return current status without calling
+        // the gateway. This avoids holding a DB lock during network I/O.
         if ($payment->status->value !== PaymentStatus::Pending->value) {
             return response()->json([
                 'data' => new PaymentResource($payment->load(['member', 'recorder'])),
@@ -182,9 +184,13 @@ class PaymentController extends Controller
         try {
             $result = $driver->verifyTransaction($reference);
 
-            DB::transaction(function () use ($payment, $result) {
-                // Idempotency: skip if already succeeded.
-                if ($payment->status === PaymentStatus::Success) {
+            // Re-acquire the payment row under lockForUpdate so that a
+            // concurrent webhook or verify call for the same reference is
+            // serialized — only the first to commit creates the ledger entry.
+            DB::transaction(function () use ($reference, $result, &$payment) {
+                $payment = Payment::where('reference', $reference)->lockForUpdate()->first();
+
+                if ($payment === null || $payment->status === PaymentStatus::Success) {
                     return;
                 }
 
@@ -197,17 +203,22 @@ class PaymentController extends Controller
 
                 if ($status === PaymentStatus::Success) {
                     $update['paid_at'] = $result['paid_at'] ?? now();
+                    // Flag for the receipt-SMS flush on the next reconcile run.
+                    $update['sms_pending'] = $payment->momo_number !== null;
                 }
 
                 $payment->update($update);
 
-                // Create the corresponding Transaction in the finance ledger.
                 if ($status === PaymentStatus::Success) {
                     $payment->createTransactionFromPayment();
                 }
             });
 
             $payment->refresh();
+
+            if ($payment->status === PaymentStatus::Success) {
+                event(new PaymentReceived($payment));
+            }
 
             return response()->json([
                 'data' => new PaymentResource($payment->load(['member', 'recorder'])),

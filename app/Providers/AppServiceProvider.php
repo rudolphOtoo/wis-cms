@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Models\ServiceReminderSettings;
 use App\Observers\ServiceReminderSettingsObserver;
 use App\Services\Payments\PaymentGatewayManager;
+use App\Services\ReceiptNumberGenerator;
 use App\Support\PhoneNormalizer;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -24,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PaymentGatewayManager::class);
+        $this->app->singleton(ReceiptNumberGenerator::class);
     }
 
     /**

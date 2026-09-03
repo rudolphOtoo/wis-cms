@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\PaymentStatus;
+use App\Events\PaymentReceived;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Payments\PaymentGatewayManager;
@@ -81,29 +82,36 @@ class PaymentWebhookController extends Controller
             return response()->json(['message' => 'Missing reference']);
         }
 
-        $payment = Payment::where('reference', $reference)->first();
+        // Atomically update the payment and create the corresponding ledger
+        // Transaction. The payment row is pessimistically locked (lockForUpdate())
+        // inside the transaction so two simultaneous webhooks (or a webhook racing
+        // the verify endpoint / reconciliation poll) for the same reference are
+        // serialized — the second waiter re-reads status=success and short-circuits,
+        // guaranteeing exactly one ledger entry.
+        /** @var Payment|null $payment */
+        $payment = null;
 
-        if ($payment === null) {
-            Log::warning('Payment webhook: payment not found', [
-                'reference' => $reference,
-            ]);
+        $processed = DB::transaction(function () use ($reference, $event, &$payment) {
+            $payment = Payment::where('reference', $reference)->lockForUpdate()->first();
 
-            return response()->json(['message' => 'Payment not found'], 404);
-        }
+            if ($payment === null) {
+                Log::warning('Payment webhook: payment not found', [
+                    'reference' => $reference,
+                ]);
 
-        // Idempotency: already processed — return 200 without double-creating.
-        if ($payment->status === PaymentStatus::Success) {
-            Log::info('Payment webhook: duplicate delivery suppressed', [
-                'payment_id' => $payment->id,
-                'reference' => $reference,
-            ]);
+                return false;
+            }
 
-            return response()->json(['message' => 'Already processed']);
-        }
+            // Idempotency: already processed — return 200 without double-creating.
+            if ($payment->status === PaymentStatus::Success) {
+                Log::info('Payment webhook: duplicate delivery suppressed', [
+                    'payment_id' => $payment->id,
+                    'reference' => $reference,
+                ]);
 
-        // Atomically update payment status and create the corresponding
-        // Transaction record in the finance ledger.
-        DB::transaction(function () use ($payment, $event) {
+                return false;
+            }
+
             $paidAt = $event['data']['paid_at'] ?? now();
 
             $payment->update([
@@ -111,10 +119,21 @@ class PaymentWebhookController extends Controller
                 'gateway_reference' => $event['data']['id'] ?? $payment->gateway_reference,
                 'gateway_response' => $event['data'],
                 'paid_at' => $paidAt,
+                // Flag for the receipt-SMS flush. When the cloud relay is
+                // unreachable the next reconcile run delivers the receipt.
+                'sms_pending' => $payment->momo_number !== null,
             ]);
 
             $payment->createTransactionFromPayment();
+
+            return true;
         });
+
+        if (! $processed) {
+            return response()->json(['message' => 'Already processed']);
+        }
+
+        event(new PaymentReceived($payment));
 
         activity()
             ->performedOn($payment)

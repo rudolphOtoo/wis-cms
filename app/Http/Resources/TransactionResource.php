@@ -16,6 +16,7 @@ class TransactionResource extends JsonResource
             'currency' => $this->currency,
             'transaction_date' => $this->transaction_date?->format('Y-m-d'),
             'reference' => $this->reference,
+            'receipt_number' => $this->receipt_number,
             'notes' => $this->notes,
             'category' => $this->whenLoaded('category', fn () => [
                 'id' => $this->category->id,
