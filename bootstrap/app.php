@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveSession;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'active-session' => EnsureActiveSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

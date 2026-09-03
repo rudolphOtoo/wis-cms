@@ -1,15 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
 import { appMeta } from '../../diocese/registry'
 
 export default function Login() {
   const { login, loading, error, isAuthenticated, hasRole, user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form, setForm]     = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const panelRef = useRef(null)
   const meta = appMeta()
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'idle_timeout') {
+      toast.info('Your session expired due to inactivity. Please sign in again.')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (isAuthenticated) {
