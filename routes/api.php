@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ChildrenController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FinanceController;
+use App\Http\Controllers\Api\KeepAliveController;
 use App\Http\Controllers\Api\LifeEventController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MemberSubmissionController;
@@ -76,6 +77,7 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
         Route::post('change-password', [AuthController::class, 'changePassword']);
+        Route::post('keep-alive', KeepAliveController::class);
     });
 
     // App bootstrap: authenticated user + active diocese profile (key,
