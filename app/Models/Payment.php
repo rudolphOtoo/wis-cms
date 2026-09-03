@@ -18,6 +18,12 @@ class Payment extends Model
 {
     use BelongsToBranch, HasFactory, HasUuids, SoftDeletes;
 
+    /** Recorded live through the app's initialize/webhook/verify flows. */
+    public const SYNC_STATUS_LOCAL = 'local';
+
+    /** Backfilled by the Paystack cold-boot reconciliation poll. */
+    public const SYNC_STATUS_SYNCED_FROM_REMOTE = 'synced_from_remote';
+
     protected $keyType = 'string';
 
     public $incrementing = false;
@@ -32,6 +38,9 @@ class Payment extends Model
         'momo_network',
         'momo_number',
         'status',
+        'sync_status',
+        'sms_pending',
+        'receipt_sms_sent_at',
         'reference',
         'gateway_reference',
         'metadata',
@@ -49,6 +58,9 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'metadata' => 'array',
             'gateway_response' => 'array',
+            'sync_status' => 'string',
+            'sms_pending' => 'boolean',
+            'receipt_sms_sent_at' => 'datetime',
             'paid_at' => 'datetime',
         ];
     }
@@ -95,9 +107,23 @@ class Payment extends Model
      * Looks up the finance category by payment_type mapping, then creates
      * an income transaction that integrates with the existing finance ledger,
      * reports, and exports.
+     *
+     * IDEMPOTENT: exactly one income ledger entry is ever created per payment
+     * reference. This is the guard that guarantees "zero duplicate crediting"
+     * when the webhook, the verify endpoint, and the Paystack reconciliation
+     * poll all race to record the same successful payment.
      */
     public function createTransactionFromPayment(): Transaction
     {
+        $existing = Transaction::query()
+            ->where('reference', $this->reference)
+            ->where('type', 'income')
+            ->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
         $category = FinanceCategory::query()
             ->where('payment_type', $this->payment_type->value)
             ->where('type', 'income')
@@ -111,7 +137,7 @@ class Payment extends Model
             'type' => 'income',
             'amount' => $this->amount,
             'currency' => $this->currency,
-            'transaction_date' => now()->toDateString(),
+            'transaction_date' => $this->paid_at?->toDateString() ?? now()->toDateString(),
             'reference' => $this->reference,
             'notes' => "Online {$this->payment_type->label()} via {$this->channel->label()} — ref: {$this->reference}",
             'recorded_by' => $this->recorded_by_user_id,

@@ -81,6 +81,15 @@ if [ "$1" = "php-fpm" ]; then
     # credits), or are still pending — instead of naively marking them expired.
     echo "Reconciling remote SMS delivery statuses..."
     php artisan sms:reconcile-remote-statuses || echo "WARNING: remote status reconciliation skipped"
+
+    # Cold-boot Paystack catch-up: pull every completed mobile money gift
+    # that settled while the desktop PC was powered off, back fill payments
+    # + finance ledger entries, and flush any sms_pending receipt SMS.
+    # Idempotent (unique Paystack reference per payment) — safe to run on
+    # every boot. Non-fatal: if Paystack or mNotify is unreachable the app
+    # must still boot and the scheduler retries.
+    echo "Reconciling offline Paystack payments..."
+    php artisan payments:reconcile-paystack || echo "WARNING: Paystack reconciliation skipped (will retry on cron)"
 fi
 
 exec "$@"

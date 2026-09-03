@@ -18,7 +18,8 @@ class Transaction extends Model
 
     protected $fillable = [
         'branch_id', 'category_id', 'member_id', 'type', 'amount',
-        'currency', 'transaction_date', 'reference', 'notes', 'recorded_by',
+        'currency', 'transaction_date', 'reference', 'receipt_number',
+        'notes', 'recorded_by',
     ];
 
     protected function casts(): array

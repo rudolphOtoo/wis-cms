@@ -13,8 +13,10 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('payments')]
 class PaymentIntegrationTest extends TestCase
 {
     use RefreshDatabase;
@@ -487,5 +489,68 @@ class PaymentIntegrationTest extends TestCase
         $this->assertDatabaseCount('payments', 5);
         $this->assertEquals(3, Payment::withoutGlobalScope(BranchScope::class)->where('branch_id', $this->branch->id)->count());
         $this->assertEquals(2, Payment::withoutGlobalScope(BranchScope::class)->where('branch_id', $otherBranch->id)->count());
+    }
+
+    // ── FIX-01: Missing signature header ────────────────────────────
+
+    public function test_webhook_rejects_missing_signature_header(): void
+    {
+        $response = $this->postJson('/api/webhooks/payments/paystack', [
+            'event' => 'charge.success',
+            'data' => ['reference' => 'X', 'status' => 'success'],
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('message', 'Invalid signature');
+    }
+
+    // ── FIX-02: Concurrency / lockForUpdate ─────────────────────────
+
+    public function test_concurrent_webhooks_produce_single_ledger_entry(): void
+    {
+        $payment = Payment::factory()->create([
+            'branch_id' => $this->branch->id,
+            'reference' => 'MOMO_CONCURRENT',
+            'status' => 'pending',
+            'payment_type' => 'tithe',
+            'amount' => 75.00,
+        ]);
+
+        $data = [
+            'event' => 'charge.success',
+            'data' => [
+                'reference' => 'MOMO_CONCURRENT',
+                'status' => 'success',
+                'amount' => 7500,
+                'paid_at' => now()->toIso8601String(),
+            ],
+        ];
+
+        $body = json_encode($data);
+        $secret = config('services.paystack.webhook_secret', 'test_secret');
+        $signature = hash_hmac('sha512', $body, $secret);
+
+        // Simulate two webhooks hitting the endpoint using the RAW body and
+        // its signature (JSON re-encoding would invalidate the HMAC).
+        $concurrently = function () use ($body, $signature) {
+            return $this->call('POST', '/api/webhooks/payments/paystack', [], [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X-Paystack-Signature' => $signature,
+            ], $body);
+        };
+
+        $response1 = $concurrently();
+        $response2 = $concurrently();
+
+        // Both return 200 — the duplicate is silently suppressed.
+        $response1->assertOk();
+        $response2->assertOk();
+
+        // Exactly one ledger entry for this payment reference.
+        $this->assertDatabaseCount('transactions', 1);
+        $this->assertDatabaseHas('transactions', [
+            'amount' => 75.00,
+            'type' => 'income',
+        ]);
     }
 }

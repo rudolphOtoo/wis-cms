@@ -1,0 +1,18 @@
+# Paystack → mNotify off-grid SMS relay for WIS-CMS.
+#
+# Deploy:
+#   wrangler login
+#   wrangler secret put PAYSTACK_WEBHOOK_SECRET
+#   wrangler secret put MNOTIFY_API_KEY
+#   wrangler deploy
+#
+# Then point Paystack (Settings → Developer → Webhooks) at the worker's
+# production URL (https://paystack-relay.<your-subdomain>.workers.dev/api/webhooks/paystack).
+name = "paystack-relay"
+main = "worker.js"
+compatibility_date = "2026-08-29"
+
+[vars]
+MNOTIFY_SENDER_ID = "WIS"
+# MNOTIFY_BASE_URL = "https://api.mnotify.com/api"
+# PAYSTACK_FORWARD_URL = "https://giving.example.org/api/webhooks/payments/paystack"
