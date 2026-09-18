@@ -13,10 +13,22 @@ wait_for_db() {
 
 wait_for_db
 
-# Auto-generate APP_KEY if not set (first boot without manual key:generate)
+# Ensure a stub .env file exists so Artisan commands don't throw stream errors.
+# Non-fatal: the app dir may be root-owned in the image and unwritable; env vars
+# are injected at runtime, and Laravel's dotenv loader safeLoads a missing file.
+if [ ! -f /var/www/html/.env ] && [ -w /var/www/html ] && touch /var/www/html/.env 2>/dev/null; then
+    echo "Created /var/www/html/.env stub (no .env baked into the image)."
+fi
+
+# Auto-generate dynamic APP_KEY if empty or default stub. --show emits the key
+# in memory and never reads/writes a physical .env, so boot cannot fail on a
+# missing environment file. The key is exported for the rest of this process
+# (migrations, imports, config:cache) and inherited by php-fpm via clear_env=no.
 if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
-    echo "APP_KEY is empty — generating a new key..."
-    php artisan key:generate --force
+    echo "APP_KEY is empty — dynamically generating runtime key..."
+    GENERATED_KEY=$(php artisan key:generate --show --no-interaction)
+    export APP_KEY="$GENERATED_KEY"
+    echo "APP_KEY dynamic generation complete."
 fi
 
 # DIOCESE_PROFILE is frozen at app boot (default: wis). Diocese-specific data
