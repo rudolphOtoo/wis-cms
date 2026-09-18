@@ -96,3 +96,4 @@ services:
 
 volumes:
   wis_postgres_data:
+  mcgh_postgres_data:
