@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\BirthdayMessageSettings;
 use App\Models\ServiceReminderSettings;
+use App\Observers\BirthdayMessageSettingsObserver;
 use App\Observers\ServiceReminderSettingsObserver;
 use App\Services\Payments\PaymentGatewayManager;
 use App\Services\ReceiptNumberGenerator;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         ServiceReminderSettings::observe(ServiceReminderSettingsObserver::class);
+        BirthdayMessageSettings::observe(BirthdayMessageSettingsObserver::class);
 
         $this->configurePasswordRules();
 

@@ -3,13 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Jobs\DispatchScheduledSmsToMnotifyJob;
-use App\Models\BirthdayMessageSettings;
-use App\Models\Member;
 use App\Models\ScheduledSmsDelivery;
-use App\Models\ServiceReminderSettings;
 use App\Models\SystemAlert;
 use App\Services\MnotifySmsService;
-use Carbon\Carbon;
+use App\Services\RecurringSmsScheduler;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -55,6 +52,12 @@ class SyncRollingSmsAutomations extends Command
     private const LOCK_TTL = 30;
 
     private const LOCK_WAIT = 5;
+
+    public function __construct(
+        protected RecurringSmsScheduler $scheduler,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -108,8 +111,10 @@ class SyncRollingSmsAutomations extends Command
         $expiredCount = $this->expirePastDueDeliveries();
 
         // Collect all deliveries that need to be pushed to mNotify
-        $birthdayIds = $this->collectBirthdayDeliveries($days);
-        $reminderIds = $this->collectServiceReminderDeliveries($days);
+        $birthdayIds = $this->scheduler->collectBirthdayDeliveries($days);
+        $reminderIds = $this->scheduler->collectServiceReminderDeliveries($days);
+
+        $this->line('  Collected '.count($birthdayIds).' birthday greeting(s) and '.count($reminderIds).' reminder(s) for dispatch.');
 
         $totalDeliveries = count($birthdayIds) + count($reminderIds);
 
@@ -262,197 +267,5 @@ class SyncRollingSmsAutomations extends Command
         }
 
         return $count;
-    }
-
-    /**
-     * Collect birthday greeting deliveries for the next N days.
-     *
-     * Creates ScheduledSmsDelivery records with pending_api status
-     * but does NOT dispatch jobs — the caller handles dispatching
-     * after credit validation.
-     *
-     * Returns array of delivery IDs created.
-     */
-    protected function collectBirthdayDeliveries(int $days): array
-    {
-        if (! config('church.birthday.enabled')) {
-            $this->line('  Birthday greetings disabled — skipping.');
-
-            return [];
-        }
-
-        $ids = [];
-        $today = now()->startOfDay();
-        $churchName = config('church.name', 'Wesleyan International Society');
-
-        for ($i = 0; $i < $days; $i++) {
-            $date = $today->copy()->addDays($i);
-            $scheduledAt = $date->copy()->hour(7)->minute(0)->second(0);
-
-            if ($scheduledAt->isPast()) {
-                continue;
-            }
-
-            $members = Member::eligibleForSms()
-                ->whereNotNull('date_of_birth')
-                ->whereRaw('EXTRACT(MONTH FROM date_of_birth) = ?', [$date->month])
-                ->whereRaw('EXTRACT(DAY FROM date_of_birth) = ?', [$date->day])
-                ->get();
-
-            foreach ($members as $member) {
-                if ($this->isAlreadyScheduled('birthday', $member->id, null, $scheduledAt)) {
-                    continue;
-                }
-
-                $settings = BirthdayMessageSettings::forBranch($member->branch_id);
-                $body = $settings->render($member, $churchName);
-
-                $delivery = ScheduledSmsDelivery::create([
-                    'branch_id' => $member->branch_id,
-                    'phone' => $member->phone,
-                    'message_body' => $body,
-                    'scheduled_at' => $scheduledAt,
-                    'status' => ScheduledSmsDelivery::STATUS_PENDING_API,
-                    'source_type' => 'birthday',
-                    'source_id' => $member->id,
-                ]);
-
-                $ids[] = $delivery->id;
-            }
-        }
-
-        $this->line('  Collected '.count($ids).' birthday greeting(s) for dispatch.');
-
-        return $ids;
-    }
-
-    /**
-     * Collect service reminder deliveries for the next N days.
-     *
-     * Creates ScheduledSmsDelivery records with pending_api status
-     * but does NOT dispatch jobs — the caller handles dispatching
-     * after credit validation.
-     *
-     * Returns array of delivery IDs created.
-     */
-    protected function collectServiceReminderDeliveries(int $days): array
-    {
-        $ids = [];
-        $today = now()->startOfDay();
-
-        for ($i = 0; $i < $days; $i++) {
-            $date = $today->copy()->addDays($i);
-            $dow = $date->dayOfWeek;
-
-            $settings = ServiceReminderSettings::query()
-                ->with(['serviceType', 'branch'])
-                ->where('is_active', true)
-                ->where('send_day_of_week', $dow)
-                ->get();
-
-            foreach ($settings as $setting) {
-                $scheduledAt = $date->copy()->hour($setting->send_hour)->minute(0)->second(0);
-
-                if ($scheduledAt->isPast()) {
-                    continue;
-                }
-
-                $intendedDate = $this->computeIntendedServiceDate($setting, $date);
-                $serviceName = $setting->serviceType?->name ?? 'Service';
-                $churchName = $setting->branch?->name ?? config('church.name', 'Your church');
-                $serviceTime = $setting->serviceTimeLabel();
-
-                $members = Member::eligibleForSms()
-                    ->where('branch_id', $setting->branch_id)
-                    ->get();
-
-                foreach ($members as $member) {
-                    if ($this->isAlreadyScheduled('reminder', $setting->id, $member->phone, $scheduledAt)) {
-                        continue;
-                    }
-
-                    $body = $setting->render($member, $serviceName, $intendedDate, $serviceTime, $churchName);
-
-                    $delivery = ScheduledSmsDelivery::create([
-                        'branch_id' => $setting->branch_id,
-                        'phone' => $member->phone,
-                        'message_body' => $body,
-                        'scheduled_at' => $scheduledAt,
-                        'status' => ScheduledSmsDelivery::STATUS_PENDING_API,
-                        'source_type' => 'reminder',
-                        'source_id' => $setting->id,
-                    ]);
-
-                    $ids[] = $delivery->id;
-                }
-            }
-        }
-
-        $this->line('  Collected '.count($ids).' service reminder(s) for dispatch.');
-
-        return $ids;
-    }
-
-    /**
-     * Idempotency check: has this event already been scheduled
-     * (or dispatched) for the given date — or was it explicitly
-     * cancelled/defused?
-     *
-     * Live statuses prevent duplicate pushes on repeated runs.
-     * Cancelled statuses act as tombstones so a re-run never
-     * resurrects a delivery an admin deliberately cancelled or
-     * that the system defused against mNotify.
-     */
-    protected function isAlreadyScheduled(
-        string $sourceType,
-        ?string $sourceId,
-        ?string $phone,
-        Carbon $scheduledAt,
-    ): bool {
-        $query = ScheduledSmsDelivery::query()
-            ->where('source_type', $sourceType)
-            ->where('source_id', $sourceId)
-            ->whereDate('scheduled_at', $scheduledAt->toDateString())
-            ->whereIn('status', [
-                ScheduledSmsDelivery::STATUS_PENDING_API,
-                ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
-                ScheduledSmsDelivery::STATUS_DISPATCHED,
-                ScheduledSmsDelivery::STATUS_CANCELLED,
-                ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE,
-            ]);
-
-        if ($phone !== null) {
-            $query->where('phone', $phone);
-        }
-
-        return $query->exists();
-    }
-
-    /**
-     * Compute the intended service date from a reminder settings
-     * row and the send date. Mirrors the DOW mapping used by
-     * SendServiceReminders.
-     */
-    protected function computeIntendedServiceDate(
-        ServiceReminderSettings $settings,
-        Carbon $date,
-    ): Carbon {
-        $serviceDow = match ($settings->serviceType?->slug) {
-            'sunday_adult', 'sunday_children' => Carbon::SUNDAY,
-            'midweek_service', 'bible_study' => Carbon::WEDNESDAY,
-            'prayer_meeting' => Carbon::FRIDAY,
-            default => Carbon::SUNDAY,
-        };
-
-        $d = $date->copy()->startOfDay();
-
-        for ($i = 0; $i < 7; $i++) {
-            if ($d->dayOfWeek === $serviceDow) {
-                return $d;
-            }
-            $d->addDay();
-        }
-
-        return $date->copy()->startOfDay();
     }
 }

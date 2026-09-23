@@ -36,6 +36,11 @@ return [
         // Defaults to on in local/testing; tests set it to false to exercise
         // the real HTTP path against Http::fake().
         'dry_run' => env('MNOTIFY_DRY_RUN'),
+        // How many days ahead recurring automations (birthdays, service
+        // reminders) are pushed to mNotify's scheduled messages — both by
+        // the daily sms:sync-rolling-automations run and immediately when
+        // an automation is configured/edited in the admin panel.
+        'schedule_days' => (int) env('MNOTIFY_SCHEDULE_DAYS', 14),
     ],
 
     'slack' => [
