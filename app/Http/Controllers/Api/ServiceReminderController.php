@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderLog;
 use App\Models\ServiceReminderSettings;
 use App\Models\ServiceType;
@@ -117,7 +118,42 @@ class ServiceReminderController extends Controller
         return response()->json([
             'message' => "{$type->name} reminder settings saved.",
             'data' => $settings->fresh()->load('serviceType'),
+            // The ServiceReminderSettingsObserver resyncs the mNotify
+            // schedule synchronously (dispatch_sync) inside this request,
+            // so the DB is already final here: the UI can paint a
+            // "Synced to mNotify — safe to turn off machine" badge.
+            'sync' => $this->buildSyncStatus($settings),
         ]);
+    }
+
+    /**
+     * Summarise the current mNotify remote schedule for a reminder
+     * settings row, derived from the locally mirrored deliveries.
+     *
+     * remote_synced is false when the automation is inactive, the branch
+     * has no SMS-eligible members yet, or the last resync could not reach
+     * mNotify.
+     *
+     * @return array{remote_synced: bool, scheduled_count: int, next_fire_at: string|null, next_mnotify_job_id: string|null}
+     */
+    protected function buildSyncStatus(ServiceReminderSettings $settings): array
+    {
+        $future = ScheduledSmsDelivery::query()
+            ->where('source_type', 'reminder')
+            ->where('source_id', $settings->id)
+            ->where('status', ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE)
+            ->where('scheduled_at', '>=', now())
+            ->orderBy('scheduled_at')
+            ->get();
+
+        $next = $future->first();
+
+        return [
+            'remote_synced' => $future->isNotEmpty(),
+            'scheduled_count' => $future->count(),
+            'next_fire_at' => $next?->scheduled_at?->toIso8601String(),
+            'next_mnotify_job_id' => $next?->mnotify_job_id,
+        ];
     }
 
     /**
