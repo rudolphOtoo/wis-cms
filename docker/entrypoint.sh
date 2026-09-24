@@ -2,10 +2,10 @@
 set -e
 
 wait_for_db() {
-    host="${DB_HOST:-postgres}"
+    host="${DB_HOST:-wis_cms_db}"
     port="${DB_PORT:-5432}"
     echo "Waiting for database at ${host}:${port}..."
-    until php -r "exit(@fsockopen(getenv('DB_HOST') ?: 'postgres', (int) (getenv('DB_PORT') ?: 5432)) ? 0 : 1);"; do
+    until php -r "exit(@fsockopen(getenv('DB_HOST') ?: 'wis_cms_db', (int) (getenv('DB_PORT') ?: 5432)) ? 0 : 1);"; do
         sleep 2
     done
     echo "Database is reachable."

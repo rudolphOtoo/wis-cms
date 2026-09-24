@@ -1,18 +1,18 @@
 services:
-  postgres:
+  wis_cms_db:
     image: postgres:16-alpine
     container_name: wis_cms_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-wis_cms}
-      POSTGRES_USER: ${DB_USERNAME:-wis_admin}
+      POSTGRES_USER: ${DB_USERNAME:-wis_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     ports:
       - "5433:5432"
     volumes:
       - ${DIOCESE_PROFILE:-wis}_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-wis_admin} -d ${DB_DATABASE:-wis_cms}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-wis_user} -d ${DB_DATABASE:-wis_cms}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,15 +25,15 @@ services:
       - .env
     environment:
       DB_CONNECTION: pgsql
-      DB_HOST: postgres
+      DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
-      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_USERNAME: ${DB_USERNAME:-wis_user}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
     depends_on:
-      postgres:
+      wis_cms_db:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
@@ -48,6 +48,8 @@ services:
     image: ghcr.io/rudolphotoo/wis-cms-webserver:${IMAGE_TAG:-latest}
     container_name: wis_cms_webserver
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8000:80"
     depends_on:
@@ -62,10 +64,10 @@ services:
       - .env
     environment:
       DB_CONNECTION: pgsql
-      DB_HOST: postgres
+      DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
-      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_USERNAME: ${DB_USERNAME:-wis_user}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
@@ -82,10 +84,10 @@ services:
       - .env
     environment:
       DB_CONNECTION: pgsql
-      DB_HOST: postgres
+      DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
-      DB_USERNAME: ${DB_USERNAME:-wis_admin}
+      DB_USERNAME: ${DB_USERNAME:-wis_user}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
