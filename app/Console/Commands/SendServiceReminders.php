@@ -6,6 +6,7 @@ use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
+use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderLog;
 use App\Models\ServiceReminderSettings;
 use Carbon\Carbon;
@@ -143,6 +144,22 @@ class SendServiceReminders extends Command
                 continue;
             }
 
+            // Idempotency: the mNotify cloud already holds this reminder.
+            //
+            // The rolling sync pre-schedules every reminder on mNotify's own
+            // queue, which is what lets the church desktop be powered off and
+            // still deliver. This command is the fallback for when that push
+            // did not happen — so it must stand down whenever the cloud
+            // already owns the message. It previously only consulted
+            // ServiceReminderLog, which the cloud path never writes, so on a
+            // running desktop every member received the reminder TWICE: once
+            // from the cloud job firing and once from here.
+            if ($this->cloudAlreadyHoldsReminder($member, $settings, $now)) {
+                $skipped++;
+
+                continue;
+            }
+
             if (empty($member->phone)) {
                 ServiceReminderLog::create([
                     'branch_id' => $member->branch_id,
@@ -224,6 +241,46 @@ class SendServiceReminders extends Command
             'skipped' => $skipped,
             'failed' => $failed,
         ];
+    }
+
+    /**
+     * Does mNotify's cloud already own this member's reminder for the slot
+     * currently being processed?
+     *
+     * This command only ever runs at the exact configured slot (day-of-week
+     * and hour must both match), and the rolling sync reserves the cloud
+     * job at that same slot, so matching on the send calendar day is exact.
+     * Deliberately NOT matched on the service date: the reminder fires on
+     * Saturday for a Sunday service, so the two dates are a day apart and
+     * comparing them would never match.
+     *
+     * Only provider-owned statuses count. A row the cloud cancelled or that
+     * permanently failed will never be delivered, so it must not suppress
+     * the local fallback.
+     */
+    protected function cloudAlreadyHoldsReminder(
+        Member $member,
+        ServiceReminderSettings $settings,
+        Carbon $now,
+    ): bool {
+        if (empty($member->phone)) {
+            return false;
+        }
+
+        return ScheduledSmsDelivery::query()
+            ->where('branch_id', $settings->branch_id)
+            ->where('source_type', 'reminder')
+            ->where('source_id', $settings->id)
+            ->where('phone', $member->phone)
+            ->whereIn('status', [
+                ScheduledSmsDelivery::STATUS_PENDING_API,
+                ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+            ])
+            ->whereBetween('scheduled_at', [
+                $now->copy()->startOfDay(),
+                $now->copy()->endOfDay(),
+            ])
+            ->exists();
     }
 
     /**

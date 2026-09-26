@@ -6,6 +6,8 @@ import {
   previewReminder,
   getUpcomingReminders,
   getReminderLog,
+  getScheduledSms,
+  cancelScheduledSms,
 } from '../../api/reminders'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -273,6 +275,63 @@ function UpcomingPanel({ upcoming }) {
   )
 }
 
+function ScheduledSmsPanel({ deliveries, onCancel, busyId }) {
+  if (!deliveries.length) {
+    return (
+      <p className="text-sm" style={{ color: '#6b7280' }}>
+        No individual messages are scheduled on mNotify right now.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {deliveries.map(d => (
+        <div
+          key={d.id}
+          className="flex items-center justify-between gap-3 p-3 rounded-lg"
+          style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}
+        >
+          <div className="min-w-0">
+            <div className="font-medium" style={{ color: 'var(--color-navy)' }}>
+              {d.phone}
+              <span className="ml-2 text-xs font-normal" style={{ color: '#6b7280' }}>
+                {new Date(d.scheduled_at).toLocaleString('en-GB', {
+                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </span>
+            </div>
+            <div className="text-xs truncate" style={{ color: '#6b7280', maxWidth: '420px' }}>
+              {d.message_body}
+            </div>
+            <div className="text-xs mt-1" style={{ color: d.on_cloud ? '#047857' : '#b45309' }}>
+              {d.on_cloud
+                ? 'Held on mNotify — will send even if this PC is off'
+                : 'Not yet uploaded to mNotify'}
+            </div>
+          </div>
+
+          {d.is_cancellable && (
+            <button
+              type="button"
+              onClick={() => onCancel(d)}
+              disabled={busyId === d.id}
+              className="px-3 py-1.5 text-sm rounded-lg shrink-0"
+              style={{
+                border: '1px solid #b91c1c',
+                color: '#b91c1c',
+                opacity: busyId === d.id ? 0.5 : 1,
+              }}
+            >
+              {busyId === d.id ? 'Cancelling...' : 'Cancel message'}
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function LogPanel({ logs, statusFilter, setStatusFilter }) {
   const statusColors = {
     sent: { bg: '#d1fae5', fg: '#065f46' },
@@ -334,19 +393,23 @@ export default function Reminders() {
   const [settings, setSettings] = useState([])
   const [upcoming, setUpcoming] = useState([])
   const [logs, setLogs] = useState([])
+  const [deliveries, setDeliveries] = useState([])
+  const [cancellingId, setCancellingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [loading, setLoading] = useState(true)
 
   const loadAll = useCallback(async () => {
     try {
-      const [s, u, l] = await Promise.all([
+      const [s, u, l, d] = await Promise.all([
         getReminderSettings(),
         getUpcomingReminders(),
         getReminderLog({ days: 30, status: statusFilter === 'all' ? undefined : statusFilter }),
+        getScheduledSms({ days: 14, source_type: 'reminder' }),
       ])
       setSettings(s.data.data)
       setUpcoming(u.data.data)
       setLogs(l.data.data)
+      setDeliveries(d.data.data || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -355,6 +418,40 @@ export default function Reminders() {
   }, [statusFilter])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  // Withdraw a single scheduled message from mNotify.
+  //
+  // The server round-trips to the provider, so the outcome is not always a
+  // clean yes. A 202 means mNotify has not confirmed the delete yet: the
+  // withdraw is queued for retry, but until it lands the message may still
+  // fire. Saying "Cancelled" in that case would be a lie the member pays
+  // for, so the pending state is surfaced instead.
+  const handleCancelDelivery = useCallback(async (delivery) => {
+    setCancellingId(delivery.id)
+    try {
+      const { data } = await cancelScheduledSms(delivery.id)
+
+      if (data.cloud_cancelled) {
+        toast.success('Cancelled', {
+          description: `Message to ${delivery.phone} withdrawn from mNotify. It will not be delivered.`,
+        })
+      } else {
+        toast.warning('Withdrawal queued — not yet confirmed', {
+          description:
+            'mNotify has not confirmed the removal. The withdraw will be retried automatically, ' +
+            'but treat this message as possibly still active until it clears.',
+        })
+      }
+
+      await loadAll()
+    } catch (err) {
+      toast.error('Could not cancel', {
+        description: err?.response?.data?.message || 'The message may still be scheduled on mNotify.',
+      })
+    } finally {
+      setCancellingId(null)
+    }
+  }, [loadAll])
 
   if (loading) {
     return (
@@ -392,6 +489,17 @@ export default function Reminders() {
           Upcoming This Week
         </h2>
         <UpcomingPanel upcoming={upcoming} />
+      </div>
+
+      <div>
+        <h2 className="font-bold mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--color-navy)' }}>
+          Scheduled Messages (next 14 days)
+        </h2>
+        <ScheduledSmsPanel
+          deliveries={deliveries}
+          onCancel={handleCancelDelivery}
+          busyId={cancellingId}
+        />
       </div>
 
       <div>
