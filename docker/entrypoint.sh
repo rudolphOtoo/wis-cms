@@ -1,6 +1,16 @@
 #!/bin/sh
 set -e
 
+# Directory used to share state that MUST be identical across the app, queue
+# and scheduler containers. It lives on a named volume that all three mount, so
+# whichever container boots first creates the key and the others reuse it.
+# Without this, each container would generate its own APP_KEY, and since
+# SESSION_ENCRYPT=true and member attributes are encrypted at rest, sessions
+# and stored ciphertext would become undecryptable the moment a container
+# restarted — silent, permanent data loss.
+RUNTIME_DIR="${WIS_RUNTIME_DIR:-/var/www/html/storage/docker-runtime}"
+KEY_FILE="$RUNTIME_DIR/app_key"
+
 wait_for_db() {
     host="${DB_HOST:-wis_cms_db}"
     port="${DB_PORT:-5432}"
@@ -13,22 +23,72 @@ wait_for_db() {
 
 wait_for_db
 
-# Ensure a stub .env file exists so Artisan commands don't throw stream errors.
-# Non-fatal: the app dir may be root-owned in the image and unwritable; env vars
-# are injected at runtime, and Laravel's dotenv loader safeLoads a missing file.
-if [ ! -f /var/www/html/.env ] && [ -w /var/www/html ] && touch /var/www/html/.env 2>/dev/null; then
-    echo "Created /var/www/html/.env stub (no .env baked into the image)."
+# Seed a missing .env from the template shipped in the image, so a fresh
+# `docker compose up` on a machine with no .env at all still boots instead of
+# aborting on a missing file.
+if [ ! -f /var/www/html/.env ] && [ -f /var/www/html/.env.example ]; then
+    if cp /var/www/html/.env.example /var/www/html/.env 2>/dev/null; then
+        echo "Seeded /var/www/html/.env from .env.example (no .env was present)."
+    else
+        echo "WARNING: could not seed .env from .env.example; continuing with injected env vars only."
+    fi
 fi
 
-# Auto-generate dynamic APP_KEY if empty or default stub. --show emits the key
-# in memory and never reads/writes a physical .env, so boot cannot fail on a
-# missing environment file. The key is exported for the rest of this process
-# (migrations, imports, config:cache) and inherited by php-fpm via clear_env=no.
-if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
-    echo "APP_KEY is empty — dynamically generating runtime key..."
-    GENERATED_KEY=$(php artisan key:generate --show --no-interaction)
-    export APP_KEY="$GENERATED_KEY"
-    echo "APP_KEY dynamic generation complete."
+mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+
+# Resolve APP_KEY: reuse the shared key if one already exists, otherwise adopt
+# a key injected by the operator, otherwise generate one and persist it for the
+# sibling containers. The resolved value is exported so every subsequent artisan
+# call and php-fpm worker sees it, and written into .env so the file on disk
+# reflects the key actually in use.
+resolved_key=""
+if [ -f "$KEY_FILE" ]; then
+    resolved_key=$(cat "$KEY_FILE" 2>/dev/null || echo "")
+fi
+
+if [ -z "$resolved_key" ]; then
+    if [ -n "$APP_KEY" ] && [ "$APP_KEY" != "base64:" ]; then
+        # Operator-supplied key wins, and becomes the shared key.
+        resolved_key="$APP_KEY"
+    else
+        # Fall back to a key already present in an on-disk .env before
+        # generating one. Compose normally injects .env into the environment
+        # via env_file, but if that is disabled or the file is mounted
+        # directly, honouring the stored key is what stops a boot from
+        # silently rotating APP_KEY — which would make every session and all
+        # at-rest ciphertext permanently undecryptable.
+        if [ -f /var/www/html/.env ]; then
+            file_key=$(sed -n 's/^APP_KEY=//p' /var/www/html/.env | head -n 1 | tr -d '"' | tr -d "'" | tr -d '\r')
+            if [ -n "$file_key" ] && [ "$file_key" != "base64:" ]; then
+                resolved_key="$file_key"
+                echo "Adopting APP_KEY already present in .env (not rotating)."
+            fi
+        fi
+    fi
+
+    if [ -z "$resolved_key" ]; then
+        resolved_key=$(php artisan key:generate --show --no-interaction)
+        echo "APP_KEY was empty — generated a key and persisting it for all containers."
+    fi
+
+    if [ -n "$resolved_key" ] && printf '%s' "$resolved_key" > "$KEY_FILE" 2>/dev/null; then
+        chmod 600 "$KEY_FILE" 2>/dev/null || true
+    else
+        echo "WARNING: could not persist APP_KEY to $KEY_FILE — each container will generate its own key."
+    fi
+fi
+
+export APP_KEY="$resolved_key"
+
+# Keep the on-disk .env in sync so the effective key is discoverable/backupable.
+# The export above is what Laravel actually uses (Dotenv will not overwrite an
+# existing environment variable), so a failure here is cosmetic only.
+if [ -f /var/www/html/.env ] && [ -w /var/www/html/.env ]; then
+    if grep -q '^APP_KEY=' /var/www/html/.env; then
+        sed -i "s|^APP_KEY=.*|APP_KEY=${resolved_key}|" /var/www/html/.env 2>/dev/null || true
+    else
+        printf '\nAPP_KEY=%s\n' "$resolved_key" >> /var/www/html/.env 2>/dev/null || true
+    fi
 fi
 
 # DIOCESE_PROFILE is frozen at app boot (default: wis). Diocese-specific data
@@ -37,6 +97,15 @@ fi
 profile="${DIOCESE_PROFILE:-wis}"
 
 if [ "$1" = "php-fpm" ]; then
+    # Run migrations explicitly, before anything that touches the schema.
+    # This was previously only reachable as a side effect of
+    # `app:data-migrate --import`, which meant a diocese profile that skipped
+    # the import path would silently boot against an unmigrated database.
+    # Idempotent and safe on every boot; queue and scheduler both gate on this
+    # container reporting healthy.
+    echo "Running database migrations..."
+    php artisan migrate --force --no-interaction
+
     case "$profile" in
         wis)
             php artisan app:data-migrate --import

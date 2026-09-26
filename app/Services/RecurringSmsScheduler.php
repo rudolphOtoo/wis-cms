@@ -88,6 +88,17 @@ class RecurringSmsScheduler
 
                 $body = $settings->render($member, $churchName);
 
+                // Reclaim an orphan from an aborted batch instead of inserting
+                // a second row for the same member/slot.
+                $orphan = $this->reclaimOrphanedSlot('birthday', $member->id, null, $scheduledAt);
+
+                if ($orphan) {
+                    $orphan->update(['message_body' => $body]);
+                    $ids[] = $orphan->id;
+
+                    continue;
+                }
+
                 $delivery = ScheduledSmsDelivery::create([
                     'branch_id' => $member->branch_id,
                     'phone' => $member->phone,
@@ -232,6 +243,16 @@ class RecurringSmsScheduler
 
                 $body = $settings->render($member, $churchName);
 
+                $orphan = $this->reclaimOrphanedSlot('birthday', $member->id, null, $scheduledAt);
+
+                if ($orphan) {
+                    $orphan->update(['message_body' => $body]);
+                    $this->dispatchSchedule($orphan->id);
+                    $count++;
+
+                    continue;
+                }
+
                 $delivery = ScheduledSmsDelivery::create([
                     'branch_id' => $settings->branch_id,
                     'phone' => $member->phone,
@@ -264,22 +285,18 @@ class RecurringSmsScheduler
      */
     public function cancelBirthdayDeliveries(string $branchId, string $reason): void
     {
-        $rows = ScheduledSmsDelivery::query()
-            ->where('source_type', 'birthday')
-            ->where('branch_id', $branchId)
-            ->active()
-            ->where('scheduled_at', '>=', now())
-            ->get();
+        $cancelled = $this->cancelFutureDeliveries(
+            ScheduledSmsDelivery::query()
+                ->where('source_type', 'birthday')
+                ->where('branch_id', $branchId),
+            $reason,
+        );
 
-        foreach ($rows as $delivery) {
-            $this->deprecateDelivery($delivery);
-        }
-
-        $this->logSync('Birthday automation stopped — remote schedules cancelled', array_filter([
+        $this->logSync('Birthday automation stopped — remote schedules cancelled', [
             'branch_id' => $branchId,
             'reason' => $reason,
-            'cancelled' => $rows->count(),
-        ]));
+            'cancelled' => $cancelled,
+        ]);
     }
 
     /**
@@ -307,6 +324,63 @@ class RecurringSmsScheduler
         }
 
         return $date->copy()->startOfDay();
+    }
+
+    // ─── Public cancellation API ─────────────────────────────────
+
+    /**
+     * Cancel one delivery on mNotify's cloud, synchronously and safely.
+     *
+     * This is the single entry point every admin-initiated cancellation
+     * must go through (UI toggle, per-dispatch cancel endpoint, observer
+     * deactivation). It guarantees:
+     *
+     *   1. a real DELETE /scheduled/{id} is issued to mNotify, with the
+     *      far-future defusal as fallback when the provider's DELETE is
+     *      unavailable, so the message can never fire from the cloud;
+     *   2. the local row is transitioned to cancelled_remote (or
+     *      cancelled when it never reached the provider);
+     *   3. a provider/network failure is logged and queued in
+     *      pending_remote_schedules instead of aborting the caller.
+     */
+    public function cancelDeliveryOnMnotify(ScheduledSmsDelivery $delivery): void
+    {
+        $this->dispatchCancel($delivery->id);
+    }
+
+    /**
+     * Push one pending delivery to mNotify's cloud, synchronously and
+     * safely. Never throws — a failure is logged and retried by
+     * sync:pending-schedules.
+     */
+    public function pushDeliveryToMnotify(ScheduledSmsDelivery $delivery): void
+    {
+        $this->dispatchSchedule($delivery->id);
+    }
+
+    /**
+     * Cancel every future active delivery matching $query on mNotify.
+     *
+     * Returns the number of deliveries processed. One unreachable
+     * recipient never prevents the rest of the batch from being defused.
+     */
+    public function cancelFutureDeliveries(Builder $query, string $reason): int
+    {
+        $rows = (clone $query)
+            ->active()
+            ->where('scheduled_at', '>=', now())
+            ->get();
+
+        foreach ($rows as $delivery) {
+            $this->deprecateDelivery($delivery);
+        }
+
+        $this->logSync('Remote SMS schedules cancelled', array_filter([
+            'reason' => $reason,
+            'cancelled' => $rows->count(),
+        ]));
+
+        return $rows->count();
     }
 
     // ─── Shared building blocks ─────────────────────────────────────
@@ -353,6 +427,18 @@ class RecurringSmsScheduler
             }
 
             $body = $settings->render($member, $serviceName, $intendedDate, $serviceTime, $churchName);
+
+            $orphan = $this->reclaimOrphanedSlot('reminder', $settings->id, $member->phone, $scheduledAt);
+
+            if ($orphan) {
+                $orphan->update([
+                    'phone' => $member->phone,
+                    'message_body' => $body,
+                ]);
+                $ids[] = $orphan->id;
+
+                continue;
+            }
 
             $ids[] = ScheduledSmsDelivery::create([
                 'branch_id' => $settings->branch_id,
@@ -406,7 +492,7 @@ class RecurringSmsScheduler
             return;
         }
 
-        dispatch_sync(new CancelScheduledSmsJob($delivery->id));
+        $this->dispatchCancel($delivery->id);
     }
 
     /**
@@ -415,21 +501,75 @@ class RecurringSmsScheduler
      * Runs synchronously (dispatch_sync): configure-time resyncs execute
      * inside the admin request, so by the time the API responds the rows
      * are already scheduled_remote with a confirmed mnotify_job_id.
+     *
+     * Never throws. Both DispatchScheduledSmsToMnotifyJob and
+     * CancelScheduledSmsJob persist a PendingRemoteSchedule row before
+     * rethrowing, so swallowing the exception here loses nothing: the
+     * offline queue (sync:pending-schedules) still retries the failed
+     * member while the rest of the batch proceeds. Letting the exception
+     * escape would abort every remaining recipient in the batch and leave
+     * them stuck in pending_api with no job ID — the exact failure mode
+     * that stranded 111 members.
      */
     protected function dispatchSchedule(string $deliveryId): void
     {
-        dispatch_sync(new DispatchScheduledSmsToMnotifyJob($deliveryId));
+        $this->runResiliently(
+            fn () => dispatch_sync(new DispatchScheduledSmsToMnotifyJob($deliveryId)),
+            'schedule',
+            $deliveryId,
+        );
+    }
+
+    /**
+     * Dispatch a single cancellation to mNotify synchronously, isolating
+     * failures to the one delivery being cancelled.
+     */
+    protected function dispatchCancel(string $deliveryId): void
+    {
+        $this->runResiliently(
+            fn () => dispatch_sync(new CancelScheduledSmsJob($deliveryId)),
+            'cancel',
+            $deliveryId,
+        );
+    }
+
+    /**
+     * Run one mNotify operation, converting any failure into a log entry so
+     * a single bad recipient cannot abort the surrounding batch.
+     */
+    protected function runResiliently(callable $operation, string $action, string $deliveryId): void
+    {
+        try {
+            $operation();
+        } catch (\Throwable $e) {
+            Log::warning("RecurringSmsScheduler: {$action} failed for delivery {$deliveryId} — continuing batch", [
+                'delivery_id' => $deliveryId,
+                'action' => $action,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
      * Idempotency check: has this event already been scheduled (or
      * dispatched) for the given date — or was it explicitly cancelled?
      *
-     * By default cancelled rows act as tombstones so a re-run never
-     * resurrects a delivery an admin deliberately cancelled or that the
-     * system defused against mNotify. When $ignoredIds is supplied, that
-     * resync's own tombstones are excluded so a reconfiguration can
-     * legitimately recreate its messages.
+     * A row only counts as "already handled" when mNotify actually
+     * confirmed it:
+     *
+     *   - scheduled_remote / dispatched — provider-confirmed, skip.
+     *   - pending_api WITH a mnotify_job_id — the provider accepted the
+     *     push and the local status write is the only thing missing, so
+     *     re-pushing would double-send. Skip.
+     *   - pending_api WITHOUT a mnotify_job_id — an orphan left behind
+     *     when a batch aborted mid-dispatch. The member has NOT been
+     *     scheduled remotely, so this must NOT count as done; otherwise
+     *     the row is permanently stuck and the member silently never
+     *     receives the message. Deliberately excluded so the collector
+     *     reclaims it via reclaimOrphanedSlot().
+     *   - cancelled / cancelled_remote — tombstones, honored unless the
+     *     current resync deprecated them itself ($ignoredIds).
      */
     protected function isAlreadyScheduled(
         string $sourceType,
@@ -438,22 +578,23 @@ class RecurringSmsScheduler
         Carbon $scheduledAt,
         array $ignoredIds = [],
     ): bool {
-        $query = ScheduledSmsDelivery::query()
-            ->where('source_type', $sourceType)
-            ->where('source_id', $sourceId)
-            ->whereDate('scheduled_at', $scheduledAt->toDateString());
-
-        if ($phone !== null) {
-            $query->where('phone', $phone);
-        }
+        $query = $this->slotQuery($sourceType, $sourceId, $phone, $scheduledAt);
 
         $query->where(function (Builder $q) use ($ignoredIds) {
+            // Provider-confirmed rows.
             $q->whereIn('status', [
-                ScheduledSmsDelivery::STATUS_PENDING_API,
                 ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
                 ScheduledSmsDelivery::STATUS_DISPATCHED,
             ]);
 
+            // Accepted by the provider, local status write pending.
+            $q->orWhere(function (Builder $c) {
+                $c->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+                    ->whereNotNull('mnotify_job_id')
+                    ->where('mnotify_job_id', '<>', '');
+            });
+
+            // Admin tombstones / defused jobs.
             $q->orWhere(function (Builder $c) use ($ignoredIds) {
                 $c->whereIn('status', [
                     ScheduledSmsDelivery::STATUS_CANCELLED,
@@ -467,6 +608,60 @@ class RecurringSmsScheduler
         });
 
         return $query->exists();
+    }
+
+    /**
+     * Find a pending_api row for this exact slot that never received an
+     * mNotify job ID — i.e. an orphan from an aborted batch.
+     *
+     * The collectors reuse these rows instead of inserting new ones, so a
+     * retry repairs the original record rather than growing the table with
+     * a second row for the same member/slot.
+     */
+    protected function reclaimOrphanedSlot(
+        string $sourceType,
+        string $sourceId,
+        ?string $phone,
+        Carbon $scheduledAt,
+    ): ?ScheduledSmsDelivery {
+        $query = $this->slotQuery($sourceType, $sourceId, $phone, $scheduledAt)
+            ->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+            ->where(fn ($q) => $q->whereNull('mnotify_job_id')->orWhere('mnotify_job_id', ''))
+            ->oldest('created_at');
+
+        $orphan = $query->first();
+
+        if (! $orphan) {
+            return null;
+        }
+
+        $orphan->update([
+            'status' => ScheduledSmsDelivery::STATUS_PENDING_API,
+            'error_message' => null,
+        ]);
+
+        return $orphan;
+    }
+
+    /**
+     * Base query for the (source, phone, date) scheduling slot.
+     */
+    protected function slotQuery(
+        string $sourceType,
+        string $sourceId,
+        ?string $phone,
+        Carbon $scheduledAt,
+    ): Builder {
+        $query = ScheduledSmsDelivery::query()
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->whereDate('scheduled_at', $scheduledAt->toDateString());
+
+        if ($phone !== null) {
+            $query->where('phone', $phone);
+        }
+
+        return $query;
     }
 
     /**

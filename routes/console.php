@@ -58,6 +58,21 @@ Schedule::command('sync:pending-schedules')->everyFiveMinutes();
 // queued after a container restart.
 Schedule::command('sms:sync-rolling-automations')->dailyAt('05:00');
 
+// Self-healing repair: re-push any pending_api delivery that never
+// received an mNotify job ID. Historically these were unrecoverable —
+// the idempotency guard treated pending_api as "already scheduled", so a
+// batch that aborted mid-dispatch silently cost those members their
+// message. Runs hourly, before the reminder slots, and is a no-op when
+// every pending row already holds a job ID.
+Schedule::command('sms:repair-pending-orphans --execute')->hourlyAt(10);
+
+// Cloud hygiene: cancel duplicate/orphaned jobs on mNotify that the local
+// ledger does not own. Without this, a re-pushed automation leaves earlier
+// copies live and members receive the same message two or three times.
+// Dry-run by default in the command; --execute applies. Runs daily after
+// the rolling sync so freshly pushed jobs are never mistaken for orphans.
+Schedule::command('sms:prune-remote-duplicates --execute')->dailyAt('05:15');
+
 // Post-delivery reconciliation: query mNotify for actual delivery
 // status of past-due scheduled SMS instead of naively marking them
 // expired. Runs 30 minutes after the rolling sync to allow time for

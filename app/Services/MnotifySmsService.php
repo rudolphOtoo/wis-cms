@@ -261,8 +261,36 @@ class MnotifySmsService
         return null;
     }
 
+    /**
+     * List every job currently held on mNotify's cloud schedule.
+     *
+     * Public accessor for reconciliation tooling (sms:prune-remote-duplicates)
+     * that must reason about remote jobs the local ledger no longer owns.
+     * Returns an empty list when the provider is unreachable, so callers
+     * MUST distinguish "no jobs" from "could not read" before mutating
+     * anything remotely.
+     *
+     * @return list<array<string, mixed>>
+     *
+     * @throws TransientSmsException on network/server errors
+     */
+    public function fetchScheduledJobs(): array
+    {
+        $this->loadRemoteSchedule();
+
+        // An unreachable listing is NOT an empty schedule. Reconciliation
+        // must never mistake "could not read" for "nothing to prune".
+        if ($this->remoteScheduleUnavailable) {
+            throw new TransientSmsException('mNotify schedule listing unavailable');
+        }
+
+        return $this->remoteScheduleCache;
+    }
+
     /** @var list<array<string, mixed>> */
     protected array $remoteScheduleCache = [];
+
+    protected bool $remoteScheduleUnavailable = false;
 
     protected bool $remoteScheduleLoaded = false;
 
@@ -280,6 +308,8 @@ class MnotifySmsService
         try {
             $apiKey = $this->getApiKey();
             if ($apiKey === null) {
+                $this->remoteScheduleUnavailable = true;
+
                 return;
             }
 
@@ -288,6 +318,7 @@ class MnotifySmsService
 
             if (! $response->successful()) {
                 Log::warning('mNotify schedule listing unavailable (HTTP '.$response->status().')');
+                $this->remoteScheduleUnavailable = true;
 
                 return;
             }
@@ -296,6 +327,7 @@ class MnotifySmsService
             $this->remoteScheduleCache = is_array($jobs) ? array_values($jobs) : [];
         } catch (ConnectionException $e) {
             Log::warning('mNotify schedule listing unreachable: '.$e->getMessage());
+            $this->remoteScheduleUnavailable = true;
         }
     }
 

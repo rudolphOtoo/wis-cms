@@ -35,6 +35,15 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
+    volumes:
+      # Shared by app, queue and scheduler. It carries BOTH the uploaded
+      # files and the single persisted APP_KEY, so containers agree on the
+      # encryption key across restarts. Previously storage lived in each
+      # container's writable layer, so uploads and the key were both lost on
+      # recreate, and each container generated a DIFFERENT key — which made
+      # database sessions and at-rest ciphertext undecryptable.
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +51,10 @@ services:
       test: ["CMD", "pgrep", "-f", "php-fpm: master process"]
       interval: 10s
       timeout: 5s
-      start_period: 120s
+      # Boot runs explicit migrations + the full roster CSV import before
+      # php-fpm execs. queue and scheduler gate on this being healthy, so
+      # allow a generous window or they never start after a rebuild.
+      start_period: 300s
       retries: 5
 
   webserver:
@@ -73,7 +85,10 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    volumes:
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       app:
         condition: service_healthy
@@ -92,11 +107,16 @@ services:
       DB_USERNAME: ${DB_USERNAME:-wis_admin}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       QUEUE_CONNECTION: database
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
     command: php artisan schedule:work
+    volumes:
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       app:
         condition: service_healthy
 
 volumes:
+  wis_app_storage:
+  mcgh_app_storage:
   wis_postgres_data:
   mcgh_postgres_data:
