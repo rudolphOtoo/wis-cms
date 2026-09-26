@@ -36,6 +36,41 @@ fi
 
 mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
 
+# ---- Permissions ------------------------------------------------------------
+# The image runs as www-data (non-root), so ownership is fixed at build time in
+# the Dockerfile. Here we only (a) guarantee the writable directories Laravel
+# needs actually exist, and (b) tighten the mode bits.
+#
+# These are best-effort: if a directory is owned by another user (e.g. a
+# host-mounted volume) chmod will fail, and failing boot over a mode bit would
+# be worse than a permissive directory. So every call is non-fatal.
+ensure_writable_dir() {
+    d="$1"
+    if [ ! -d "$d" ] && mkdir -p "$d" 2>/dev/null; then
+        :
+    fi
+    if [ -d "$d" ]; then
+        chmod 0775 "$d" 2>/dev/null || true
+    fi
+}
+
+# Laravel writes to all of these; a missing one is a hard 500 at runtime.
+ensure_writable_dir /var/www/html/storage
+ensure_writable_dir /var/www/html/storage/framework/cache
+ensure_writable_dir /var/www/html/storage/framework/sessions
+ensure_writable_dir /var/www/html/storage/framework/views
+ensure_writable_dir /var/www/html/storage/logs
+ensure_writable_dir /var/www/html/storage/app/public
+ensure_writable_dir /var/www/html/storage/app/private
+ensure_writable_dir /var/www/html/bootstrap/cache
+ensure_writable_dir "$RUNTIME_DIR"
+
+# .env holds DB and mNotify credentials, so it must not be group/world
+# readable. 0600 also matches the mode used for the persisted APP_KEY.
+if [ -f /var/www/html/.env ]; then
+    chmod 0600 /var/www/html/.env 2>/dev/null || true
+fi
+
 # Resolve APP_KEY: reuse the shared key if one already exists, otherwise adopt
 # a key injected by the operator, otherwise generate one and persist it for the
 # sibling containers. The resolved value is exported so every subsequent artisan
