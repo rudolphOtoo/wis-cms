@@ -14,7 +14,10 @@ database/database.sqlite
 tests
 *.md
 .env
-.env.example
+# .env.example is deliberately NOT excluded: docker/entrypoint.sh seeds a
+# missing .env from it at boot so a fresh `docker compose up` needs no manual
+# file creation. It is a template with no secrets (keys/passwords are blank).
+!.env.example
 .editorconfig
 .gitattributes
 .gitignore

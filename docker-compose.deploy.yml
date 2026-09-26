@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_DATABASE:-wis_cms}
       POSTGRES_USER: ${DB_USERNAME:-wis_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wis_password}
     ports:
       - "5433:5432"
     volumes:
@@ -21,17 +21,28 @@ services:
     image: ghcr.io/rudolphotoo/wis-cms-app:${IMAGE_TAG:-latest}
     container_name: wis_cms_app
     restart: unless-stopped
+    # Optional: a machine with no .env at all must still boot. The image ships
+    # .env.example and docker/entrypoint.sh seeds .env from it, so omitting the
+    # host file degrades to documented defaults instead of aborting the deploy.
+    # The file, when present, still takes precedence.
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_CONNECTION: pgsql
       DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_user}
-      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_password}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
+    volumes:
+      # Persists uploaded photos/logs/compiled views AND the shared APP_KEY
+      # across recreates. Without this, uploads and the encryption key were
+      # both lost every time the container was rebuilt.
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       wis_cms_db:
         condition: service_healthy
@@ -49,7 +60,8 @@ services:
     container_name: wis_cms_webserver
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     ports:
       - "8000:80"
     depends_on:
@@ -61,17 +73,23 @@ services:
     container_name: wis_cms_queue
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_CONNECTION: pgsql
       DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_user}
-      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_password}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    # Same volume as `app` so both read the identical APP_KEY. A separately
+    # generated key would make session and at-rest ciphertext undecryptable.
+    volumes:
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       app:
         condition: service_healthy
@@ -81,21 +99,27 @@ services:
     container_name: wis_cms_scheduler
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_CONNECTION: pgsql
       DB_HOST: wis_cms_db
       DB_PORT: 5432
       DB_DATABASE: ${DB_DATABASE:-wis_cms}
       DB_USERNAME: ${DB_USERNAME:-wis_user}
-      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD:-wis_password}
       QUEUE_CONNECTION: database
       SESSION_SECURE_COOKIE: "false"
+      WIS_RUNTIME_DIR: /var/www/html/storage/docker-runtime
     command: sh -c "while :; do php artisan schedule:run --no-interaction; sleep 60; done"
+    volumes:
+      - ${DIOCESE_PROFILE:-wis}_app_storage:/var/www/html/storage
     depends_on:
       app:
         condition: service_healthy
 
 volumes:
+  wis_app_storage:
+  mcgh_app_storage:
   wis_postgres_data:
   mcgh_postgres_data:

@@ -110,7 +110,11 @@ function ConfigCard({ row, onSaved }) {
             {row.configured ? (
               <>
                 Fires {row.send_day_label} at {row.send_hour_label} for service at {row.service_time_label}
-                {!row.is_active && <span style={{ color: '#b91c1c', marginLeft: '8px' }}>(paused)</span>}
+                {!row.is_active && (
+                  <span style={{ color: '#b91c1c', marginLeft: '8px' }}>
+                    (Cancelled — all scheduled messages withdrawn from mNotify)
+                  </span>
+                )}
               </>
             ) : (
               <span style={{ color: '#9ca3af' }}>Not configured yet</span>

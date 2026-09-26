@@ -142,20 +142,39 @@ class SyncRollingSmsAutomations extends Command
             return self::FAILURE;
         }
 
-        // Credits are sufficient — dispatch all jobs to the queue
+        // Credits are sufficient — dispatch all jobs. Each push is
+        // isolated: a single transient mNotify failure is logged and
+        // queued for offline retry instead of aborting the batch, which
+        // previously stranded every remaining recipient in pending_api
+        // with no job ID (unrecoverable, since the idempotency guard
+        // treated those rows as already scheduled).
+        $pushFailures = 0;
+
         foreach ($deliveryIds as $deliveryId) {
-            DispatchScheduledSmsToMnotifyJob::dispatch($deliveryId);
+            try {
+                DispatchScheduledSmsToMnotifyJob::dispatch($deliveryId);
+            } catch (\Throwable $e) {
+                $pushFailures++;
+                $this->warn("  Push failed for delivery {$deliveryId} ({$e->getMessage()}) — queued for retry, continuing.");
+            }
         }
 
         $birthdayCount = count($birthdayIds);
         $reminderCount = count($reminderIds);
 
-        $this->info("Sync complete: {$expiredCount} expired, {$birthdayCount} birthday(s), {$reminderCount} reminder(s) queued on mNotify.");
+        $summary = "Sync complete: {$expiredCount} expired, {$birthdayCount} birthday(s), {$reminderCount} reminder(s) queued on mNotify.";
+
+        if ($pushFailures > 0) {
+            $summary .= " {$pushFailures} push(es) deferred to the offline retry queue.";
+        }
+
+        $this->info($summary);
 
         Log::info('sms:sync-rolling-automations completed', [
             'expired' => $expiredCount,
             'birthdays' => $birthdayCount,
             'reminders' => $reminderCount,
+            'push_failures' => $pushFailures,
             'days' => $days,
         ]);
 

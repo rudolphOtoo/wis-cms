@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\ScheduledSmsController;
 use App\Http\Controllers\Api\ServiceReminderController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SystemAlertController;
@@ -236,6 +237,14 @@ Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])->group(functio
         Route::get('reminders/upcoming', [ServiceReminderController::class, 'upcoming'])
             ->middleware('permission:view service reminders');
         Route::get('reminders/log', [ServiceReminderController::class, 'log'])
+            ->middleware('permission:manage service reminders');
+
+        // Individual scheduled dispatches. Cancelling here round-trips to
+        // mNotify (DELETE /scheduled/{id}) so an admin withdrawing one
+        // message cannot leave a live job behind on the provider.
+        Route::get('sms/scheduled', [ScheduledSmsController::class, 'index'])
+            ->middleware('permission:view service reminders');
+        Route::post('sms/scheduled/{delivery}/cancel', [ScheduledSmsController::class, 'cancel'])
             ->middleware('permission:manage service reminders');
 
         // Member submissions queue — admin review of self-service form

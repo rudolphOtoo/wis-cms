@@ -2,8 +2,6 @@
 
 namespace App\Observers;
 
-use App\Jobs\CancelScheduledSmsJob;
-use App\Jobs\DispatchScheduledSmsToMnotifyJob;
 use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderSettings;
 use App\Services\RecurringSmsScheduler;
@@ -82,19 +80,20 @@ class ServiceReminderSettingsObserver
 
     protected function cancelAssociatedDeliveries(ServiceReminderSettings $settings, string $reason): void
     {
-        $deliveries = ScheduledSmsDelivery::forSource('reminder', $settings->id)
-            ->active()
-            ->where('scheduled_at', '>=', now())
-            ->get();
+        // Routed through the scheduler so each cancellation issues a real
+        // DELETE /scheduled/{id} against mNotify and a single unreachable
+        // recipient cannot abort the remaining cancellations mid-loop.
+        $cancelled = $this->scheduler()->cancelFutureDeliveries(
+            ScheduledSmsDelivery::query()
+                ->where('source_type', 'reminder')
+                ->where('source_id', $settings->id),
+            $reason,
+        );
 
-        foreach ($deliveries as $delivery) {
-            dispatch_sync(new CancelScheduledSmsJob($delivery->id));
-        }
-
-        Log::info('Service reminder deactivated — dispatching remote cancellations', [
+        Log::info('Service reminder deactivated — remote cancellations dispatched', [
             'settings_id' => $settings->id,
             'reason' => $reason,
-            'cancelled_deliveries' => $deliveries->count(),
+            'cancelled_deliveries' => $cancelled,
         ]);
     }
 
@@ -120,7 +119,7 @@ class ServiceReminderSettingsObserver
                 'error_message' => 'Resumed: reminder automation was reactivated',
             ]);
 
-            dispatch_sync(new DispatchScheduledSmsToMnotifyJob($delivery->id));
+            $this->scheduler()->pushDeliveryToMnotify($delivery);
         }
 
         Log::info('Service reminder reactivated — resuming remote schedules', [

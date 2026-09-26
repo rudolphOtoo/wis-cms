@@ -38,12 +38,17 @@ ARG CACHEBUST
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
 
-RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/app/public storage/logs storage/docker-runtime bootstrap/cache \
     && php artisan package:discover --ansi \
     && chown -R www-data:www-data storage bootstrap/cache
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Sanity check: the entrypoint's .env seeding depends on the template being
+# present in the image. .dockerignore explicitly un-ignores .env.example, so
+# assert it rather than discovering the breakage as a boot failure in prod.
+RUN test -f .env.example || (echo "FATAL: .env.example missing from image (check .dockerignore)" && exit 1)
 
 USER www-data
 ENTRYPOINT ["entrypoint.sh"]
