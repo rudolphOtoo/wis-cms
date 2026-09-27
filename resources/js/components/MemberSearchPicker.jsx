@@ -3,13 +3,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 /**
  * Searchable member picker. Filters a passed-in list of members by
  * name, phone, or member_number as the user types.
+ *
+ * When the caller cannot pass the full roster (thousands of members, or
+ * it would be wasteful to ship it), supply `onQueryChange` and treat the
+ * `members` prop as a server-side result set. The typing is still
+ * filtered client-side, which is harmless and keeps the two modes
+ * behaving identically from the user's point of view.
  */
 export default function MemberSearchPicker({
   members = [],
   value = '',
   onChange,
+  onQueryChange,
   placeholder = 'Search by name or phone...',
   disabled = false,
+  searching = false,
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -51,12 +59,14 @@ export default function MemberSearchPicker({
   const handleSelect = (member) => {
     onChange?.(member.id)
     setQuery('')
+    onQueryChange?.('')
     setOpen(false)
   }
 
   const handleClear = () => {
     onChange?.('')
     setQuery('')
+    onQueryChange?.('')
   }
 
   const displayName = selectedMember
@@ -69,7 +79,7 @@ export default function MemberSearchPicker({
         <div
           className="input-field flex items-center justify-between"
           style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
-          onClick={() => { if (!disabled) { onChange?.(''); setQuery('') } }}
+          onClick={() => { if (!disabled) handleClear() }}
         >
           <div>
             <span className="font-semibold" style={{ color: 'var(--color-navy)' }}>
@@ -97,7 +107,11 @@ export default function MemberSearchPicker({
             className="input-field w-full"
             placeholder={placeholder}
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              onQueryChange?.(e.target.value)
+              setOpen(true)
+            }}
             onFocus={() => setOpen(true)}
             disabled={disabled}
           />
@@ -111,7 +125,11 @@ export default function MemberSearchPicker({
             >
               {filteredMembers.length === 0 ? (
                 <div className="px-4 py-3 text-sm" style={{ color: '#6b7280' }}>
-                  {query.trim() ? 'No members match your search.' : 'No members available.'}
+                  {searching
+                    ? 'Searching...'
+                    : query.trim()
+                      ? 'No members match your search.'
+                      : 'No members available.'}
                 </div>
               ) : (
                 <>
