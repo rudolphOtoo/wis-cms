@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ScheduledSmsDelivery;
 use App\Services\RecurringSmsScheduler;
+use App\Services\ReminderCancellationLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Per-delivery control over SMS dispatches that are already scheduled.
@@ -29,21 +31,48 @@ class ScheduledSmsController extends Controller
      * GET /api/sms/scheduled
      * Upcoming dispatches for the admin's branch, with an explicit
      * cloud-state flag per row.
+     *
+     * Only messages that can still be delivered are listed, so withdrawing
+     * one (per-dispatch cancel, or a whole automation being switched off)
+     * clears it from the screen. Terminal rows remain queryable through
+     * `?status=<state>` or `?status=all`.
      */
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::in([
+                ScheduledSmsDelivery::STATUS_PENDING_API,
+                ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+                ScheduledSmsDelivery::STATUS_DISPATCHED,
+                ScheduledSmsDelivery::STATUS_CANCELLED,
+                ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE,
+                ScheduledSmsDelivery::STATUS_FAILED,
+                ScheduledSmsDelivery::STATUS_FAILED_PROVIDER,
+                'all',
+            ])],
             'days' => ['nullable', 'integer', 'between:1,60'],
             'source_type' => ['nullable', 'string', 'in:reminder,birthday'],
         ]);
 
         $days = (int) ($validated['days'] ?? 14);
 
+        $status = $validated['status'] ?? null;
+
         $rows = ScheduledSmsDelivery::query()
             ->where('branch_id', $request->user()->branch_id)
             ->where('scheduled_at', '>=', now())
-            ->when($validated['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
+            // A withdrawn dispatch must vanish from the panel, exactly as it
+            // vanished from mNotify. The cancelled rows are kept in the
+            // database (resync needs them to suppress duplicate regeneration
+            // on the same slot), so the default listing is restricted to
+            // messages that can still reach a member: anything already
+            // cancelled, dispatched or failed is not "scheduled" any more.
+            //
+            // Pass an explicit `status` to look at one terminal state, or
+            // `status=all` to audit every future row including tombstones.
+            ->when($status === 'all', fn ($q) => $q)
+            ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
+            ->when(! $status, fn ($q) => $q->active())
             ->when($validated['source_type'] ?? null, fn ($q, $s) => $q->where('source_type', $s))
             ->where('scheduled_at', '<', now()->addDays($days))
             ->orderBy('scheduled_at')
@@ -87,10 +116,16 @@ class ScheduledSmsController extends Controller
         if (! $delivery->mnotify_job_id) {
             $delivery->markCancelled();
 
+            $log = $this->cancellationLog()->recordMessageWithdrawal(
+                $delivery->refresh(),
+                $request->user(),
+            );
+
             return response()->json([
                 'message' => 'Cancelled. This message was never uploaded to mNotify, so nothing was sent from the cloud.',
                 'cloud_cancelled' => false,
-                'data' => $this->present($delivery->fresh()),
+                'data' => $this->present($delivery),
+                'log' => ['id' => $log->id],
             ]);
         }
 
@@ -102,11 +137,20 @@ class ScheduledSmsController extends Controller
         $delivery->refresh();
         $cloudCancelled = $delivery->status === ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE;
 
+        // Recorded before responding. The withdrawn message is about to
+        // leave the scheduled list, so the audit of who took it away has
+        // to be the thing that remains. The wording follows the delivery's
+        // real status, which is why an unconfirmed withdraw is filed as
+        // "possibly still active" rather than as a cancellation that
+        // already happened.
+        $log = $this->cancellationLog()->recordMessageWithdrawal($delivery, $request->user());
+
         if ($cloudCancelled) {
             return response()->json([
                 'message' => 'Cancelled on mNotify. The message will not be delivered.',
                 'cloud_cancelled' => true,
                 'data' => $this->present($delivery),
+                'log' => ['id' => $log->id],
             ]);
         }
 
@@ -123,7 +167,13 @@ class ScheduledSmsController extends Controller
             'cloud_cancelled' => false,
             'retry_queued' => true,
             'data' => $this->present($delivery),
+            'log' => ['id' => $log->id],
         ], 202);
+    }
+
+    protected function cancellationLog(): ReminderCancellationLog
+    {
+        return app(ReminderCancellationLog::class);
     }
 
     protected function authorizeBranch(Request $request, ScheduledSmsDelivery $delivery): void

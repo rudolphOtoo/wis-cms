@@ -18,7 +18,10 @@ export const previewReminder = (payload) =>
 export const getUpcomingReminders = () =>
   api.get('/reminders/upcoming')
 
-// Audit log with optional filters: { days, status, service_type_id }
+// Audit log with optional filters: { days, status, service_type_id }.
+// `status` accepts a comma-separated list, so the screen can ask for
+// "cancelled,cancelled_batch" and get both a single withdrawn message and
+// a whole reminder that was switched off.
 export const getReminderLog = (params) =>
   api.get('/reminders/log', { params })
 
@@ -31,6 +34,10 @@ export const getScheduledSms = (params) =>
 // Withdraw one scheduled dispatch. This is NOT a local-only operation: the
 // server issues DELETE /scheduled/{id} against mNotify (falling back to
 // parking the job in 2099) and only then reports back.
+//
+// The withdrawal is written to the reminder audit log before the response
+// is sent (response `log.id`), because the message leaves the scheduled
+// list and the log is the only remaining record of who took it away.
 //
 // The response distinguishes two outcomes, and callers MUST respect it:
 //   200 -> { cloud_cancelled: true }  confirmed withdrawn from the provider

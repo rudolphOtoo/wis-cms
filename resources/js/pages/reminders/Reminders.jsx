@@ -337,43 +337,70 @@ function LogPanel({ logs, statusFilter, setStatusFilter }) {
     sent: { bg: '#d1fae5', fg: '#065f46' },
     no_phone: { bg: '#fef3c7', fg: '#92400e' },
     failed: { bg: '#fee2e2', fg: '#991b1b' },
+    cancelled: { bg: '#ede9fe', fg: '#5b21b6' },
+    cancelled_batch: { bg: '#f3e8ff', fg: '#6b21a8' },
   }
+
+  // 'cancelled' covers both a single withdrawn message and a whole
+  // reminder being switched off: to an admin they are the same question.
+  const filters = [
+    { key: 'all', label: 'All' },
+    { key: 'sent', label: 'Sent' },
+    { key: 'no_phone', label: 'No Phone' },
+    { key: 'failed', label: 'Failed' },
+    { key: 'cancelled', label: 'Cancelled' },
+  ]
 
   return (
     <div>
-      <div className="flex gap-2 mb-3">
-        {['all', 'sent', 'no_phone', 'failed'].map(s => (
-          <button key={s} type="button" onClick={() => setStatusFilter(s)}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {filters.map(f => (
+          <button key={f.key} type="button" onClick={() => setStatusFilter(f.key)}
             className="px-3 py-1 text-xs rounded-full"
             style={{
               border: '1px solid var(--color-surface-border)',
-              backgroundColor: statusFilter === s ? 'var(--color-navy)' : 'white',
-              color: statusFilter === s ? 'white' : 'var(--color-navy)',
+              backgroundColor: statusFilter === f.key ? 'var(--color-navy)' : 'white',
+              color: statusFilter === f.key ? 'white' : 'var(--color-navy)',
             }}>
-            {s === 'no_phone' ? 'No Phone' : s.charAt(0).toUpperCase() + s.slice(1)}
+            {f.label}
           </button>
         ))}
       </div>
 
       {!logs.length ? (
-        <p className="text-sm" style={{ color: '#6b7280' }}>No reminders sent yet.</p>
+        <p className="text-sm" style={{ color: '#6b7280' }}>
+          {statusFilter === 'cancelled'
+            ? 'Nothing has been cancelled in this period.'
+            : 'No reminders sent yet.'}
+        </p>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {logs.map(log => {
             const c = statusColors[log.status] ?? { bg: '#f3f4f6', fg: '#4b5563' }
+            const isCancellation = log.status === 'cancelled' || log.status === 'cancelled_batch'
             return (
               <div key={log.id} className="p-3 rounded-lg"
                 style={{ backgroundColor: '#f8f9fa', border: '1px solid var(--color-surface-border)' }}>
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-sm" style={{ color: 'var(--color-navy)' }}>{log.member_name}</div>
-                  <span className="text-xs px-2 py-0.5 rounded-full"
+                  <div className="font-medium text-sm" style={{ color: 'var(--color-navy)' }}>
+                    {log.headline ?? log.member_name}
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full shrink-0"
                     style={{ backgroundColor: c.bg, color: c.fg, fontWeight: 600 }}>
-                    {log.status === 'no_phone' ? 'no phone' : log.status}
+                    {log.status_label ?? log.status}
                   </span>
                 </div>
                 <div className="text-xs mt-1" style={{ color: '#6b7280' }}>
-                  {log.service_type} • for {log.intended_service_date} • sent {new Date(log.sent_at).toLocaleString()}
+                  {[
+                    log.service_type,
+                    log.intended_service_date ? `for ${log.intended_service_date}` : null,
+                    `${isCancellation ? 'cancelled' : 'sent'} ${new Date(log.sent_at).toLocaleString()}`,
+                    log.cancelled_by ? `by ${log.cancelled_by}` : null,
+                  ].filter(Boolean).join(' • ')}
                 </div>
+                {log.detail && (
+                  <div className="text-xs mt-2" style={{ color: '#5b21b6' }}>{log.detail}</div>
+                )}
                 {log.message_body && (
                   <div className="text-xs mt-2 italic" style={{ color: '#6b7280' }}>"{log.message_body}"</div>
                 )}
@@ -403,7 +430,16 @@ export default function Reminders() {
       const [s, u, l, d] = await Promise.all([
         getReminderSettings(),
         getUpcomingReminders(),
-        getReminderLog({ days: 30, status: statusFilter === 'all' ? undefined : statusFilter }),
+        getReminderLog({
+          days: 30,
+          // One "Cancelled" pill, two underlying statuses: a withdrawn
+          // message and a whole reminder switched off.
+          status: statusFilter === 'all'
+            ? undefined
+            : statusFilter === 'cancelled'
+              ? 'cancelled,cancelled_batch'
+              : statusFilter,
+        }),
         getScheduledSms({ days: 14, source_type: 'reminder' }),
       ])
       setSettings(s.data.data)
@@ -425,15 +461,20 @@ export default function Reminders() {
   // clean yes. A 202 means mNotify has not confirmed the delete yet: the
   // withdraw is queued for retry, but until it lands the message may still
   // fire. Saying "Cancelled" in that case would be a lie the member pays
-  // for, so the pending state is surfaced instead.
+  // for, so the pending state is surfaced instead — and, crucially, the row
+  // is kept on screen, because the message really might still be live.
   const handleCancelDelivery = useCallback(async (delivery) => {
     setCancellingId(delivery.id)
     try {
       const { data } = await cancelScheduledSms(delivery.id)
 
       if (data.cloud_cancelled) {
+        // Drop it the moment it is confirmed gone from the provider, so the
+        // list reflects the cancel immediately rather than after a refetch.
+        setDeliveries(list => list.filter(x => x.id !== delivery.id))
         toast.success('Cancelled', {
-          description: `Message to ${delivery.phone} withdrawn from mNotify. It will not be delivered.`,
+          description: `Message to ${delivery.phone} withdrawn from mNotify. It will not be delivered. `
+            + 'The withdrawal is recorded in the cancellation log below.',
         })
       } else {
         toast.warning('Withdrawal queued — not yet confirmed', {
@@ -504,7 +545,7 @@ export default function Reminders() {
 
       <div>
         <h2 className="font-bold mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--color-navy)' }}>
-          Send Log (last 30 days)
+          Send &amp; Cancellation Log (last 30 days)
         </h2>
         <LogPanel logs={logs} statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       </div>

@@ -10,10 +10,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Audit log of every SMS reminder attempt. One row per (member,
- * service_type, intended_service_date) — used for idempotency
- * (never send the same reminder twice) and for the admin audit
- * view.
+ * Audit log of every SMS reminder outcome: one row per (member,
+ * service_type, intended_service_date) for sends, plus the withdrawals
+ * that stopped one.
+ *
+ * The send rows drive idempotency (never send the same reminder twice);
+ * the cancellation rows are the audit trail. They are deliberately not
+ * counted as sends — a message that was withdrawn was never delivered,
+ * and reporting it as anything else would misrepresent what members got.
  */
 class ServiceReminderLog extends Model
 {
@@ -32,6 +36,8 @@ class ServiceReminderLog extends Model
         'phone_used',
         'message_body',
         'error_message',
+        'cancelled_by',
+        'detail',
     ];
 
     protected $casts = [
@@ -44,6 +50,19 @@ class ServiceReminderLog extends Model
     public const STATUS_NO_PHONE = 'no_phone';
 
     public const STATUS_FAILED = 'failed';
+
+    /**
+     * One message was withdrawn on an admin's instruction.
+     */
+    public const STATUS_CANCELLED = 'cancelled';
+
+    /**
+     * A whole automation was switched off, taking every future message
+     * for that service type with it. One row, not one per member: the
+     * cascade routinely retires 100+ dispatches and a log line each
+     * would bury the entries an admin actually reads.
+     */
+    public const STATUS_CANCELLED_BATCH = 'cancelled_batch';
 
     public function branch(): BelongsTo
     {
@@ -58,6 +77,11 @@ class ServiceReminderLog extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class);
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function scopeStatus(Builder $query, string $status): Builder

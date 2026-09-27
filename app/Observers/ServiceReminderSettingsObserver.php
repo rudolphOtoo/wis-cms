@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderSettings;
 use App\Services\RecurringSmsScheduler;
+use App\Services\ReminderCancellationLog;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -30,6 +31,10 @@ use Illuminate\Support\Facades\Log;
  * Each cancellation runs through CancelScheduledSmsJob so transient
  * network failures are retried via the pending_remote_schedules queue,
  * keeping remote cleanup resilient to outages.
+ *
+ * Every admin-initiated withdrawal is also written to the reminder audit
+ * log (see ReminderCancellationLog), because the dispatches themselves
+ * disappear from the admin screen the moment they are withdrawn.
  */
 class ServiceReminderSettingsObserver
 {
@@ -90,6 +95,18 @@ class ServiceReminderSettingsObserver
             $reason,
         );
 
+        // One audit entry for the action, not one per withdrawn dispatch.
+        // The messages leave the scheduled list, so the record that they
+        // were deliberately taken away is the only thing an admin has
+        // left to go on. Resync does NOT come through here — that churn
+        // is bookkeeping and must not appear as an admin action.
+        $this->cancellationLog()->recordAutomationWithdrawal(
+            $settings,
+            $cancelled,
+            $reason,
+            auth()->user(),
+        );
+
         Log::info('Service reminder deactivated — remote cancellations dispatched', [
             'settings_id' => $settings->id,
             'reason' => $reason,
@@ -131,5 +148,10 @@ class ServiceReminderSettingsObserver
     protected function scheduler(): RecurringSmsScheduler
     {
         return app(RecurringSmsScheduler::class);
+    }
+
+    protected function cancellationLog(): ReminderCancellationLog
+    {
+        return app(ReminderCancellationLog::class);
     }
 }
