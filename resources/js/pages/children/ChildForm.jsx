@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createChild, updateChild, getChild } from '../../api/children'
 import { getMembers } from '../../api/members'
+import MemberSearchPicker from '../../components/MemberSearchPicker'
 
 const cardBase = {
   backgroundColor: '#fff',
@@ -42,20 +43,71 @@ export default function ChildForm() {
     gender:'', date_of_birth:'', class_group:'',
     is_active: true, notes:'',
   })
-  const [members,    setMembers]    = useState([])
   const [errors,     setErrors]     = useState({})
   const [loading,    setLoading]    = useState(false)
   const [fetching,   setFetching]   = useState(isEdit)
 
-  useEffect(() => {
-    getMembers({ per_page: 500, status: 'active' })
-      .then(res => setMembers(res.data.data))
+  // Guardian is chosen from a live server-side search rather than a
+  // preloaded dropdown. A church can hold well over 500 active members,
+  // and a fixed list silently hid everyone past the cut-off — a guardian
+  // outside that window could not be selected at all.
+  const [guardianOptions,   setGuardianOptions]   = useState([])
+  const [guardianQuery,     setGuardianQuery]     = useState('')
+  const [guardianSearching, setGuardianSearching] = useState(false)
+  const [selectedGuardian,  setSelectedGuardian]  = useState(null)
 
+  useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+
+    // Debounced so typing a name is one request, not one per keystroke.
+    const timer = setTimeout(async () => {
+      setGuardianSearching(true)
+      try {
+        const res = await getMembers({
+          search: guardianQuery.trim() || undefined,
+          status: 'active',
+          per_page: 25,
+          // A child's guardian may sit in any cell of the branch, so the
+          // cell-leader scoping used elsewhere in the app would wrongly
+          // hide them. Branch isolation is unaffected: that is a global
+          // scope on the model, not a request parameter.
+          unscoped: 1,
+        }, controller.signal)
+
+        if (!cancelled) setGuardianOptions(res.data.data)
+      } catch (err) {
+        if (!cancelled && err.code !== 'ERR_CANCELED') console.error(err)
+      } finally {
+        if (!cancelled) setGuardianSearching(false)
+      }
+    }, 250)
+
+    return () => { cancelled = true; clearTimeout(timer); controller.abort() }
+  }, [guardianQuery])
+
+  // Keep the current guardian in the list even when the search results no
+  // longer contain them (they were typed away from, or the member is no
+  // longer 'active'). Without this the field renders as empty while the id
+  // is still set, which reads as "no guardian chosen".
+  const guardianList = useMemo(() => {
+    const chosen = selectedGuardian
+    if (chosen && !guardianOptions.some(m => m.id === chosen.id)) {
+      return [chosen, ...guardianOptions]
+    }
+    return guardianOptions
+  }, [guardianOptions, selectedGuardian])
+
+  useEffect(() => {
     if (isEdit) {
       setFetching(true)
       getChild(id)
         .then(res => {
           const c = res.data.data
+          // ChildrenResource exposes the guardian's name as `name`, but the
+          // picker reads `full_name` (the shape MemberResource returns).
+          // Without this alias the chosen guardian renders as a nameless chip.
+          if (c.guardian) setSelectedGuardian({ ...c.guardian, full_name: c.guardian.name })
           setForm({
             guardian_member_id: c.guardian?.id   ?? '',
             first_name:         c.first_name     ?? '',
@@ -166,12 +218,18 @@ export default function ChildForm() {
         <div style={{...cardBase, padding:'24px'}}>
           <SectionHeader num="2" title="Guardian Information" />
           <FIELD label="Guardian Member *" error={errors.guardian_member_id?.[0]}>
-            <select className="input-field" value={form.guardian_member_id} onChange={set('guardian_member_id')} required>
-              <option value="">Select the parent or guardian</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.full_name} ({m.member_number})</option>
-              ))}
-            </select>
+            <MemberSearchPicker
+              members={guardianList}
+              value={form.guardian_member_id}
+              onChange={(memberId) => {
+                setForm(f => ({ ...f, guardian_member_id: memberId }))
+                setErrors(e => ({ ...e, guardian_member_id: null }))
+                setSelectedGuardian(guardianList.find(m => m.id === memberId) ?? null)
+              }}
+              onQueryChange={setGuardianQuery}
+              searching={guardianSearching}
+              placeholder="Search guardian by name, phone or member number..."
+            />
           </FIELD>
           <p className="text-xs mt-2" style={{color:'#9ca3af'}}>The guardian must already be a registered church member.</p>
         </div>
