@@ -236,6 +236,65 @@ class ScheduledSmsCancelApiTest extends TestCase
             ->assertJsonPath('meta.not_on_cloud', 1);
     }
 
+    public function test_cancelled_deliveries_disappear_from_the_scheduled_listing(): void
+    {
+        $kept = $this->delivery(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, 'push-ref-abc');
+        $withdrawn = $this->delivery(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, 'push-ref-def');
+
+        $deleted = [];
+        $this->fakeProvider($deleted);
+
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/sms/scheduled/{$withdrawn->id}/cancel")
+            ->assertOk();
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/sms/scheduled?days=1');
+
+        // A withdrawn message is gone from the panel even though its row is
+        // deliberately kept in the database for resync bookkeeping.
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.cancellable', 1);
+
+        $this->assertSame(
+            [$kept->id],
+            array_column($response->json('data'), 'id')
+        );
+    }
+
+    public function test_withdrawn_deliveries_remain_auditable_via_status_filter(): void
+    {
+        $withdrawn = $this->delivery(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, 'push-ref-abc');
+
+        $deleted = [];
+        $this->fakeProvider($deleted);
+
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/sms/scheduled/{$withdrawn->id}/cancel")
+            ->assertOk();
+
+        $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/sms/scheduled?days=1&status='.ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE)
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $withdrawn->id)
+            ->assertJsonPath('data.0.status_label', 'Cancelled on mNotify');
+
+        $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/sms/scheduled?days=1&status=all')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1);
+    }
+
+    public function test_unknown_status_filter_is_rejected(): void
+    {
+        $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/sms/scheduled?status=whatever')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('status');
+    }
+
     public function test_cancel_reports_honestly_and_queues_a_retry_when_mnotify_refuses(): void
     {
         $delivery = $this->delivery(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, 'push-ref-abc');
@@ -300,5 +359,11 @@ class ScheduledSmsCancelApiTest extends TestCase
 
         // The uploaded job must have been withdrawn from the cloud.
         $this->assertSame(['213781'], $deleted);
+
+        // And nothing is left for the admin to see or click again.
+        $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/sms/scheduled?days=1&source_type=reminder')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 0);
     }
 }

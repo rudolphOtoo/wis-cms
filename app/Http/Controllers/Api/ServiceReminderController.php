@@ -23,6 +23,18 @@ use Illuminate\Validation\Rule;
 class ServiceReminderController extends Controller
 {
     /**
+     * Outcomes the audit log can be filtered by. Kept in step with
+     * ServiceReminderLog's statuses.
+     */
+    public const LOG_STATUSES = [
+        ServiceReminderLog::STATUS_SENT,
+        ServiceReminderLog::STATUS_NO_PHONE,
+        ServiceReminderLog::STATUS_FAILED,
+        ServiceReminderLog::STATUS_CANCELLED,
+        ServiceReminderLog::STATUS_CANCELLED_BATCH,
+    ];
+
+    /**
      * GET /api/reminders/settings
      * Returns ALL reminder settings rows for the current branch, one
      * per configured service type. Service types without a row appear
@@ -213,26 +225,43 @@ class ServiceReminderController extends Controller
 
     /**
      * GET /api/reminders/log?days=30&status=sent&service_type_id=...
-     * Audit log of past sends with optional filters.
+     * Audit log of past sends and withdrawals with optional filters.
+     *
+     * Withdrawals live here too, because the message they describe is
+     * deliberately gone from the scheduled list — this is the only place
+     * left that says it was cancelled, by whom, and whether mNotify
+     * confirmed.
      */
     public function log(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'days' => ['nullable', 'integer', 'between:1,365'],
-            'status' => ['nullable', 'string', Rule::in(['sent', 'no_phone', 'failed'])],
+            'status' => ['nullable', 'string', function (string $attr, mixed $value, \Closure $fail) {
+                $unknown = array_diff($this->requestedStatuses($value), self::LOG_STATUSES);
+
+                if ($unknown !== []) {
+                    $fail('Unknown log status: '.implode(', ', $unknown).'.');
+                }
+            }],
             'service_type_id' => ['nullable', 'uuid', 'exists:service_types,id'],
         ]);
 
         $days = $validated['days'] ?? 30;
         $branchId = $request->user()->branch_id;
 
+        $statuses = $this->requestedStatuses($validated['status'] ?? null);
+
         $logs = ServiceReminderLog::query()
             ->where('branch_id', $branchId)
             ->where('sent_at', '>=', now()->subDays($days))
-            ->when(! empty($validated['status']), fn ($q) => $q->status($validated['status']))
+            ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
             ->when(! empty($validated['service_type_id']),
                 fn ($q) => $q->where('service_type_id', $validated['service_type_id']))
-            ->with(['member:id,first_name,last_name,phone', 'serviceType:id,name,slug'])
+            ->with([
+                'member:id,first_name,last_name,phone',
+                'serviceType:id,name,slug',
+                'cancelledBy:id,name',
+            ])
             ->orderByDesc('sent_at')
             ->limit(200)
             ->get();
@@ -241,20 +270,82 @@ class ServiceReminderController extends Controller
             'data' => $logs->map(fn ($log) => [
                 'id' => $log->id,
                 'member_id' => $log->member_id,
-                'member_name' => $log->member ? trim("{$log->member->first_name} {$log->member->last_name}") : '(deleted)',
+                'member_name' => $this->memberLabel($log),
+                'headline' => $this->headline($log),
                 'service_type' => $log->serviceType?->name,
                 'sent_at' => $log->sent_at,
                 'intended_service_date' => $log->intended_service_date?->toDateString(),
                 'status' => $log->status,
+                'status_label' => $this->logStatusLabel($log->status),
                 'phone_used' => $log->phone_used,
                 'message_body' => $log->message_body,
                 'error_message' => $log->error_message,
+                'detail' => $log->detail,
+                'cancelled_by' => $log->cancelledBy?->name,
             ]),
             'meta' => [
                 'days' => $days,
                 'total' => $logs->count(),
             ],
         ]);
+    }
+
+    /**
+     * Turn the `status` filter into a list of statuses.
+     *
+     * Accepts a comma-separated list so the UI can ask for "everything
+     * that was cancelled" — per-message withdrawals and whole-automation
+     * stops live under different statuses but are one thing to an admin
+     * looking for evidence of a cancel.
+     *
+     * @return list<string>
+     */
+    protected function requestedStatuses(mixed $raw): array
+    {
+        if (blank($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', (string) $raw))));
+    }
+
+    /**
+     * Best available label for who an entry is about. A withdrawal is
+     * filed against the number that was going to be texted, so the number
+     * is shown when the member is gone or was never resolvable.
+     */
+    protected function memberLabel(ServiceReminderLog $log): string
+    {
+        if ($log->member) {
+            return trim("{$log->member->first_name} {$log->member->last_name}");
+        }
+
+        return $log->phone_used ?: '(deleted)';
+    }
+
+    /**
+     * The entry's headline. A whole-automation stop belongs to the
+     * reminder itself, not to any one person.
+     */
+    protected function headline(ServiceReminderLog $log): string
+    {
+        if ($log->status === ServiceReminderLog::STATUS_CANCELLED_BATCH) {
+            return 'All '.($log->serviceType?->name ?? 'reminder').' reminders';
+        }
+
+        return $this->memberLabel($log);
+    }
+
+    protected function logStatusLabel(string $status): string
+    {
+        return match ($status) {
+            ServiceReminderLog::STATUS_SENT => 'Sent',
+            ServiceReminderLog::STATUS_NO_PHONE => 'No phone',
+            ServiceReminderLog::STATUS_FAILED => 'Failed',
+            ServiceReminderLog::STATUS_CANCELLED => 'Cancelled',
+            ServiceReminderLog::STATUS_CANCELLED_BATCH => 'Reminder cancelled',
+            default => ucfirst(str_replace('_', ' ', $status)),
+        };
     }
 
     /**
