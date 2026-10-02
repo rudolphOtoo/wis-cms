@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBranch;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Settings for the recurring per-service-type SMS reminder.
@@ -61,6 +63,53 @@ class ServiceReminderSettings extends Model
      * Generic fallback for any other service type added later.
      */
     public const DEFAULT_GENERIC_TEMPLATE = 'Hello {first_name}! Reminder: {service_name} on {service_date} at {service_time}. {church_name} looking forward to seeing you. God bless.';
+
+    /**
+     * Keep only the newest active row per (branch, day-of-week, hour) slot.
+     *
+     * Why a slot — not just the service type — is the unit of dispatch
+     * ---------------------------------------------------------------
+     * A settings row fires at one specific moment: (branch, weekday,
+     * hour). Two rows in the same slot means two templates go out in the
+     * same minute, to the same phones, announcing the same service — the
+     * exact "2 or 3 distinct reminders at 12:00 PM" symptom this guards
+     * against.
+     *
+     * A UNIQUE (branch_id, service_type_id) index makes duplicates of one
+     * service type impossible, so the rows that collide in a slot are
+     * always *different* service types (a re-seeded/duplicated
+     * service_types record, or two services genuinely pointed at the same
+     * weekday and hour). Each one looked perfectly valid on its own, which
+     * is why this could not be left to the database.
+     *
+     * Only ACTIVE rows compete: a row switched off must never win the
+     * slot, and must never cause an active row to be suppressed.
+     *
+     * "Newest" = latest created_at, tie-broken on id, so the
+     * most recently configured template is the one that fires. The
+     * suppressed rows stay in the table untouched — only the dispatch
+     * reads are narrowed — so no configuration is destroyed.
+     */
+    public function scopeWithoutSlotDuplicates(Builder $query): Builder
+    {
+        return $query->whereNotExists(function ($newer) {
+            $newer->selectRaw('1')
+                ->from('service_reminder_settings as newer_slot')
+                ->where('newer_slot.is_active', true)
+                ->whereColumn('newer_slot.branch_id', 'service_reminder_settings.branch_id')
+                ->whereColumn('newer_slot.send_day_of_week', 'service_reminder_settings.send_day_of_week')
+                ->whereColumn('newer_slot.send_hour', 'service_reminder_settings.send_hour')
+                ->where(function ($ordering) {
+                    $ordering
+                        ->where('newer_slot.created_at', '>', DB::raw('service_reminder_settings.created_at'))
+                        ->orWhere(function ($tie) {
+                            $tie
+                                ->where('newer_slot.created_at', '=', DB::raw('service_reminder_settings.created_at'))
+                                ->where('newer_slot.id', '>', DB::raw('service_reminder_settings.id'));
+                        });
+                });
+        });
+    }
 
     public function branch(): BelongsTo
     {

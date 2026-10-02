@@ -130,6 +130,8 @@ class SmsCloudHygieneTest extends TestCase
     public function test_prune_cancels_jobs_the_ledger_does_not_own_at_all(): void
     {
         // No local rows at all — every future remote job is an orphan.
+        // That is also 0% ledger coverage, which the safety floor blocks by
+        // default, so this asserts the --force path.
         $remote = [
             ['_id' => '200', 'date_time' => '2026-08-22 12:00:00', 'message' => 'Ghost message'],
         ];
@@ -137,7 +139,7 @@ class SmsCloudHygieneTest extends TestCase
         $deleted = [];
         $this->fakeProvider($remote, $deleted);
 
-        $this->artisan('sms:prune-remote-duplicates --execute')->assertSuccessful();
+        $this->artisan('sms:prune-remote-duplicates --execute --force')->assertSuccessful();
 
         $this->assertSame(['200'], $deleted);
     }
@@ -199,7 +201,7 @@ class SmsCloudHygieneTest extends TestCase
             return Http::response(['status' => 'success'], 200);
         });
 
-        $this->artisan('sms:prune-remote-duplicates --execute')
+        $this->artisan('sms:prune-remote-duplicates --execute --force')
             ->expectsOutputToContain('defused to 2099')
             ->assertSuccessful();
     }
