@@ -41,6 +41,15 @@ return [
         // the daily sms:sync-rolling-automations run and immediately when
         // an automation is configured/edited in the admin panel.
         'schedule_days' => (int) env('MNOTIFY_SCHEDULE_DAYS', 14),
+        // Safety floor for sms:prune-remote-duplicates. The prune treats a
+        // remote job with no matching local delivery as an orphan and
+        // defuses it. That inference is only sound when the local database
+        // actually accounts for the cloud schedule: against a fresh or
+        // partial database every legitimate reminder reads as an orphan and
+        // the daily cron would defuse the church's entire upcoming SMS run.
+        // So before mutating anything the command requires the ledger to
+        // explain at least this share of the deliverable cloud jobs.
+        'safety_threshold' => (float) env('MNOTIFY_PRUNE_SAFETY_THRESHOLD', 0.25),
     ],
 
     'slack' => [

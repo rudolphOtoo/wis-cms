@@ -63,11 +63,17 @@ class SendServiceReminders extends Command
         // Find all settings rows whose schedule matches RIGHT NOW.
         // Across all branches (multi-tenant safe — the trait will scope
         // member queries below).
+        //
+        // withoutSlotDuplicates() collapses the slot so that two active
+        // rows pointed at the same branch/weekday/hour cannot both fan
+        // out. Without it each row renders its own template and every
+        // member gets both.
         $matches = ServiceReminderSettings::query()
             ->with(['serviceType', 'branch'])
             ->where('is_active', true)
             ->where('send_day_of_week', $dow)
             ->where('send_hour', $hour)
+            ->withoutSlotDuplicates()
             ->get();
 
         if ($matches->isEmpty()) {
@@ -136,6 +142,15 @@ class SendServiceReminders extends Command
         $churchName = $settings->branch?->name ?? config('church.name', 'Your church');
         $serviceTime = $settings->serviceTimeLabel();
 
+        // One indexed lookup for the whole branch instead of one per member.
+        // Keys are the phones that already hold this member's reminder for
+        // today; see alreadyQueuedForMember() for why the phone, and not the
+        // settings row, is the key.
+        $queuedPhones = ScheduledSmsDelivery::reminderPhonesInFlight(
+            $now,
+            $members->map(fn (Member $member) => $member->phone)->all(),
+        );
+
         foreach ($members as $member) {
             // Idempotency: already sent THIS reminder for THIS service date.
             if (ServiceReminderLog::alreadySent($member->id, $settings->service_type_id, $intendedDate)) {
@@ -144,7 +159,8 @@ class SendServiceReminders extends Command
                 continue;
             }
 
-            // Idempotency: the mNotify cloud already holds this reminder.
+            // Idempotency: the mNotify cloud already holds this member's
+            // reminder for this day.
             //
             // The rolling sync pre-schedules every reminder on mNotify's own
             // queue, which is what lets the church desktop be powered off and
@@ -154,7 +170,7 @@ class SendServiceReminders extends Command
             // ServiceReminderLog, which the cloud path never writes, so on a
             // running desktop every member received the reminder TWICE: once
             // from the cloud job firing and once from here.
-            if ($this->cloudAlreadyHoldsReminder($member, $settings, $now)) {
+            if ($this->alreadyQueuedForMember($member, $settings, $now, $queuedPhones)) {
                 $skipped++;
 
                 continue;
@@ -244,8 +260,8 @@ class SendServiceReminders extends Command
     }
 
     /**
-     * Does mNotify's cloud already own this member's reminder for the slot
-     * currently being processed?
+     * Does a service reminder for this member already exist for today,
+     * from ANY source?
      *
      * This command only ever runs at the exact configured slot (day-of-week
      * and hour must both match), and the rolling sync reserves the cloud
@@ -254,33 +270,36 @@ class SendServiceReminders extends Command
      * Saturday for a Sunday service, so the two dates are a day apart and
      * comparing them would never match.
      *
-     * Only provider-owned statuses count. A row the cloud cancelled or that
-     * permanently failed will never be delivered, so it must not suppress
-     * the local fallback.
+     * The check is keyed on the member's phone number rather than on the
+     * settings row that scheduled the message. A duplicate settings row in
+     * the same slot creates a delivery under its own source_id, and
+     * matching on source_id let each row claim the slot was free — so the
+     * local sender would fire on top of the cloud job the *other* row had
+     * already reserved. Keyed on phone + day, one member gets one reminder.
      */
-    protected function cloudAlreadyHoldsReminder(
+    protected function alreadyQueuedForMember(
         Member $member,
         ServiceReminderSettings $settings,
         Carbon $now,
+        array $queuedPhones,
     ): bool {
-        if (empty($member->phone)) {
+        if (empty($member->phone) || ! isset($queuedPhones[$member->phone])) {
             return false;
         }
 
-        return ScheduledSmsDelivery::query()
-            ->where('branch_id', $settings->branch_id)
-            ->where('source_type', 'reminder')
-            ->where('source_id', $settings->id)
-            ->where('phone', $member->phone)
-            ->whereIn('status', [
-                ScheduledSmsDelivery::STATUS_PENDING_API,
-                ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
-            ])
-            ->whereBetween('scheduled_at', [
-                $now->copy()->startOfDay(),
-                $now->copy()->endOfDay(),
-            ])
-            ->exists();
+        Log::warning(
+            '[Service Reminder] Skipped duplicate reminder for member '.$member->id
+            .' ('.$member->phone.') on target date '.$now->toDateString().'.',
+            [
+                'member_id' => $member->id,
+                'phone' => $member->phone,
+                'target_date' => $now->toDateString(),
+                'settings_id' => $settings->id,
+                'reason' => 'A reminder for this recipient and day is already queued or sent.',
+            ]
+        );
+
+        return true;
     }
 
     /**

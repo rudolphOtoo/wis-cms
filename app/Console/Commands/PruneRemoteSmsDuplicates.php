@@ -40,11 +40,29 @@ use Illuminate\Support\Facades\Log;
  * The command is deliberately conservative — it will only ever remove
  * remote jobs, never create or modify local rows, and it defaults to a
  * dry run.
+ *
+ * COVERAGE SAFETY FLOOR
+ * ---------------------
+ * "No local delivery for this message" is only evidence that a remote job
+ * is unwanted when the local database is genuinely the ledger that
+ * scheduled the cloud. Run against a fresh, partial, or simply wrong
+ * database, every legitimately scheduled reminder reads as an orphan and
+ * this command would defuse the church's entire upcoming SMS run — as
+ * "hygiene". That is exactly what a coverage floor prevents.
+ *
+ * Before any cancellation, the command measures what share of the
+ * deliverable cloud jobs the ledger can actually account for (matched by
+ * the same natural key used for classification). Below the threshold in
+ * `services.mnotify.safety_threshold` it reports, logs, and exits
+ * successfully without touching mNotify. Threshold is configurable via
+ * MNOTIFY_PRUNE_SAFETY_THRESHOLD; --force bypasses a single run for an
+ * operator who has verified the jobs by other means.
  */
 class PruneRemoteSmsDuplicates extends Command
 {
     protected $signature = 'sms:prune-remote-duplicates
                             {--execute : Actually cancel the surplus/orphan jobs (default: dry run)}
+                            {--force : Prune even when the local ledger does not cover enough of the cloud schedule}
                             {--date= : Only consider remote jobs scheduled on this date (Y-m-d)}
                             {--hours= : Only consider remote jobs due within N hours}';
 
@@ -55,6 +73,15 @@ class PruneRemoteSmsDuplicates extends Command
         ScheduledSmsDelivery::STATUS_PENDING_API,
         ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
     ];
+
+    /** Local statuses that represent a message the CMS already withdrew. */
+    private const WITHDRAWN_STATUSES = [
+        ScheduledSmsDelivery::STATUS_CANCELLED,
+        ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE,
+    ];
+
+    /** Used when the configured threshold is missing or nonsensical. */
+    private const DEFAULT_THRESHOLD = 0.25;
 
     public function handle(MnotifySmsService $sms): int
     {
@@ -83,6 +110,7 @@ class PruneRemoteSmsDuplicates extends Command
         }
 
         $expectedByKey = $this->expectedCountsByKey();
+        $withdrawnByKey = $this->withdrawnCountsByKey();
         $seenByKey = [];
         $surplus = [];
 
@@ -127,7 +155,128 @@ class PruneRemoteSmsDuplicates extends Command
             return self::SUCCESS;
         }
 
+        // Last gate before anything is mutated on the provider. A dry run
+        // above is safe to run anywhere, so the floor only gates real work.
+        if (! $this->coverageIsSufficient($candidates, $expectedByKey, $withdrawnByKey)) {
+            return self::SUCCESS;
+        }
+
         return $this->cancelAll($sms, $surplus);
+    }
+
+    /**
+     * Refuse to prune when the local ledger cannot account for enough of
+     * the deliverable cloud schedule.
+     *
+     * Coverage is measured as "deliverable cloud jobs this ledger can
+     * explain" — those matching a live or withdrawn local delivery on the
+     * natural key — over all deliverable cloud jobs. Counting local rows
+     * instead would be fooled by stale rows for messages that already
+     * dispatched: those inflate the numerator while explaining none of the
+     * jobs actually at risk.
+     *
+     * Aborts with a successful exit code. A scheduled safety abort is not
+     * a command failure, and reporting one as a failure would make the
+     * scheduler's failure monitoring cry wolf on every misconfigured host.
+     *
+     * @param  Collection<int, array<string, mixed>>  $candidates
+     * @param  array<string, int>  $expectedByKey
+     * @param  array<string, int>  $withdrawnByKey
+     */
+    protected function coverageIsSufficient(Collection $candidates, array $expectedByKey, array $withdrawnByKey): bool
+    {
+        $threshold = $this->safetyThreshold();
+        $deliverable = $candidates->count();
+
+        $accounted = $candidates->filter(function (array $job) use ($expectedByKey, $withdrawnByKey) {
+            $key = $this->naturalKey($job);
+
+            return ($expectedByKey[$key] ?? 0) > 0 || ($withdrawnByKey[$key] ?? 0) > 0;
+        })->count();
+
+        $coverage = $deliverable > 0 ? $accounted / $deliverable : 1.0;
+        $percent = number_format($coverage * 100, 2);
+        $floor = number_format($threshold * 100, 0);
+
+        if ($coverage >= $threshold) {
+            $this->line(sprintf(
+                'Ledger coverage: %s%% of %d active mNotify cloud job(s) accounted for. Floor %s%%.',
+                $percent,
+                $deliverable,
+                $floor,
+            ));
+
+            return true;
+        }
+
+        if ($this->option('force')) {
+            $this->warn('');
+            $this->warn('--force: pruning at '.$percent.'% ledger coverage (floor '.$floor.'%).');
+            $this->warn('Cancelling on the operator\'s own authority — confirm these jobs really are unwanted.');
+
+            Log::warning('[SMS Prune Safety Guard] Bypassed by --force: local DB accounts for '.$accounted
+                .' of '.$deliverable.' active mNotify cloud jobs ('.$percent.'% coverage). '
+                .'Minimum required is '.$floor.'%.', [
+                    'coverage_percent' => $percent,
+                    'threshold_percent' => $floor,
+                    'accounted_cloud_jobs' => $accounted,
+                    'active_cloud_jobs' => $deliverable,
+                ]);
+
+            return true;
+        }
+
+        $this->warn('');
+        $this->warn('[SMS Prune Safety Guard] Prune aborted — nothing was cancelled on mNotify.');
+        $this->warn("  Local DB accounts for {$accounted} of {$deliverable} active mNotify cloud job(s) ({$percent}% coverage).");
+        $this->warn("  Minimum required is {$floor}% (services.mnotify.safety_threshold).");
+        $this->warn('');
+        $this->warn('Below this floor, "no local delivery" stops being evidence that a job is');
+        $this->warn('unwanted — it just means this database is not the one that scheduled the');
+        $this->warn('messages. Pruning now would defuse real reminders that are still meant to send.');
+        $this->warn('');
+        $this->warn('Fix the ledger (check DB_DATABASE / DB_HOST), lower the floor via');
+        $this->warn('MNOTIFY_PRUNE_SAFETY_THRESHOLD, or re-run with --force if you have verified');
+        $this->warn('these jobs by other means.');
+
+        Log::warning('[SMS Prune Safety Guard] Aborted daily prune: local DB accounts for '.$accounted
+            .' of '.$deliverable.' active mNotify cloud jobs ('.$percent.'% coverage). '
+            .'Minimum required is '.$floor.'%.', [
+                'coverage_percent' => $percent,
+                'threshold_percent' => $floor,
+                'accounted_cloud_jobs' => $accounted,
+                'active_cloud_jobs' => $deliverable,
+                'forced' => false,
+            ]);
+
+        return false;
+    }
+
+    /**
+     * The configured coverage floor, falling back to the default when it is
+     * absent or nonsensical. Values outside 0..1 are rejected rather than
+     * silently honoured, so a typo cannot quietly disable the guard.
+     */
+    protected function safetyThreshold(): float
+    {
+        $configured = config('services.mnotify.safety_threshold');
+
+        if ($configured === null) {
+            return self::DEFAULT_THRESHOLD;
+        }
+
+        $value = (float) $configured;
+
+        if ($value < 0.0 || $value > 1.0) {
+            Log::warning('[SMS Prune Safety Guard] Ignoring out-of-range MNOTIFY_PRUNE_SAFETY_THRESHOLD, using default.', [
+                'configured' => $configured,
+                'default' => self::DEFAULT_THRESHOLD,
+            ]);
+
+            return self::DEFAULT_THRESHOLD;
+        }
+
+        return $value;
     }
 
     /**
@@ -199,6 +348,31 @@ class PruneRemoteSmsDuplicates extends Command
     {
         return ScheduledSmsDelivery::query()
             ->whereIn('status', self::LIVE_STATUSES)
+            ->where('scheduled_at', '>=', now())
+            ->get(['scheduled_at', 'message_body'])
+            ->groupBy(fn ($row) => $this->keyFromParts(
+                $row->scheduled_at->format('Y-m-d H:i:s'),
+                (string) $row->message_body
+            ))
+            ->map->count()
+            ->all();
+    }
+
+    /**
+     * How many cancelled local deliveries exist for each (date_time, body)
+     * key.
+     *
+     * Used by the coverage guard: a cloud job the ledger has explicitly
+     * withdrawn still proves the ledger describes this account, so it
+     * counts as accounted-for coverage even though it contributes nothing
+     * to the expected live copy count.
+     *
+     * @return array<string, int>
+     */
+    protected function withdrawnCountsByKey(): array
+    {
+        return ScheduledSmsDelivery::query()
+            ->whereIn('status', self::WITHDRAWN_STATUSES)
             ->where('scheduled_at', '>=', now())
             ->get(['scheduled_at', 'message_body'])
             ->groupBy(fn ($row) => $this->keyFromParts(

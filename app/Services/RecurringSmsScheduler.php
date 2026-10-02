@@ -6,6 +6,7 @@ use App\Jobs\CancelScheduledSmsJob;
 use App\Jobs\DispatchScheduledSmsToMnotifyJob;
 use App\Models\BirthdayMessageSettings;
 use App\Models\Member;
+use App\Models\PendingRemoteSchedule;
 use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderSettings;
 use Carbon\Carbon;
@@ -132,10 +133,17 @@ class RecurringSmsScheduler
             $date = $today->copy()->addDays($i);
             $dow = $date->dayOfWeek;
 
+            // withoutSlotDuplicates() keeps only the newest active row per
+            // (branch, weekday, hour). Two rows sharing a dispatch slot used
+            // to each create a full set of deliveries — with different
+            // source_ids, so the per-source idempotency check below could not
+            // see them — and every member was pushed the same reminder twice
+            // with two different wordings.
             $settings = ServiceReminderSettings::query()
                 ->with(['serviceType', 'branch'])
                 ->where('is_active', true)
                 ->where('send_day_of_week', $dow)
+                ->withoutSlotDuplicates()
                 ->get();
 
             foreach ($settings as $setting) {
@@ -349,6 +357,72 @@ class RecurringSmsScheduler
     }
 
     /**
+     * Withdraw one delivery and report what actually happened.
+     *
+     * cancelDeliveryOnMnotify() is fire-and-observe: it runs the job under
+     * dispatch_sync() but deliberately swallows failures so one unreachable
+     * recipient cannot abandon the rest of a batch. Callers that must then
+     * *know* the outcome — the dedupe command, which re-counts survivors —
+     * need both the reconciled local status and the reason behind it.
+     *
+     * Why the reason matters: mNotify's DELETE /scheduled/{id} currently
+     * answers HTTP 500, so cancellation takes the TransientSmsException
+     * branch, which records a PendingRemoteSchedule retry and rethrows
+     * *without* marking the row cancelled. The duplicate is then still live
+     * on the provider, and the honest report is "still scheduled remotely,
+     * queued for retry" — not the generic "could not cancel".
+     *
+     * @return array{status: ?string, withdrawn: bool, remote: bool, reason: ?string}
+     */
+    public function reconcileCancellation(ScheduledSmsDelivery $delivery): array
+    {
+        $error = null;
+
+        try {
+            dispatch_sync(new CancelScheduledSmsJob($delivery->id));
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+        }
+
+        // Re-read rather than trusting the in-memory instance: the job
+        // updated the row, and every later query in the caller must see it.
+        $fresh = $delivery->fresh();
+
+        if ($fresh === null) {
+            return [
+                'status' => null,
+                'withdrawn' => false,
+                'remote' => false,
+                'reason' => 'Delivery row no longer exists.',
+            ];
+        }
+
+        return [
+            'status' => $fresh->status,
+            'withdrawn' => in_array($fresh->status, ScheduledSmsDelivery::WITHDRAWN_STATUSES, true),
+            'remote' => $fresh->status === ScheduledSmsDelivery::STATUS_CANCELLED_REMOTE,
+            'reason' => $error
+                ?? $fresh->error_message
+                ?? $this->pendingCancelReason($delivery->id),
+        ];
+    }
+
+    /**
+     * The retry reason recorded when a cancellation was deferred rather than
+     * completed. Null when nothing was deferred.
+     */
+    protected function pendingCancelReason(string $deliveryId): ?string
+    {
+        $pending = PendingRemoteSchedule::query()
+            ->where('scheduled_sms_delivery_id', $deliveryId)
+            ->where('action', PendingRemoteSchedule::ACTION_CANCEL)
+            ->latest('id')
+            ->first();
+
+        return $pending?->error_message;
+    }
+
+    /**
      * Push one pending delivery to mNotify's cloud, synchronously and
      * safely. Never throws — a failure is logged and retried by
      * sync:pending-schedules.
@@ -421,14 +495,63 @@ class RecurringSmsScheduler
             ->where('branch_id', $settings->branch_id)
             ->get();
 
+        // Three idempotency questions per member, each answered by one
+        // indexed lookup for the whole branch instead of one per member.
+        $phones = $members->map(fn (Member $member) => $member->phone)->all();
+
+        // This automation's own view of the slot, tombstones included.
+        $handledPhones = $this->alreadyScheduledPhones(
+            'reminder',
+            [$settings->id],
+            $date,
+            $phones,
+            $ignoredIds,
+        );
+
+        // Recipient-level view. handledPhones() is scoped to this settings
+        // row's own source_id, so it cannot see a message another automation
+        // already reserved for the same phone and day — which is precisely
+        // how a second reminder got queued for a member who already had one.
+        // Keyed on phone + date only, so the answer does not depend on which
+        // row is asking.
+        $claimedPhones = ScheduledSmsDelivery::reminderPhonesClaimed(
+            $date,
+            $phones,
+            $ignoredIds,
+        );
+
+        // Rows an aborted batch left behind, waiting to be reused.
+        $orphanSlots = $this->reclaimOrphanedSlots(
+            'reminder',
+            [$settings->id],
+            $date,
+            $phones,
+        );
+
         foreach ($members as $member) {
-            if ($this->isAlreadyScheduled('reminder', $settings->id, $member->phone, $scheduledAt, $ignoredIds)) {
+            if (in_array($member->phone, $handledPhones, true)) {
+                continue;
+            }
+
+            if (isset($claimedPhones[$member->phone])) {
+                Log::warning(
+                    '[Service Reminder] Skipped duplicate reminder for member '.$member->id
+                    .' ('.$member->phone.') on target date '.$date->toDateString().'.',
+                    [
+                        'member_id' => $member->id,
+                        'phone' => $member->phone,
+                        'target_date' => $date->toDateString(),
+                        'settings_id' => $settings->id,
+                        'reason' => 'Another reminder already holds this recipient and day.',
+                    ]
+                );
+
                 continue;
             }
 
             $body = $settings->render($member, $serviceName, $intendedDate, $serviceTime, $churchName);
 
-            $orphan = $this->reclaimOrphanedSlot('reminder', $settings->id, $member->phone, $scheduledAt);
+            $orphan = $orphanSlots[$member->phone] ?? null;
 
             if ($orphan) {
                 $orphan->update([
@@ -578,9 +701,77 @@ class RecurringSmsScheduler
         Carbon $scheduledAt,
         array $ignoredIds = [],
     ): bool {
-        $query = $this->slotQuery($sourceType, $sourceId, $phone, $scheduledAt);
+        // Birthday slots are keyed on the member rather than a phone number,
+        // so a null phone means "no phone restriction" — not "no match".
+        // Routing that through the batch helper would filter the null out and
+        // quietly disable the guard for every birthday automation.
+        $query = $this->slotQuery($sourceType, [$sourceId], null, $scheduledAt)
+            ->where($this->handledStatusRule($ignoredIds));
 
-        $query->where(function (Builder $q) use ($ignoredIds) {
+        if ($phone !== null) {
+            $query->where('phone', $phone);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Batch form of isAlreadyScheduled(): which of $phones already have a
+     * row this automation considers handled for that day.
+     *
+     * Probing once per member made a 300-member branch cost 300 round trips
+     * on every sync. Same predicate, one query for the whole batch.
+     *
+     * @param  list<string>  $sourceIds
+     * @param  list<string|null>  $phones
+     * @param  list<string>  $ignoredIds
+     * @return list<string> the subset of $phones that is already handled
+     */
+    protected function alreadyScheduledPhones(
+        string $sourceType,
+        array $sourceIds,
+        Carbon $scheduledAt,
+        array $phones,
+        array $ignoredIds = [],
+    ): array {
+        $phones = array_values(array_filter($phones, fn ($p) => $p !== null && $p !== ''));
+
+        if ($phones === []) {
+            return [];
+        }
+
+        return $this->slotQuery($sourceType, $sourceIds, null, $scheduledAt)
+            ->whereIn('phone', $phones)
+            ->where($this->handledStatusRule($ignoredIds))
+            ->distinct()
+            ->pluck('phone')
+            ->all();
+    }
+
+    /**
+     * The statuses that mean "this automation already has this slot handled".
+     *
+     * Shared by the single-slot and batch forms so they cannot drift apart.
+     *
+     *   - scheduled_remote / dispatched — provider-confirmed, skip.
+     *   - pending_api WITH a mnotify_job_id — the provider accepted the
+     *     push and the local status write is the only thing missing, so
+     *     re-pushing would double-send. Skip.
+     *   - pending_api WITHOUT a mnotify_job_id — an orphan left behind
+     *     when a batch aborted mid-dispatch. The member has NOT been
+     *     scheduled remotely, so this must NOT count as done; otherwise
+     *     the row is permanently stuck and the member silently never
+     *     receives the message. Deliberately excluded so the collector
+     *     reclaims it via reclaimOrphanedSlot().
+     *   - cancelled / cancelled_remote — tombstones, honored unless the
+     *     current resync deprecated them itself ($ignoredIds).
+     *
+     * @param  list<string>  $ignoredIds
+     * @return \Closure(Builder): void
+     */
+    protected function handledStatusRule(array $ignoredIds): \Closure
+    {
+        return function (Builder $q) use ($ignoredIds) {
             // Provider-confirmed rows.
             $q->whereIn('status', [
                 ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
@@ -605,9 +796,7 @@ class RecurringSmsScheduler
                     $c->whereNotIn('id', $ignoredIds);
                 }
             });
-        });
-
-        return $query->exists();
+        };
     }
 
     /**
@@ -624,12 +813,22 @@ class RecurringSmsScheduler
         ?string $phone,
         Carbon $scheduledAt,
     ): ?ScheduledSmsDelivery {
-        $query = $this->slotQuery($sourceType, $sourceId, $phone, $scheduledAt)
+        if ($phone !== null) {
+            return $this->reclaimOrphanedSlots(
+                $sourceType,
+                [$sourceId],
+                $scheduledAt,
+                [$phone],
+            )[$phone] ?? null;
+        }
+
+        // Birthday slots are keyed on the member rather than a phone number,
+        // so there is nothing to group by — take the oldest directly.
+        $orphan = $this->slotQuery($sourceType, [$sourceId], null, $scheduledAt)
             ->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
             ->where(fn ($q) => $q->whereNull('mnotify_job_id')->orWhere('mnotify_job_id', ''))
-            ->oldest('created_at');
-
-        $orphan = $query->first();
+            ->oldest('created_at')
+            ->first();
 
         if (! $orphan) {
             return null;
@@ -644,21 +843,88 @@ class RecurringSmsScheduler
     }
 
     /**
+     * Batch form of reclaimOrphanedSlot(): at most one reclaimable orphan
+     * per phone, oldest first.
+     *
+     * The single-phone form was the third per-member round trip in the
+     * collector's loop, so a sync paid for it once per member.
+     *
+     * @param  list<string>  $sourceIds
+     * @param  list<string|null>  $phones
+     * @return array<string, ScheduledSmsDelivery> keyed by phone
+     */
+    protected function reclaimOrphanedSlots(
+        string $sourceType,
+        array $sourceIds,
+        Carbon $scheduledAt,
+        array $phones,
+    ): array {
+        $phones = array_values(array_filter($phones, fn ($p) => $p !== null && $p !== ''));
+
+        if ($phones === []) {
+            return [];
+        }
+
+        $orphans = $this->slotQuery($sourceType, $sourceIds, null, $scheduledAt)
+            ->whereIn('phone', $phones)
+            ->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+            ->where(fn ($q) => $q->whereNull('mnotify_job_id')->orWhere('mnotify_job_id', ''))
+            ->oldest('created_at')
+            ->get();
+
+        $byPhone = [];
+
+        foreach ($orphans as $orphan) {
+            // First row per phone wins, matching the single-slot form's
+            // oldest('created_at')->first().
+            if (isset($byPhone[$orphan->phone])) {
+                continue;
+            }
+
+            $orphan->update([
+                'status' => ScheduledSmsDelivery::STATUS_PENDING_API,
+                'error_message' => null,
+            ]);
+
+            $byPhone[$orphan->phone] = $orphan;
+        }
+
+        return $byPhone;
+    }
+
+    /**
      * Base query for the (source, phone, date) scheduling slot.
+     *
+     * $sourceIds and $phone are both accept-or-null so the batch callers can
+     * widen the scope without a second copy of the date rule — which is what
+     * keeps this from becoming the place where the two forms diverge.
+     *
+     * The date is a half-open range, not whereDate(): the cast in
+     * `scheduled_at::date = ?` stops the index bounding the scan by day and
+     * leaves Postgres filtering every row the source ever has.
+     *
+     * @param  list<string>|null  $sourceIds
+     * @param  list<string>|string|null  $phone
      */
     protected function slotQuery(
         string $sourceType,
-        string $sourceId,
-        ?string $phone,
+        array|string|null $sourceIds,
+        array|string|null $phone,
         Carbon $scheduledAt,
     ): Builder {
+        $start = $scheduledAt->copy()->startOfDay();
+
         $query = ScheduledSmsDelivery::query()
             ->where('source_type', $sourceType)
-            ->where('source_id', $sourceId)
-            ->whereDate('scheduled_at', $scheduledAt->toDateString());
+            ->where('scheduled_at', '>=', $start)
+            ->where('scheduled_at', '<', $start->copy()->addDay());
+
+        if ($sourceIds !== null) {
+            $query->whereIn('source_id', (array) $sourceIds);
+        }
 
         if ($phone !== null) {
-            $query->where('phone', $phone);
+            $query->whereIn('phone', (array) $phone);
         }
 
         return $query;

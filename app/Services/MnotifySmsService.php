@@ -125,15 +125,32 @@ class MnotifySmsService
      */
     public function cancelScheduled(string $mnotifyJobId): bool
     {
+        return $this->deleteScheduledJob($mnotifyJobId)['confirmed'];
+    }
+
+    /**
+     * Cancel a scheduled SMS and report the provider's raw answer.
+     *
+     * Same request as cancelScheduled(), but returns the HTTP status and
+     * decoded payload so operational tooling can print an auditable
+     * "job X -> HTTP nnn {body}" line per cancellation instead of a bare
+     * boolean.
+     *
+     * @return array{confirmed: bool, http_status: int, body: array<string, mixed>|string}
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function deleteScheduledJob(string $mnotifyJobId): array
+    {
         if ($this->isDryRunMode()) {
             Log::info("[DEV DRY-RUN] Cancel scheduled SMS #{$mnotifyJobId}");
 
-            return true;
+            return ['confirmed' => true, 'http_status' => 0, 'body' => ['status' => 'dry-run']];
         }
 
         $apiKey = $this->getApiKey();
         if ($apiKey === null) {
-            return false;
+            return ['confirmed' => false, 'http_status' => 0, 'body' => ['message' => 'API key not configured']];
         }
 
         $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled/{$mnotifyJobId}?key={$apiKey}";
@@ -152,12 +169,14 @@ class MnotifySmsService
         if (! $response->successful()) {
             Log::error("mNotify cancel rejected (HTTP {$response->status()}) for #{$mnotifyJobId}: ".$response->body());
 
-            return false;
+            return ['confirmed' => false, 'http_status' => $response->status(), 'body' => $this->bodyOf($response)];
         }
 
-        $body = $response->json();
-
-        return ($body['status'] ?? null) === 'success';
+        return [
+            'confirmed' => ($response->json('status') === 'success'),
+            'http_status' => $response->status(),
+            'body' => $this->bodyOf($response),
+        ];
     }
 
     /**
@@ -182,7 +201,7 @@ class MnotifySmsService
             'message' => $message,
             // mNotify only accepts schedule times between 7am and 7pm
             'schedule_date' => $scheduledAt->format('Y-m-d H:i'),
-        ]);
+        ])['confirmed'];
     }
 
     /**
@@ -202,10 +221,22 @@ class MnotifySmsService
      */
     public function defuseScheduled(string $mnotifyJobId): bool
     {
+        return $this->defuseScheduledJob($mnotifyJobId)['confirmed'];
+    }
+
+    /**
+     * Defuse a scheduled SMS and report the provider's raw answer.
+     *
+     * @return array{confirmed: bool, http_status: int, body: array<string, mixed>|string}
+     *
+     * @throws TransientSmsException when the failure is retry-worthy
+     */
+    public function defuseScheduledJob(string $mnotifyJobId): array
+    {
         if ($this->isDryRunMode()) {
             Log::info("[DEV DRY-RUN] Defuse scheduled SMS #{$mnotifyJobId}");
 
-            return true;
+            return ['confirmed' => true, 'http_status' => 0, 'body' => ['status' => 'dry-run']];
         }
 
         return $this->putScheduledUpdate($mnotifyJobId, [
@@ -287,6 +318,27 @@ class MnotifySmsService
         return $this->remoteScheduleCache;
     }
 
+    /**
+     * Re-read the cloud schedule, discarding any cached listing.
+     *
+     * Reconciliation tooling needs a truthful "after" figure once it has
+     * mutated the cloud within the same process — the per-process cache
+     * would otherwise report the pre-purge state forever.
+     *
+     * @return list<array<string, mixed>>
+     *
+     * @throws TransientSmsException on network/server errors
+     */
+    public function refreshScheduledJobs(): array
+    {
+        $this->remoteScheduleLoaded = false;
+        $this->remoteScheduleUnavailable = false;
+        $this->remoteScheduleCache = [];
+        $this->consumedRemoteIds = [];
+
+        return $this->fetchScheduledJobs();
+    }
+
     /** @var list<array<string, mixed>> */
     protected array $remoteScheduleCache = [];
 
@@ -338,14 +390,15 @@ class MnotifySmsService
      * POST verb is rejected with HTTP 405 by the current API.
      *
      * @param  array<string, mixed>  $payload
+     * @return array{confirmed: bool, http_status: int, body: array<string, mixed>|string}
      *
      * @throws TransientSmsException when the failure is retry-worthy
      */
-    protected function putScheduledUpdate(string $mnotifyJobId, array $payload): bool
+    protected function putScheduledUpdate(string $mnotifyJobId, array $payload): array
     {
         $apiKey = $this->getApiKey();
         if ($apiKey === null) {
-            return false;
+            return ['confirmed' => false, 'http_status' => 0, 'body' => ['message' => 'API key not configured']];
         }
 
         $endpoint = rtrim(config('services.mnotify.base_url'), '/')."/scheduled/{$mnotifyJobId}?key={$apiKey}";
@@ -367,12 +420,28 @@ class MnotifySmsService
         if (! $response->successful()) {
             Log::error("mNotify update rejected (HTTP {$response->status()}) for #{$mnotifyJobId}: ".$response->body());
 
-            return false;
+            return ['confirmed' => false, 'http_status' => $response->status(), 'body' => $this->bodyOf($response)];
         }
 
-        $body = $response->json();
+        return [
+            'confirmed' => ($response->json('status') === 'success'),
+            'http_status' => $response->status(),
+            'body' => $this->bodyOf($response),
+        ];
+    }
 
-        return ($body['status'] ?? null) === 'success';
+    /**
+     * Decode a provider response for display, falling back to the raw
+     * body when it is not JSON (mNotify answers HTML error pages on
+     * gateway failures, which operators still need to see).
+     *
+     * @return array<string, mixed>|string
+     */
+    protected function bodyOf(Response $response): array|string
+    {
+        $json = $response->json();
+
+        return is_array($json) ? $json : $response->body();
     }
 
     // ─── Balance check ──────────────────────────────────────────
