@@ -556,6 +556,10 @@ class MnotifySmsService
             // mNotify wraps results in 'summary' or returns a flat array
             return $payload['summary'] ?? (is_array($payload) ? $payload : []);
         } catch (\Throwable $e) {
+            Log::warning('mNotify delivery report fetch failed', [
+                'error' => $e->getMessage(),
+            ]);
+
             return [];
         }
     }

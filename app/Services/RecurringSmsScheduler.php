@@ -76,12 +76,29 @@ class RecurringSmsScheduler
                 ->whereRaw('EXTRACT(DAY FROM date_of_birth) = ?', [$date->day])
                 ->get();
 
+            if ($members->isEmpty()) {
+                continue;
+            }
+
+            // Three batch lookups for the whole day's cohort instead of
+            // one round trip per member: which slots are already handled,
+            // which orphaned rows can be reclaimed, and each branch's
+            // greeting settings.
+            $memberIds = $members->pluck('id')->all();
+            $handledIds = array_flip($this->alreadyScheduledSourceIds('birthday', $memberIds, $scheduledAt));
+            $orphans = $this->reclaimOrphanedSlotsBySourceId('birthday', $memberIds, $scheduledAt);
+            $settingsByBranch = BirthdayMessageSettings::query()
+                ->whereIn('branch_id', $members->pluck('branch_id')->unique())
+                ->get()
+                ->keyBy('branch_id');
+
             foreach ($members as $member) {
-                if ($this->isAlreadyScheduled('birthday', $member->id, null, $scheduledAt)) {
+                if (isset($handledIds[$member->id])) {
                     continue;
                 }
 
-                $settings = BirthdayMessageSettings::forBranch($member->branch_id);
+                $settings = $settingsByBranch->get($member->branch_id)
+                    ?? BirthdayMessageSettings::forBranch($member->branch_id);
 
                 if (! $settings->is_active) {
                     continue;
@@ -91,7 +108,7 @@ class RecurringSmsScheduler
 
                 // Reclaim an orphan from an aborted batch instead of inserting
                 // a second row for the same member/slot.
-                $orphan = $this->reclaimOrphanedSlot('birthday', $member->id, null, $scheduledAt);
+                $orphan = $orphans[$member->id] ?? null;
 
                 if ($orphan) {
                     $orphan->update(['message_body' => $body]);
@@ -749,6 +766,32 @@ class RecurringSmsScheduler
     }
 
     /**
+     * Batch form of isAlreadyScheduled() for source-keyed slots (birthdays):
+     * which of $sourceIds already have a row this automation considers
+     * handled for that day. One query for the whole cohort.
+     *
+     * @param  list<string>  $sourceIds
+     * @param  list<string>  $ignoredIds
+     * @return list<string> the subset of $sourceIds that is already handled
+     */
+    protected function alreadyScheduledSourceIds(
+        string $sourceType,
+        array $sourceIds,
+        Carbon $scheduledAt,
+        array $ignoredIds = [],
+    ): array {
+        if ($sourceIds === []) {
+            return [];
+        }
+
+        return $this->slotQuery($sourceType, $sourceIds, null, $scheduledAt)
+            ->where($this->handledStatusRule($ignoredIds))
+            ->distinct()
+            ->pluck('source_id')
+            ->all();
+    }
+
+    /**
      * The statuses that mean "this automation already has this slot handled".
      *
      * Shared by the single-slot and batch forms so they cannot drift apart.
@@ -890,6 +933,48 @@ class RecurringSmsScheduler
         }
 
         return $byPhone;
+    }
+
+    /**
+     * Batch form of reclaimOrphanedSlot() for source-keyed slots: at most
+     * one reclaimable orphan per source ID, oldest first.
+     *
+     * @param  list<string>  $sourceIds
+     * @return array<string, ScheduledSmsDelivery> keyed by source_id
+     */
+    protected function reclaimOrphanedSlotsBySourceId(
+        string $sourceType,
+        array $sourceIds,
+        Carbon $scheduledAt,
+    ): array {
+        if ($sourceIds === []) {
+            return [];
+        }
+
+        $orphans = $this->slotQuery($sourceType, $sourceIds, null, $scheduledAt)
+            ->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+            ->where(fn ($q) => $q->whereNull('mnotify_job_id')->orWhere('mnotify_job_id', ''))
+            ->oldest('created_at')
+            ->get();
+
+        $bySourceId = [];
+
+        foreach ($orphans as $orphan) {
+            // First row per source wins, matching the single-slot form's
+            // oldest('created_at')->first().
+            if (isset($bySourceId[$orphan->source_id])) {
+                continue;
+            }
+
+            $orphan->update([
+                'status' => ScheduledSmsDelivery::STATUS_PENDING_API,
+                'error_message' => null,
+            ]);
+
+            $bySourceId[$orphan->source_id] = $orphan;
+        }
+
+        return $bySourceId;
     }
 
     /**

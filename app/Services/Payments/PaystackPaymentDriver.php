@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Payments;
 
 use App\Enums\MoMoNetwork;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -24,12 +25,13 @@ class PaystackPaymentDriver implements PaymentGatewayInterface
 
     private string $webhookSecret;
 
-    private string $baseUrl = 'https://api.paystack.co';
+    private string $baseUrl;
 
     public function __construct()
     {
         $this->secretKey = (string) config('services.paystack.secret');
         $this->webhookSecret = (string) config('services.paystack.webhook_secret');
+        $this->baseUrl = (string) config('services.paystack.base_url', 'https://api.paystack.co');
     }
 
     public function initializePayment(array $payload): array
@@ -50,10 +52,20 @@ class PaystackPaymentDriver implements PaymentGatewayInterface
             ];
         }
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->secretKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(30)->post("{$this->baseUrl}/charge", $body);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$this->secretKey,
+                'Content-Type' => 'application/json',
+            ])->retry(3, 200, null, false)->connectTimeout(5)->timeout(30)
+                ->post("{$this->baseUrl}/charge", $body);
+        } catch (ConnectionException $e) {
+            Log::error('Paystack charge unreachable', [
+                'error' => $e->getMessage(),
+                'reference' => $payload['reference'],
+            ]);
+
+            throw new \RuntimeException('Payment gateway is unreachable. Please try again.');
+        }
 
         $data = $response->json();
 
@@ -78,9 +90,23 @@ class PaystackPaymentDriver implements PaymentGatewayInterface
 
     public function verifyTransaction(string $reference): array
     {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->secretKey,
-        ])->timeout(30)->get("{$this->baseUrl}/transaction/verify/{$reference}");
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$this->secretKey,
+            ])->retry(3, 200, null, false)->connectTimeout(5)->timeout(30)
+                ->get("{$this->baseUrl}/transaction/verify/{$reference}");
+        } catch (ConnectionException $e) {
+            Log::warning('Paystack verify unreachable', [
+                'error' => $e->getMessage(),
+                'reference' => $reference,
+            ]);
+
+            return [
+                'status' => 'failed',
+                'gateway_response' => ['message' => 'Payment gateway is unreachable.'],
+                'paid_at' => null,
+            ];
+        }
 
         $body = $response->json();
 

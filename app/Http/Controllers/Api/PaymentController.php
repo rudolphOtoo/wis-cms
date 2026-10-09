@@ -13,6 +13,7 @@ use App\Models\Branch;
 use App\Models\Payment;
 use App\Services\Payments\PaymentGatewayManager;
 use App\Support\PhoneNormalizer;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,10 +42,10 @@ class PaymentController extends Controller
             $query->where('status', $status);
         }
         if ($from = $request->input('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('created_at', '>=', Carbon::parse($from)->startOfDay());
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('created_at', '<', Carbon::parse($to)->addDay()->startOfDay());
         }
         if ($memberId = $request->input('member_id')) {
             $query->where('member_id', $memberId);
@@ -245,8 +246,8 @@ class PaymentController extends Controller
         $now = now();
 
         $thisMonth = Payment::query()
-            ->whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
+            ->where('created_at', '>=', $now->copy()->startOfMonth())
+            ->where('created_at', '<', $now->copy()->addMonthNoOverflow()->startOfMonth())
             ->selectRaw("
                 COUNT(*) AS total_count,
                 COALESCE(SUM(CASE WHEN status = 'success' THEN amount ELSE 0 END), 0) AS total_received,
@@ -257,8 +258,8 @@ class PaymentController extends Controller
             ->first();
 
         $byType = Payment::query()
-            ->whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
+            ->where('created_at', '>=', $now->copy()->startOfMonth())
+            ->where('created_at', '<', $now->copy()->addMonthNoOverflow()->startOfMonth())
             ->where('status', PaymentStatus::Success)
             ->selectRaw('payment_type, SUM(amount) AS total, COUNT(*) AS count')
             ->groupBy('payment_type')

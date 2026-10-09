@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\Member;
+use App\Support\DateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -67,9 +68,12 @@ class PortalController extends Controller
         $member = $this->currentMember($request);
         $year = $request->integer('year', (int) now()->format('Y'));
 
+        [$yearFrom, $yearTo] = DateRange::year($year);
+
         $transactions = $member->transactions()
             ->where('type', 'income')
-            ->whereYear('transaction_date', $year)
+            ->where('transaction_date', '>=', $yearFrom)
+            ->where('transaction_date', '<', $yearTo)
             ->with('category')
             ->orderByDesc('transaction_date')
             ->get();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Transaction;
+use App\Support\DateRange;
 
 /**
  * PERF-02 FIX: Encapsulates all financial statistics aggregations.
@@ -42,9 +43,11 @@ class FinanceStatsService
         $now = now();
 
         // ─── Q1: Current-month income + expense + count (single pass) ─────────
+        [$monthFrom, $monthTo] = DateRange::month($now);
+
         $monthSummary = Transaction::query()
-            ->whereMonth('transaction_date', $now->month)
-            ->whereYear('transaction_date', $now->year)
+            ->where('transaction_date', '>=', $monthFrom)
+            ->where('transaction_date', '<', $monthTo)
             ->selectRaw("
                 COALESCE(SUM(CASE WHEN type = 'income'  THEN amount END), 0) AS income,
                 COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS expenses,
@@ -98,8 +101,8 @@ class FinanceStatsService
 
         // ─── Q4: Top 5 income categories this month ───────────────────────────
         $topCategories = Transaction::query()
-            ->whereMonth('transaction_date', $now->month)
-            ->whereYear('transaction_date', $now->year)
+            ->where('transaction_date', '>=', $monthFrom)
+            ->where('transaction_date', '<', $monthTo)
             ->where('type', 'income')
             ->selectRaw('category_id, SUM(amount) AS total')
             ->groupBy('category_id')

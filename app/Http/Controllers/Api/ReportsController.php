@@ -13,6 +13,7 @@ use App\Models\Transaction;
 use App\Services\AttendanceSummaryService;
 use App\Services\MemberWelfareService;
 use App\Support\AttendanceCounts;
+use App\Support\DateRange;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -1290,8 +1291,11 @@ class ReportsController extends Controller
 
         $year = (int) ($validated['year'] ?? now()->year);
 
+        [$yearFrom, $yearTo] = DateRange::year($year);
+
         $events = LifeEvent::with(['member', 'fatherMember'])
-            ->whereYear('event_date', $year)
+            ->where('event_date', '>=', $yearFrom)
+            ->where('event_date', '<', $yearTo)
             ->orderBy('event_date')
             ->get();
 

@@ -110,7 +110,7 @@ class AttendanceController extends Controller
         $existing = AttendanceSession::where('service_type_id', $validated['service_type_id'])
             ->where('department_id', $departmentId)
             ->where('cell_id', $cellId)
-            ->whereDate('service_date', $validated['service_date'])
+            ->where('service_date', $validated['service_date'])
             ->first();
 
         if ($existing) {

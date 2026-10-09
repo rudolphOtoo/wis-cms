@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -154,7 +156,7 @@ class BirthdayController extends Controller
         $days = (int) ($validated['days'] ?? 7);
         $user = $request->user();
 
-        $today = Carbon::today('Africa/Accra');
+        $today = Carbon::today(config('church.timezone'));
         $endDate = $today->copy()->addDays($days);
 
         $todayMD = $today->format('m-d');
@@ -173,11 +175,14 @@ class BirthdayController extends Controller
         }
 
         // Filter birthdays by month-day range using SQL, handling
-        // year-crossing windows (e.g. Dec 28 → Jan 4).
+        // year-crossing windows (e.g. Dec 28 → Jan 4). The OR branch is
+        // parenthesised so it cannot bypass the status/scoping predicates
+        // above; the functional index on TO_CHAR(date_of_birth,'MM-DD')
+        // keeps both branches index-sargable.
         if ($todayMD <= $endMD) {
             $query->whereRaw("TO_CHAR(date_of_birth, 'MM-DD') BETWEEN ? AND ?", [$todayMD, $endMD]);
         } else {
-            $query->whereRaw("TO_CHAR(date_of_birth, 'MM-DD') >= ? OR TO_CHAR(date_of_birth, 'MM-DD') <= ?", [$todayMD, $endMD]);
+            $query->whereRaw("(TO_CHAR(date_of_birth, 'MM-DD') >= ? OR TO_CHAR(date_of_birth, 'MM-DD') <= ?)", [$todayMD, $endMD]);
         }
 
         $members = $query
@@ -235,7 +240,7 @@ class BirthdayController extends Controller
         ]);
 
         $days = (int) ($validated['days'] ?? 30);
-        $cutoff = Carbon::today('Africa/Accra')->subDays($days);
+        $cutoff = Carbon::today(config('church.timezone'))->subDays($days);
 
         $query = BirthdayMessageLog::query()
             ->with('member:id,first_name,last_name')

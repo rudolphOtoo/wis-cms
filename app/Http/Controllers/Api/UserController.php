@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -21,7 +23,7 @@ class UserController extends Controller
     {
         $query = User::query()
             ->where('branch_id', $request->user()->branch_id)
-            ->with(['roles', 'member']);
+            ->with(['roles', 'roles.permissions', 'permissions', 'member']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

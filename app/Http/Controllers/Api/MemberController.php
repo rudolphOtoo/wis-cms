@@ -16,6 +16,7 @@ use App\Models\Department;
 use App\Models\LifeEvent;
 use App\Models\Member;
 use App\Models\User;
+use App\Support\DateRange;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -312,9 +313,12 @@ class MemberController extends Controller
         $member = Member::query()->findOrFail($id);
         $year = $request->integer('year', (int) now()->format('Y'));
 
+        [$yearFrom, $yearTo] = DateRange::year($year);
+
         $transactions = $member->transactions()
             ->where('type', 'income')
-            ->whereYear('transaction_date', $year)
+            ->where('transaction_date', '>=', $yearFrom)
+            ->where('transaction_date', '<', $yearTo)
             ->with('category')
             ->orderByDesc('transaction_date')
             ->paginate(25);
@@ -376,9 +380,12 @@ class MemberController extends Controller
         $member = Member::query()->with('branch')->findOrFail($id);
         $year = $request->integer('year', (int) now()->format('Y'));
 
+        [$yearFrom, $yearTo] = DateRange::year($year);
+
         $transactions = $member->transactions()
             ->where('type', 'income')
-            ->whereYear('transaction_date', $year)
+            ->where('transaction_date', '>=', $yearFrom)
+            ->where('transaction_date', '<', $yearTo)
             ->with('category')
             ->orderBy('transaction_date')
             ->get();

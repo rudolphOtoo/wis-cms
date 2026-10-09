@@ -63,11 +63,21 @@ class SendBirthdayGreetings extends Command
         $skippedAlreadySent = 0;
         $failed = 0;
 
+        // Idempotency: one query for the whole cohort instead of one
+        // exists() probe per member. Safe to re-run the command (e.g.
+        // after a transient failure earlier in the day) without
+        // spamming members.
+        $alreadySent = BirthdayMessageLog::memberIdsSentToday($members->pluck('id')->all());
+
+        // One settings row per branch, fetched in a single query; the
+        // firstOrCreate fallback only fires for branches never configured.
+        $settingsByBranch = BirthdayMessageSettings::query()
+            ->whereIn('branch_id', $members->pluck('branch_id')->unique())
+            ->get()
+            ->keyBy('branch_id');
+
         foreach ($members as $member) {
-            // Idempotency: don't send twice on the same day.
-            // Safe to re-run the command (e.g. after a transient failure
-            // earlier in the day) without spamming members.
-            if (BirthdayMessageLog::memberSentToday($member->id)) {
+            if (isset($alreadySent[$member->id])) {
                 $skippedAlreadySent++;
 
                 continue;
@@ -90,7 +100,8 @@ class SendBirthdayGreetings extends Command
             try {
                 // Template comes from the per-branch BirthdayMessageSettings
                 // row (created on first access with a sensible default).
-                $settings = BirthdayMessageSettings::forBranch($member->branch_id);
+                $settings = $settingsByBranch->get($member->branch_id)
+                    ?? BirthdayMessageSettings::forBranch($member->branch_id);
                 $body = $settings->render(
                     $member,
                     config('church.name', 'Wesleyan International Society')

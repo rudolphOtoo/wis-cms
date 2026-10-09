@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Branch;
 use App\Models\Member;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,9 +17,21 @@ use Illuminate\Support\Facades\DB;
  * window (branch-specific thresholds). The flag is denormalized on the
  * members table for fast queries but recomputed weekly by the
  * ComputeMemberWelfare artisan command.
+ *
+ * Every metric is resolved with one aggregated query per branch
+ * (attendance counts, giving totals, last-attendance dates), never one
+ * query per member: a 300-member branch costs 3 queries here instead of
+ * 600+.
  */
 class MemberWelfareService
 {
+    /**
+     * Service slugs that count towards the engagement denominator.
+     *
+     * @var list<string>
+     */
+    private const COUNTABLE_SLUGS = ['sunday_adult', 'sunday_children'];
+
     /**
      * Build the member welfare dataset for a branch.
      *
@@ -41,21 +54,7 @@ class MemberWelfareService
         $windowStart = Carbon::now()->subWeeks($windowWeeks)->startOfWeek(Carbon::SUNDAY);
         $today = Carbon::today();
 
-        // Total Sunday services in the window (denominator for attendance rate)
-        $totalSundaysInWindow = DB::table('attendance_sessions as s')
-            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-            ->where('s.branch_id', $branchId)
-            ->where('s.service_date', '>=', $windowStart)
-            ->where('s.service_date', '<=', $today)
-            ->where(function ($q) {
-                $q->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
-                    ->orWhere(function ($q) {
-                        $q->where('st.slug', 'cell_meeting')
-                            ->whereRaw('EXTRACT(DOW FROM s.service_date) = 0');
-                    });
-            })
-            ->selectRaw('COUNT(DISTINCT s.service_date) as count')
-            ->value('count') ?? 1;
+        $totalSundaysInWindow = $this->totalSundays($branchId, $windowStart, $today);
 
         // Active members query
         $membersQuery = Member::query()
@@ -74,31 +73,14 @@ class MemberWelfareService
 
         $members = $membersQuery->get();
 
-        // Compute per-member engagement
-        $memberRows = $members->map(function (Member $member) use ($branchId, $windowStart, $totalSundaysInWindow) {
-            // Attendance count in window
-            $attendedServices = DB::table('attendance_records as ar')
-                ->join('attendance_sessions as s', 'ar.session_id', '=', 's.id')
-                ->join('service_types as st', 's.service_type_id', '=', 'st.id')
-                ->where('ar.member_id', $member->id)
-                ->where('ar.is_present', true)
-                ->whereNull('ar.deleted_at')
-                ->where('s.branch_id', $branchId)
-                ->where('s.service_date', '>=', $windowStart)
-                ->where(function ($q) {
-                    $q->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
-                        ->orWhere(function ($q) {
-                            $q->where('st.slug', 'cell_meeting')
-                                ->whereRaw('EXTRACT(DOW FROM s.service_date) = 0');
-                        });
-                })
-                ->count();
+        // Two aggregated lookups for the whole branch instead of two
+        // queries per member.
+        $attendanceCounts = $this->attendanceCounts($branchId, $windowStart);
+        $givingTotals = $this->givingTotals($branchId, $windowStart);
 
-            // Giving in window
-            $givingTotal = $member->transactions()
-                ->where('type', 'income')
-                ->where('transaction_date', '>=', $windowStart)
-                ->sum('amount');
+        $memberRows = $members->map(function (Member $member) use ($attendanceCounts, $givingTotals, $totalSundaysInWindow) {
+            $attendedServices = $attendanceCounts[$member->id] ?? 0;
+            $givingTotal = $givingTotals[$member->id] ?? 0;
 
             $attendanceRate = $totalSundaysInWindow > 0
                 ? round(($attendedServices / $totalSundaysInWindow) * 100, 1)
@@ -161,5 +143,102 @@ class MemberWelfareService
                 'by_cell' => $byCell,
             ],
         ];
+    }
+
+    /**
+     * Distinct countable service dates in the window (the denominator
+     * for attendance rate).
+     */
+    public function totalSundays(string $branchId, CarbonInterface $windowStart, ?CarbonInterface $until = null): int
+    {
+        $query = DB::table('attendance_sessions as s')
+            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
+            ->where('s.branch_id', $branchId)
+            ->where('s.service_date', '>=', $windowStart);
+
+        if ($until !== null) {
+            $query->where('s.service_date', '<=', $until);
+        }
+
+        return (int) ($query
+            ->where(function ($q) {
+                $q->whereIn('st.slug', self::COUNTABLE_SLUGS)
+                    ->orWhere(function ($q) {
+                        $q->where('st.slug', 'cell_meeting')
+                            ->whereRaw('EXTRACT(DOW FROM s.service_date) = 0');
+                    });
+            })
+            ->selectRaw('COUNT(DISTINCT s.service_date) as count')
+            ->value('count') ?? 1);
+    }
+
+    /**
+     * Present attendance count per member since $windowStart.
+     *
+     * @return array<string, int> member_id => sessions attended
+     */
+    public function attendanceCounts(string $branchId, CarbonInterface $windowStart): array
+    {
+        return DB::table('attendance_records as ar')
+            ->join('attendance_sessions as s', 'ar.session_id', '=', 's.id')
+            ->join('service_types as st', 's.service_type_id', '=', 'st.id')
+            ->where('ar.is_present', true)
+            ->whereNull('ar.deleted_at')
+            ->where('s.branch_id', $branchId)
+            ->where('s.service_date', '>=', $windowStart)
+            ->where(function ($q) {
+                $q->whereIn('st.slug', self::COUNTABLE_SLUGS)
+                    ->orWhere(function ($q) {
+                        $q->where('st.slug', 'cell_meeting')
+                            ->whereRaw('EXTRACT(DOW FROM s.service_date) = 0');
+                    });
+            })
+            ->groupBy('ar.member_id')
+            ->selectRaw('ar.member_id, COUNT(*) AS attended')
+            ->get()
+            ->keyBy('member_id')
+            ->map(fn ($row) => (int) $row->attended)
+            ->all();
+    }
+
+    /**
+     * Income total per member since $windowStart.
+     *
+     * @return array<string, float> member_id => amount
+     */
+    public function givingTotals(string $branchId, CarbonInterface $windowStart): array
+    {
+        return DB::table('transactions')
+            ->where('branch_id', $branchId)
+            ->where('type', 'income')
+            ->whereNotNull('member_id')
+            ->where('transaction_date', '>=', $windowStart)
+            ->groupBy('member_id')
+            ->selectRaw('member_id, COALESCE(SUM(amount), 0) AS total')
+            ->get()
+            ->keyBy('member_id')
+            ->map(fn ($row) => (float) $row->total)
+            ->all();
+    }
+
+    /**
+     * Most recent attended service date per member, across the whole
+     * branch (not window-bound — this feeds members.last_attendance_date).
+     *
+     * @return array<string, string|null> member_id => Y-m-d
+     */
+    public function lastAttendanceDates(string $branchId): array
+    {
+        return DB::table('attendance_records as ar')
+            ->join('attendance_sessions as s', 'ar.session_id', '=', 's.id')
+            ->where('ar.is_present', true)
+            ->whereNull('ar.deleted_at')
+            ->where('s.branch_id', $branchId)
+            ->groupBy('ar.member_id')
+            ->selectRaw('ar.member_id, MAX(s.service_date) AS last_date')
+            ->get()
+            ->keyBy('member_id')
+            ->map(fn ($row) => $row->last_date === null ? null : substr((string) $row->last_date, 0, 10))
+            ->all();
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Member;
 use App\Models\Transaction;
 use App\Models\Visitor;
+use App\Support\DateRange;
 use Carbon\Carbon;
 
 /**
@@ -62,28 +63,24 @@ class DashboardService
 
         // ─── Q3: Current + previous month income in one aggregated query ──────
         $prevMonth = $now->copy()->subMonth();
+        [$monthFrom, $monthTo] = DateRange::month($now);
+        [$prevFrom, $prevTo] = DateRange::month($prevMonth);
 
         $incomeAgg = Transaction::query()
             ->where('type', 'income')
-            ->where(function ($q) use ($now, $prevMonth) {
-                $q->where(function ($inner) use ($now) {
-                    $inner->whereMonth('transaction_date', $now->month)
-                        ->whereYear('transaction_date', $now->year);
-                })->orWhere(function ($inner) use ($prevMonth) {
-                    $inner->whereMonth('transaction_date', $prevMonth->month)
-                        ->whereYear('transaction_date', $prevMonth->year);
-                });
-            })
+            ->where('transaction_date', '>=', $prevFrom)
+            ->where('transaction_date', '<', $monthTo)
             ->selectRaw('
                 COALESCE(SUM(amount) FILTER (
-                    WHERE EXTRACT(MONTH FROM transaction_date) = ?
-                      AND EXTRACT(YEAR  FROM transaction_date) = ?
+                    WHERE transaction_date >= ? AND transaction_date < ?
                 ), 0) AS current_month,
                 COALESCE(SUM(amount) FILTER (
-                    WHERE EXTRACT(MONTH FROM transaction_date) = ?
-                      AND EXTRACT(YEAR  FROM transaction_date) = ?
+                    WHERE transaction_date >= ? AND transaction_date < ?
                 ), 0) AS prev_month
-            ', [$now->month, $now->year, $prevMonth->month, $prevMonth->year])
+            ', [
+                $monthFrom->toDateString(), $monthTo->toDateString(),
+                $prevFrom->toDateString(), $prevTo->toDateString(),
+            ])
             ->first();
 
         $monthIncome = (float) ($incomeAgg->current_month ?? 0);
@@ -94,8 +91,8 @@ class DashboardService
 
         // ─── Q4: Visitor count this month ─────────────────────────────────────
         $monthVisitors = Visitor::query()
-            ->whereMonth('visit_date', $now->month)
-            ->whereYear('visit_date', $now->year)
+            ->where('visit_date', '>=', $monthFrom)
+            ->where('visit_date', '<', $monthTo)
             ->count();
 
         // ─── Q5: 6-month finance chart (1 GROUP BY query, not 12) ─────────────
@@ -123,13 +120,22 @@ class DashboardService
             ];
         }
 
-        // ─── Q6: Attendance chart — last 8 distinct dates, total per date
+        // ─── Q6: Attendance chart — last 8 distinct dates, total per date.
+        // The dates are resolved first so the session load stays bounded
+        // at 8 days of rows instead of hydrating the whole table.
+        $recentDates = AttendanceSession::query()
+            ->select('service_date')
+            ->distinct()
+            ->orderByDesc('service_date')
+            ->limit(8)
+            ->pluck('service_date');
+
         $attendanceChart = AttendanceSession::query()
             ->with('counts')
+            ->whereIn('service_date', $recentDates)
             ->latest('service_date')
             ->get()
             ->groupBy(fn ($s) => $s->service_date->toDateString())
-            ->take(8)
             ->reverse()
             ->map(fn ($sessionsOnDate, string $date) => [
                 'date' => Carbon::parse($date)->format('d M'),
@@ -139,8 +145,8 @@ class DashboardService
 
         // ─── Q7: Top income categories this month ─────────────────────────────
         $topCategories = Transaction::query()
-            ->whereMonth('transaction_date', $now->month)
-            ->whereYear('transaction_date', $now->year)
+            ->where('transaction_date', '>=', $monthFrom)
+            ->where('transaction_date', '<', $monthTo)
             ->where('type', 'income')
             ->selectRaw('category_id, SUM(amount) AS total')
             ->groupBy('category_id')

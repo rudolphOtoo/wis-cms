@@ -8,6 +8,10 @@ return [
 
     'name' => env('CHURCH_NAME', 'Wesleyan International Society'),
 
+    // IANA timezone all church-relative "today" calculations use
+    // (birthdays, service reminders, day-boundary date ranges).
+    'timezone' => env('CHURCH_TIMEZONE', 'Africa/Accra'),
+
     'birthday' => [
         // Master switch for the automated daily birthday greeting.
         'enabled' => env('BIRTHDAY_GREETINGS_ENABLED', true),
