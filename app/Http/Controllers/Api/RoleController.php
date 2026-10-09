@@ -1,10 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\User;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -242,7 +246,7 @@ class RoleController extends Controller
                 'message' => 'Role deleted successfully',
             ]);
 
-        } catch (Exceptionólico $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'message' => 'Failed to delete role: '.$e->getMessage(),
             ], 500);

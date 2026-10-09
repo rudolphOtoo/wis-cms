@@ -1,19 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
+use App\Actions\SendGroupMessageAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Department\StoreDepartmentRequest;
 use App\Http\Requests\Department\UpdateDepartmentRequest;
 use App\Http\Resources\DepartmentResource;
-use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Department;
 use App\Models\Member;
-use App\Models\Message;
-use App\Models\MessageRecipient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class DepartmentController extends Controller
 {
@@ -195,7 +194,7 @@ class DepartmentController extends Controller
      * Scoped: the user must lead the department (scopedQuery enforces this).
      * Reuses the broadcast pipeline (SendBroadcastMessageJob).
      */
-    public function message(Request $request, string $id): JsonResponse
+    public function message(Request $request, string $id, SendGroupMessageAction $action): JsonResponse
     {
         $department = $this->scopedQuery($request)->findOrFail($id);
 
@@ -205,22 +204,7 @@ class DepartmentController extends Controller
             'channel' => ['required', 'in:sms,email,both'],
         ]);
 
-        // Recipients = this department's members with valid contact info
-        // for the chosen channel.
-        $recipients = $department->members()
-            ->where(function ($q) use ($request) {
-                if ($request->channel === 'email') {
-                    $q->whereNotNull('email')->where('email', '!=', '');
-                } elseif ($request->channel === 'sms') {
-                    $q->whereNotNull('phone')->where('phone', '!=', '');
-                } else {
-                    $q->where(function ($inner) {
-                        $inner->whereNotNull('email')->where('email', '!=', '')
-                            ->orWhereNotNull('phone')->where('phone', '!=', '');
-                    });
-                }
-            })
-            ->get();
+        $recipients = $action->contacts($department->members(), $request->channel)->get();
 
         if ($recipients->isEmpty()) {
             return response()->json([
@@ -228,43 +212,13 @@ class DepartmentController extends Controller
             ], 422);
         }
 
-        $recipientIds = [];
-        $message = DB::transaction(function () use ($request, $department, $recipients, &$recipientIds) {
-            $msg = Message::create([
-                'branch_id' => $request->user()->branch_id,
-                'sender_id' => $request->user()->id,
-                'subject' => $request->subject,
-                'body' => $request->body,
-                'channel' => $request->channel,
-                'status' => 'sending',
-                'recipient_group' => 'department',
-                'department_id' => $department->id,
-                'sent_at' => now(),
-            ]);
-
-            foreach ($recipients as $member) {
-                $r = MessageRecipient::create([
-                    'message_id' => $msg->id,
-                    'member_id' => $member->id,
-                    'phone' => $member->phone,
-                    'email' => $member->email,
-                    'delivery_status' => 'pending',
-                ]);
-                $recipientIds[] = $r->id;
-            }
-
-            $msg->update(['status' => 'sent']);
-
-            return $msg;
-        });
-
-        foreach ($recipientIds as $rid) {
-            SendBroadcastMessageJob::dispatch($rid);
-        }
-
-        activity()->causedBy($request->user())
-            ->performedOn($message)
-            ->log("Department leader messaged {$recipients->count()} members of {$department->name}");
+        $message = $action->send($request->user(), $recipients, [
+            'subject' => $request->subject,
+            'body' => $request->body,
+            'channel' => $request->channel,
+            'recipient_group' => 'department',
+            'department_id' => $department->id,
+        ], "Department leader messaged {$recipients->count()} members of {$department->name}");
 
         return response()->json([
             'message' => "Message sent to {$recipients->count()} members of {$department->name}.",

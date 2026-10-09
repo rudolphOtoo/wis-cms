@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -7,6 +9,7 @@ use App\Http\Requests\LifeEvent\StoreLifeEventRequest;
 use App\Http\Requests\LifeEvent\UpdateLifeEventRequest;
 use App\Http\Resources\LifeEventResource;
 use App\Models\LifeEvent;
+use App\Support\DateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +39,8 @@ class LifeEventController extends Controller
         }
 
         if ($year = $request->get('year')) {
-            $query->whereYear('event_date', (int) $year);
+            [$yearFrom, $yearTo] = DateRange::year((int) $year);
+            $query->where('event_date', '>=', $yearFrom)->where('event_date', '<', $yearTo);
         }
 
         if ($memberId = $request->get('member_id')) {
@@ -179,8 +183,11 @@ class LifeEventController extends Controller
     {
         $year = $request->integer('year', now()->year);
 
+        [$yearFrom, $yearTo] = DateRange::year($year);
+
         $totals = LifeEvent::query()
-            ->whereYear('event_date', $year)
+            ->where('event_date', '>=', $yearFrom)
+            ->where('event_date', '<', $yearTo)
             ->selectRaw("
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE type = 'death') AS deaths,
@@ -189,7 +196,8 @@ class LifeEventController extends Controller
             ->first();
 
         $byMonth = LifeEvent::query()
-            ->whereYear('event_date', $year)
+            ->where('event_date', '>=', $yearFrom)
+            ->where('event_date', '<', $yearTo)
             ->selectRaw("TO_CHAR(event_date, 'YYYY-MM') AS month, type, COUNT(*) AS count")
             ->groupBy('month', 'type')
             ->get()

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -150,19 +152,18 @@ class ServiceReminderController extends Controller
      */
     protected function buildSyncStatus(ServiceReminderSettings $settings): array
     {
-        $future = ScheduledSmsDelivery::query()
+        $scope = fn ($query) => $query
             ->where('source_type', 'reminder')
             ->where('source_id', $settings->id)
             ->where('status', ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE)
-            ->where('scheduled_at', '>=', now())
-            ->orderBy('scheduled_at')
-            ->get();
+            ->where('scheduled_at', '>=', now());
 
-        $next = $future->first();
+        $scheduledCount = $scope(ScheduledSmsDelivery::query())->count();
+        $next = $scope(ScheduledSmsDelivery::query())->orderBy('scheduled_at')->first();
 
         return [
-            'remote_synced' => $future->isNotEmpty(),
-            'scheduled_count' => $future->count(),
+            'remote_synced' => $scheduledCount > 0,
+            'scheduled_count' => $scheduledCount,
             'next_fire_at' => $next?->scheduled_at?->toIso8601String(),
             'next_mnotify_job_id' => $next?->mnotify_job_id,
         ];

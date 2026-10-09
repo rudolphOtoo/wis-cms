@@ -10,6 +10,7 @@ use App\Models\Member;
 use App\Models\ServiceType;
 use App\Models\Transaction;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -921,5 +922,108 @@ class ReportsControllerTest extends TestCase
             'leaders-meeting-report',
             (string) $response->headers->get('Content-Disposition')
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MEMBER WELFARE REPORT
+    // Regression coverage for the batched-aggregate implementation:
+    // attendance counts and giving totals must come from one grouped
+    // query per branch, not one query per member.
+    // ─────────────────────────────────────────────────────────────────
+
+    public function test_member_welfare_computes_rates_and_giving_from_batched_aggregates(): void
+    {
+        $sundayAdult = $this->makeServiceTypeWithSlug('Sunday Adult', 'sunday_adult');
+
+        // Two countable Sundays inside the 4-week engagement window.
+        $recentSunday = now()->subDays(7)->startOfWeek(Carbon::SUNDAY)->toDateString();
+        $olderSunday = now()->subDays(14)->startOfWeek(Carbon::SUNDAY)->toDateString();
+
+        $recentSession = $this->makeSession($sundayAdult, $recentSunday);
+        $olderSession = $this->makeSession($sundayAdult, $olderSunday);
+
+        $cell = $this->makeCell('Welfare Cell');
+        $always = $this->makeMemberInCell($cell, ['first_name' => 'Always']);
+        $sometimes = $this->makeMemberInCell($cell, ['first_name' => 'Sometimes']);
+
+        // Always: present at both Sundays. Sometimes: present at one.
+        $attendance = [
+            [$always, $recentSession],
+            [$always, $olderSession],
+            [$sometimes, $recentSession],
+        ];
+        foreach ($attendance as [$member, $session]) {
+            DB::table('attendance_records')->insert([
+                'id' => (string) Str::uuid(),
+                'session_id' => $session->id,
+                'member_id' => $member->id,
+                'is_present' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Giving: two income transactions attributed to $always.
+        $category = FinanceCategory::factory()->create();
+        $this->createIncome($category, 120, now()->subDays(5)->toDateString())->update(['member_id' => $always->id]);
+        $this->createIncome($category, 80, now()->subDays(3)->toDateString())->update(['member_id' => $always->id]);
+
+        $token = $this->financeToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/members/welfare');
+
+        $response->assertOk();
+        $this->assertSame(2, $response->json('summary.total_members'));
+        $this->assertSame(2, $response->json('summary.total_sundays_in_window'));
+
+        $rows = collect($response->json('members'))->keyBy('id');
+
+        $this->assertSame(100.0, (float) $rows[$always->id]['attendance_rate']);
+        $this->assertSame(2, $rows[$always->id]['attended_services']);
+        $this->assertSame(200.0, (float) $rows[$always->id]['giving_total']);
+
+        $this->assertSame(50.0, (float) $rows[$sometimes->id]['attendance_rate']);
+        $this->assertSame(1, $rows[$sometimes->id]['attended_services']);
+        $this->assertSame(0.0, (float) $rows[$sometimes->id]['giving_total']);
+
+        $this->assertSame('Welfare Cell', $rows[$always->id]['cell_name']);
+    }
+
+    public function test_member_welfare_filters_by_flag_and_cell(): void
+    {
+        $cellA = $this->makeCell('Cell A');
+        $cellB = $this->makeCell('Cell B');
+        $atRisk = $this->makeMemberInCell($cellA, ['welfare_flag' => 'at_risk']);
+        $engaged = $this->makeMemberInCell($cellA, ['welfare_flag' => 'engaged']);
+        $otherCell = $this->makeMemberInCell($cellB, ['welfare_flag' => 'at_risk']);
+
+        $token = $this->financeToken();
+
+        $flagFiltered = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/members/welfare?welfare_status=at_risk');
+        $flagFiltered->assertOk();
+        $ids = array_column($flagFiltered->json('members'), 'id');
+        sort($ids);
+        $expected = [$atRisk->id, $otherCell->id];
+        sort($expected);
+        $this->assertSame($expected, $ids);
+
+        $cellFiltered = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/members/welfare?cell_id='.$cellA->id);
+        $cellFiltered->assertOk();
+        $cellIds = array_column($cellFiltered->json('members'), 'id');
+        sort($cellIds);
+        $expectedCell = [$atRisk->id, $engaged->id];
+        sort($expectedCell);
+        $this->assertSame($expectedCell, $cellIds);
+        $this->assertSame(2, $cellFiltered->json('summary.total_members'));
+    }
+
+    public function test_member_without_view_finance_blocked_from_welfare_report(): void
+    {
+        $token = $this->memberToken();
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/reports/members/welfare');
+        $response->assertStatus(403);
     }
 }

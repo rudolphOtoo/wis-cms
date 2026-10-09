@@ -91,11 +91,6 @@ class AttendanceStatsService
             ->orderByDesc('s.service_date')
             ->get();
 
-        // ─── Group by date for O(1) slicing ──────────────────────────────────
-        /** @var Collection<string, Collection> $byDate */
-        $byDate = $sessionAggregates->groupBy('service_date');
-        $allDates = $byDate->keys()->sortDesc()->values();
-
         // ─── Compute total per row as adult_count + children_count ──────────
         $sessionAggregates = $sessionAggregates->map(fn ($r) => (object) [
             'service_date' => $r->service_date,

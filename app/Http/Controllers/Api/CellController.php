@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\SendGroupMessageAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cell\AssignCellMemberRequest;
 use App\Http\Requests\Cell\CellMessageRequest;
 use App\Http\Requests\Cell\StoreCellRequest;
 use App\Http\Requests\Cell\UpdateCellRequest;
-use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Cell;
 use App\Models\Children;
 use App\Models\Member;
-use App\Models\Message;
-use App\Models\MessageRecipient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CellController extends Controller
 {
@@ -259,26 +256,12 @@ class CellController extends Controller
      * Mirrors DepartmentController::message; only differences are
      * 'cell_id' vs 'department_id' and recipient_group = 'cell'.
      */
-    public function message(CellMessageRequest $request, string $id): JsonResponse
+    public function message(CellMessageRequest $request, string $id, SendGroupMessageAction $action): JsonResponse
     {
         $cell = $this->scopedQuery($request)->findOrFail($id);
         $validated = $request->validated();
-        $channel = $validated['channel'];
 
-        $recipients = $cell->members()
-            ->where(function ($q) use ($channel): void {
-                if ($channel === 'email') {
-                    $q->whereNotNull('email')->where('email', '!=', '');
-                } elseif ($channel === 'sms') {
-                    $q->whereNotNull('phone')->where('phone', '!=', '');
-                } else {
-                    $q->where(function ($inner): void {
-                        $inner->whereNotNull('email')->where('email', '!=', '')
-                            ->orWhereNotNull('phone')->where('phone', '!=', '');
-                    });
-                }
-            })
-            ->get();
+        $recipients = $action->contacts($cell->members(), $validated['channel'])->get();
 
         if ($recipients->isEmpty()) {
             return response()->json([
@@ -286,43 +269,13 @@ class CellController extends Controller
             ], 422);
         }
 
-        $recipientIds = [];
-        $msg = DB::transaction(function () use ($request, $validated, $cell, $recipients, &$recipientIds) {
-            $message = Message::create([
-                'branch_id' => $request->user()->branch_id,
-                'sender_id' => $request->user()->id,
-                'subject' => $validated['subject'] ?? null,
-                'body' => $validated['body'],
-                'channel' => $validated['channel'],
-                'status' => 'sending',
-                'recipient_group' => 'cell',
-                'cell_id' => $cell->id,
-                'sent_at' => now(),
-            ]);
-
-            foreach ($recipients as $member) {
-                $r = MessageRecipient::create([
-                    'message_id' => $message->id,
-                    'member_id' => $member->id,
-                    'phone' => $member->phone,
-                    'email' => $member->email,
-                    'delivery_status' => 'pending',
-                ]);
-                $recipientIds[] = $r->id;
-            }
-
-            $message->update(['status' => 'sent']);
-
-            return $message;
-        });
-
-        foreach ($recipientIds as $rid) {
-            SendBroadcastMessageJob::dispatch($rid);
-        }
-
-        activity()->causedBy($request->user())
-            ->performedOn($msg)
-            ->log("Sent message to {$cell->name} cell ({$recipients->count()} recipients)");
+        $msg = $action->send($request->user(), $recipients, [
+            'subject' => $validated['subject'] ?? null,
+            'body' => $validated['body'],
+            'channel' => $validated['channel'],
+            'recipient_group' => 'cell',
+            'cell_id' => $cell->id,
+        ], "Sent message to {$cell->name} cell ({$recipients->count()} recipients)");
 
         return response()->json([
             'message' => "Message queued for {$recipients->count()} member(s) of {$cell->name}.",

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\DispatchScheduledSmsToMnotifyJob;
 use App\Models\PendingRemoteSchedule;
 use App\Models\ScheduledSmsDelivery;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -52,7 +53,8 @@ class RepairPendingSmsOrphans extends Command
         }
 
         if ($date = $this->option('date')) {
-            $query->whereDate('scheduled_at', $date);
+            $query->where('scheduled_at', '>=', Carbon::parse($date)->startOfDay())
+                ->where('scheduled_at', '<', Carbon::parse($date)->addDay()->startOfDay());
         }
 
         if ($limit > 0) {

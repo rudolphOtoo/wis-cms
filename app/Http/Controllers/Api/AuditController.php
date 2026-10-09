@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,10 +25,10 @@ class AuditController extends Controller
         }
 
         if ($from = $request->get('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('created_at', '>=', Carbon::parse($from)->startOfDay());
         }
         if ($to = $request->get('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('created_at', '<', Carbon::parse($to)->addDay()->startOfDay());
         }
 
         if ($subjectType = $request->get('subject_type')) {

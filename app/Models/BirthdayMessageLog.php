@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBranch;
+use App\Support\DateRange;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -47,7 +48,9 @@ class BirthdayMessageLog extends Model
 
     public function scopeToday(Builder $query): Builder
     {
-        return $query->whereDate('sent_at', now('Africa/Accra')->toDateString());
+        [$from, $to] = DateRange::day(now(config('church.timezone')));
+
+        return $query->where('sent_at', '>=', $from)->where('sent_at', '<', $to);
     }
 
     public function scopeStatus(Builder $query, string $status): Builder
@@ -61,9 +64,37 @@ class BirthdayMessageLog extends Model
      */
     public static function memberSentToday(string $memberId): bool
     {
+        [$from, $to] = DateRange::day(now(config('church.timezone')));
+
         return static::query()
             ->where('member_id', $memberId)
-            ->whereDate('sent_at', now('Africa/Accra')->toDateString())
+            ->where('sent_at', '>=', $from)
+            ->where('sent_at', '<', $to)
             ->exists();
+    }
+
+    /**
+     * Idempotency guard at branch scale: the member IDs that already
+     * received a birthday message today, fetched in a single query
+     * instead of one exists() probe per member.
+     *
+     * @return array<string, true>
+     */
+    public static function memberIdsSentToday(array $memberIds): array
+    {
+        if ($memberIds === []) {
+            return [];
+        }
+
+        [$from, $to] = DateRange::day(now(config('church.timezone')));
+
+        return static::query()
+            ->where('sent_at', '>=', $from)
+            ->where('sent_at', '<', $to)
+            ->whereIn('member_id', $memberIds)
+            ->pluck('member_id')
+            ->flip()
+            ->map(fn () => true)
+            ->all();
     }
 }

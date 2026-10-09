@@ -52,10 +52,10 @@ class FinanceController extends Controller
             $query->where('category_id', $categoryId);
         }
         if ($from = $request->input('from')) {
-            $query->whereDate('transaction_date', '>=', $from);
+            $query->where('transaction_date', '>=', Carbon::parse($from)->toDateString());
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('transaction_date', '<=', $to);
+            $query->where('transaction_date', '<=', Carbon::parse($to)->toDateString());
         }
 
         $transactions = $query
@@ -212,10 +212,10 @@ class FinanceController extends Controller
             $query->where('category_id', $categoryId);
         }
         if ($from = $request->input('from')) {
-            $query->whereDate('transaction_date', '>=', $from);
+            $query->where('transaction_date', '>=', Carbon::parse($from)->toDateString());
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('transaction_date', '<=', $to);
+            $query->where('transaction_date', '<=', Carbon::parse($to)->toDateString());
         }
 
         $query->orderByDesc('transaction_date');

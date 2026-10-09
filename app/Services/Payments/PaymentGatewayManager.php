@@ -29,14 +29,12 @@ class PaymentGatewayManager
      */
     public function driver(?string $name = null): PaymentGatewayInterface
     {
-        $name = $name ?? config('services.paystack') ? 'paystack' : 'paystack';
+        $name ??= config('payments.default_driver', 'paystack');
 
         if (! isset($this->drivers[$name])) {
             throw new \InvalidArgumentException("Payment driver [{$name}] is not supported.");
         }
 
-        $class = $this->drivers[$name];
-
-        return new $class;
+        return app($this->drivers[$name]);
     }
 }

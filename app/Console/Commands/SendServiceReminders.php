@@ -151,9 +151,17 @@ class SendServiceReminders extends Command
             $members->map(fn (Member $member) => $member->phone)->all(),
         );
 
+        // Idempotency: which members already hold THIS reminder for THIS
+        // service date, resolved in one query for the whole branch
+        // instead of one exists() probe per member.
+        $alreadySent = ServiceReminderLog::alreadySentMemberIds(
+            $members->pluck('id')->all(),
+            $settings->service_type_id,
+            $intendedDate,
+        );
+
         foreach ($members as $member) {
-            // Idempotency: already sent THIS reminder for THIS service date.
-            if (ServiceReminderLog::alreadySent($member->id, $settings->service_type_id, $intendedDate)) {
+            if (isset($alreadySent[$member->id])) {
                 $skipped++;
 
                 continue;

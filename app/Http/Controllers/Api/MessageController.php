@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\SendGroupMessageAction;
 use App\Http\Controllers\Controller;
-use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Member;
 use App\Models\Message;
 use App\Models\MessageRecipient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
@@ -99,7 +97,7 @@ class MessageController extends Controller
         return response()->json(['data' => ['count' => $count]]);
     }
 
-    public function send(Request $request): JsonResponse
+    public function send(Request $request, SendGroupMessageAction $action): JsonResponse
     {
         $request->validate([
             'subject' => ['nullable', 'string', 'max:200'],
@@ -118,56 +116,13 @@ class MessageController extends Controller
             return response()->json(['message' => 'No recipients match the selected criteria.'], 422);
         }
 
-        // PERF FIX: pre-generate UUIDs here so we can build a single bulk
-        // INSERT instead of N individual Eloquent creates. MessageRecipient
-        // uses HasUuids, which only runs on create() — insert() bypasses it,
-        // so UUIDs must be provided explicitly.
-        $now = now();
-        $rows = $recipients->map(fn ($m) => [
-            'id' => (string) Str::uuid(),
-            'message_id' => null,   // filled after Message::create()
-            'member_id' => $m->id,
-            'phone' => $m->phone,
-            'email' => $m->email,
-            'delivery_status' => 'pending',
-            'delivery_attempts' => 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ])->all();
-
-        // Jobs are dispatched OUTSIDE the transaction so that a rollback
-        // never leaves orphaned jobs on the queue pointing at non-existent rows.
-        [$message, $recipientIds] = DB::transaction(function () use ($request, $rows, $now) {
-            $msg = Message::create([
-                'branch_id' => $request->user()->branch_id,
-                'sender_id' => $request->user()->id,
-                'subject' => $request->input('subject'),
-                'body' => $request->input('body'),
-                'channel' => $request->input('channel'),
-                'status' => 'sending',
-                'recipient_group' => $request->input('recipient_group'),
-                'department_id' => $request->input('department_id'),
-                'sent_at' => $now,
-            ]);
-
-            // Stamp message_id now that we have it, then bulk-insert all rows
-            // in a single query (1 INSERT vs N INSERTs for large broadcasts).
-            $stamped = array_map(fn ($r) => [...$r, 'message_id' => $msg->id], $rows);
-            MessageRecipient::insert($stamped);
-
-            $msg->update(['status' => 'sent']);
-
-            return [$msg, array_column($stamped, 'id')];
-        });
-
-        // Dispatch one job per recipient after the transaction has committed.
-        foreach ($recipientIds as $rid) {
-            SendBroadcastMessageJob::dispatch($rid);
-        }
-
-        activity()->causedBy($request->user())
-            ->performedOn($message)
-            ->log("Sent {$request->input('channel')} message to {$recipients->count()} recipients");
+        $message = $action->send($request->user(), $recipients, [
+            'subject' => $request->input('subject'),
+            'body' => $request->input('body'),
+            'channel' => $request->input('channel'),
+            'recipient_group' => $request->input('recipient_group'),
+            'department_id' => $request->input('department_id'),
+        ], "Sent {$request->input('channel')} message to {$recipients->count()} recipients");
 
         return response()->json([
             'message' => "Message sent to {$recipients->count()} recipients.",

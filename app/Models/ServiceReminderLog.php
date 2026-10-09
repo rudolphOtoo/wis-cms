@@ -91,7 +91,7 @@ class ServiceReminderLog extends Model
 
     public function scopeForServiceDate(Builder $query, Carbon $date): Builder
     {
-        return $query->whereDate('intended_service_date', $date->toDateString());
+        return $query->where('intended_service_date', $date->toDateString());
     }
 
     /**
@@ -106,8 +106,33 @@ class ServiceReminderLog extends Model
         return static::query()
             ->where('member_id', $memberId)
             ->where('service_type_id', $serviceTypeId)
-            ->whereDate('intended_service_date', $serviceDate->toDateString())
+            ->where('intended_service_date', $serviceDate->toDateString())
             ->where('status', self::STATUS_SENT)
             ->exists();
+    }
+
+    /**
+     * Batch variant of alreadySent(): the member IDs already reminded
+     * for this service type on this date, resolved in one query so the
+     * sender never probes the table per member.
+     *
+     * @param  array<int, string>  $memberIds
+     * @return array<string, true>
+     */
+    public static function alreadySentMemberIds(array $memberIds, string $serviceTypeId, Carbon $serviceDate): array
+    {
+        if ($memberIds === []) {
+            return [];
+        }
+
+        return static::query()
+            ->where('service_type_id', $serviceTypeId)
+            ->where('intended_service_date', $serviceDate->toDateString())
+            ->where('status', self::STATUS_SENT)
+            ->whereIn('member_id', $memberIds)
+            ->pluck('member_id')
+            ->flip()
+            ->map(fn () => true)
+            ->all();
     }
 }
