@@ -654,7 +654,35 @@ class RecurringSmsScheduler
     protected function dispatchSchedule(string $deliveryId): void
     {
         $this->runResiliently(
-            fn () => dispatch_sync(new DispatchScheduledSmsToMnotifyJob($deliveryId)),
+            function () use ($deliveryId) {
+                // Pre-dispatch idempotency check
+                $delivery = ScheduledSmsDelivery::find($deliveryId);
+                if (! $delivery || $delivery->status !== ScheduledSmsDelivery::STATUS_PENDING_API) {
+                    return;
+                }
+                // Check for existing active delivery for same phone+date
+                $exists = ScheduledSmsDelivery::query()
+                    ->where('phone', $delivery->phone)
+                    ->whereDate('scheduled_at', $delivery->scheduled_at)
+                    ->where('id', '!=', $delivery->id)
+                    ->where(function ($q) {
+                        $q->whereIn('status', [
+                            ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+                            ScheduledSmsDelivery::STATUS_DISPATCHED,
+                        ])->orWhere(function ($q2) {
+                            $q2->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+                                ->whereNotNull('mnotify_job_id')
+                                ->where('mnotify_job_id', '<>', '');
+                        });
+                    })
+                    ->exists();
+                if ($exists) {
+                    $delivery->markCancelled();
+
+                    return;
+                }
+                dispatch_sync(new DispatchScheduledSmsToMnotifyJob($deliveryId));
+            },
             'schedule',
             $deliveryId,
         );

@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -51,7 +52,48 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
             return;
         }
 
+        // Prevent duplicate pushes for the same member on the same target date
+        $lockKey = 'sms_dispatch_'.md5($delivery->phone.'|'.$delivery->scheduled_at->format('Y-m-d'));
+        $lock = Cache::lock($lockKey, 10);
+
+        if (! $lock->get()) {
+            // Another dispatch is in progress; re-check state
+            $delivery->refresh();
+            if ($delivery->status !== ScheduledSmsDelivery::STATUS_PENDING_API) {
+                return;
+            }
+        }
+
         try {
+            $delivery->refresh();
+            if ($delivery->status !== ScheduledSmsDelivery::STATUS_PENDING_API) {
+                return;
+            }
+
+            // Local pre-push idempotency: another delivery already scheduled/active for same phone+date
+            $existingActive = ScheduledSmsDelivery::query()
+                ->where('phone', $delivery->phone)
+                ->whereDate('scheduled_at', $delivery->scheduled_at)
+                ->where('id', '!=', $delivery->id)
+                ->where(function ($q) {
+                    $q->whereIn('status', [
+                        ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+                        ScheduledSmsDelivery::STATUS_DISPATCHED,
+                    ])->orWhere(function ($q2) {
+                        $q2->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
+                            ->whereNotNull('mnotify_job_id')
+                            ->where('mnotify_job_id', '<>', '');
+                    });
+                })
+                ->exists();
+
+            if ($existingActive) {
+                Log::warning("Scheduled SMS #{$delivery->id} skipped: duplicate already exists for {$delivery->phone} on ".$delivery->scheduled_at->toDateString());
+                $delivery->markCancelled();
+
+                return;
+            }
+
             $mnotifyJobId = $sms->schedule(
                 $delivery->phone,
                 $delivery->message_body,
@@ -70,6 +112,14 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
             // Network or server error — queue for later retry
             $this->createPendingSchedule($delivery, $e->getMessage());
             throw $e; // Let the queue worker handle retry logic
+        } finally {
+            if (isset($lock) && method_exists($lock, 'owner') ? $lock->owner() === getmypid() || true : false) {
+                try {
+                    $lock->release();
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
         }
     }
 
