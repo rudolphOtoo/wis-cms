@@ -45,6 +45,11 @@ Schedule::command('reminders:send')->hourly();
 // Computes attendance-based welfare flags for all active members per branch.
 Schedule::command('welfare:compute')->weeklyOn(0, '20:00');
 
+// Biometric reporting: keep mv_biometric_attendance_daily fresh. Refreshed
+// every 5 minutes around the clock (cheap, index-only); run before the
+// welfare recompute so Sunday aggregates are current.
+Schedule::command('biometric:refresh-view')->everyFiveMinutes();
+
 // Retry failed mNotify API calls from the offline pending queue.
 // Runs every 5 minutes; idempotent and safe to re-run. Picks up
 // scheduled SMS that couldn't be pushed to mNotify due to network

@@ -16,13 +16,20 @@ class AttendanceSession extends Model
 {
     use BelongsToBranch, HasUuids;
 
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_BIOMETRIC = 'biometric';
+
+    public const SOURCE_IMPORT = 'import';
+
     protected $keyType = 'string';
 
     public $incrementing = false;
 
     protected $fillable = [
         'branch_id', 'service_type_id', 'department_id', 'cell_id',
-        'service_date', 'notes', 'attendance_mode', 'male_count', 'female_count', 'children_count',
+        'service_date', 'notes', 'attendance_mode', 'source', 'count_toward_total',
+        'male_count', 'female_count', 'children_count',
         'recorded_by', 'follow_up_status', 'follow_up_sent_at',
     ];
 
@@ -31,6 +38,8 @@ class AttendanceSession extends Model
         return [
             'service_date' => 'date',
             'attendance_mode' => 'string',
+            'source' => 'string',
+            'count_toward_total' => 'boolean',
             'male_count' => 'integer',
             'female_count' => 'integer',
             'children_count' => 'integer',

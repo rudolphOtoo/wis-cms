@@ -17,15 +17,20 @@ use App\Models\Children;
 use App\Models\Department;
 use App\Models\ServiceType;
 use App\Services\AttendanceStatsService;
+use App\Services\BiometricAttendanceService;
 use App\Support\AttendanceCounts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
-    public function __construct(private readonly AttendanceStatsService $statsService) {}
+    public function __construct(
+        private readonly AttendanceStatsService $statsService,
+        private readonly BiometricAttendanceService $biometricService,
+    ) {}
 
     /**
      * Resolve the attendance data scope based on the authenticated user's role.
@@ -330,20 +335,41 @@ class AttendanceController extends Controller
      * single performant query. Each row shows the Sunday date, adult count,
      * children count, and grand total — so the Children Ministry numbers
      * are seamlessly aggregated into the master church attendance.
+     *
+     * BIOMETRIC OVERLAY: dates with fingerprint data are computed from the
+     * pre-aggregated mv_biometric_attendance_daily view (summed across
+     * cells) and are AUTHORITATIVE for that date — manual sessions of the
+     * same date are excluded to prevent double counting. Other dates keep
+     * the existing register/headcount aggregation.
      */
     public function sundays(Request $request): JsonResponse
     {
         $scope = $this->resolveScope($request);
         $branchId = $request->user()->branch_id;
-        $perPage = $request->integer('per_page', 20);
+        $perPage = max(1, $request->integer('per_page', 20));
+        $page = max(1, $request->integer('page', 1));
+
+        // Biometric dates only "own" a date for the cells the caller can see.
+        // A scoped leader with no cells/departments sees nothing at all —
+        // the same "0 = 1" rule the manual query applies.
+        $scoped = $scope['type'] === 'scoped';
+        $hasScope = ! empty($scope['cell_ids']) || ! empty($scope['department_ids']);
+
+        $biometricDates = ! $scoped
+            ? $this->biometricService->coveredDates($branchId)
+            : ($hasScope
+                ? $this->biometricService->coveredDates($branchId, null, null, $scope['cell_ids'], $scope['department_ids'])
+                : []);
 
         // Single query — no N+1. Counts come from the index-scoped LATERAL
         // aggregation, so the adult/children split works for BOTH register
         // and headcount sessions without re-scanning every attendance record.
-        $rows = DB::table('attendance_sessions as s')
+        $manual = DB::table('attendance_sessions as s')
             ->leftJoinLateral(AttendanceCounts::subquery('s'), 'c')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
             ->where('s.branch_id', $branchId)
+            ->whereRaw(AttendanceCounts::countableWhere('s'))
+            ->when($biometricDates !== [], fn ($q) => $q->whereNotIn('s.service_date', $biometricDates))
             ->where(function ($q) {
                 $q->whereIn('st.slug', ['sunday_adult', 'sunday_children'])
                     ->orWhere(function ($q) {
@@ -370,8 +396,46 @@ class AttendanceController extends Controller
             ])
             ->groupBy('s.service_date')
             ->orderByDesc('s.service_date')
-            ->paginate($perPage);
+            ->get();
 
-        return response()->json($rows);
+        $rows = $manual->map(fn ($r) => [
+            'service_date' => $r->service_date,
+            'adult_count' => $r->adult_count,
+            'children_count' => $r->children_count,
+            'total_count' => $r->total_count,
+        ]);
+
+        // Church total for a biometric date = sum of its per-cell MV rows.
+        // Scoped users only see biometric rows for their cells/departments.
+        $biometricTotals = $scope['type'] === 'scoped'
+            ? $this->biometricService->dailyTotals(
+                $branchId,
+                null,
+                null,
+                $scope['cell_ids'],
+                $scope['department_ids'],
+            )
+            : $this->biometricService->dailyTotals($branchId);
+
+        foreach ($biometricTotals as $row) {
+            $rows->push([
+                'service_date' => $row->service_date,
+                'adult_count' => (string) $row->adult_count,
+                'children_count' => (string) $row->children_count,
+                'total_count' => (string) $row->total_count,
+            ]);
+        }
+
+        $rows = $rows->sortByDesc('service_date')->values();
+
+        $paginator = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        return response()->json($paginator);
     }
 }

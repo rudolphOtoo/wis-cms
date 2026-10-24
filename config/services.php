@@ -77,6 +77,13 @@ return [
         'secret' => env('GOOGLE_FORM_WEBHOOK_SECRET'),
     ],
 
+    'biometric' => [
+        // Shared fleet secret required in the X-Biometric-Secret header
+        // (or `secret` body field) on POST /api/biometric/scans. Generated
+        // once, stored in .env. Treat like a password.
+        'webhook_secret' => env('BIOMETRIC_WEBHOOK_SECRET'),
+    ],
+
     // When true, Password::uncompromised() is enforced even in non-production
     // environments. Useful for staging servers or offline desktops that need
     // the check disabled: set ENABLE_PWNED_PASSWORD_CHECK=false in .env.

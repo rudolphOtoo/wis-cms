@@ -34,6 +34,11 @@ use Illuminate\Support\Facades\DB;
  */
 class AttendanceStatsService
 {
+    /** @var array<string, list<string>> */
+    private array $biometricDatesCache = [];
+
+    public function __construct(private readonly BiometricAttendanceService $biometric) {}
+
     /**
      * Build all attendance statistics for a given branch.
      *
@@ -64,6 +69,8 @@ class AttendanceStatsService
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
             ->leftJoin('cells as cell', 's.cell_id', '=', 'cell.id')
             ->where('s.branch_id', $branchId)
+            ->whereRaw(AttendanceCounts::countableWhere('s'))
+            ->when($this->biometricDates($branchId, $cellIds, $departmentIds), fn ($q, $dates) => $q->whereNotIn('s.service_date', $dates))
             ->where(function ($q) {
                 $q->whereIn('st.type', ['adult', 'children'])
                     ->orWhere(function ($q) {
@@ -105,6 +112,24 @@ class AttendanceStatsService
             'count' => (int) $r->adult_count + (int) $r->children_count,
         ]);
 
+        // ─── Biometric rows from the materialized view ──────────────────────
+        // Biometric dates were excluded from the session query above, so the
+        // totals are not double-counted. The MV is grouped per cell, which
+        // also feeds last_sunday.by_cell.
+        $biometricRows = $this->biometric->aggregateRows($branchId, null, null, $cellIds, $departmentIds)
+            ->map(fn ($r) => (object) [
+                'service_date' => $r->service_date,
+                'cell_id' => $r->cell_id,
+                'service_type_name' => 'Biometric Attendance',
+                'service_type' => 'adult',
+                'cell_name' => $r->cell_name ?: 'Unassigned',
+                'adult_count' => $r->adult_count,
+                'children_count' => $r->children_count,
+                'count' => $r->adult_count + $r->children_count,
+            ]);
+
+        $sessionAggregates = $sessionAggregates->concat($biometricRows);
+
         // ─── Group by date for O(1) slicing ──────────────────────────────────
         /** @var Collection<string, Collection> $byDate */
         $byDate = $sessionAggregates->groupBy('service_date');
@@ -129,6 +154,7 @@ class AttendanceStatsService
 
         // ─── Q2: Total sessions (lightweight count) ───────────────────────────
         $totalSessions = AttendanceSession::where('branch_id', $branchId)
+            ->whereRaw(AttendanceCounts::countableWhere('attendance_sessions'))
             ->when($cellIds || $departmentIds, fn ($q) => $q->where(function ($q) use ($cellIds, $departmentIds) {
                 if ($cellIds) {
                     $q->whereIn('cell_id', $cellIds);
@@ -227,5 +253,27 @@ class AttendanceStatsService
                 'trend_direction' => $trendDirection,
             ],
         ];
+    }
+
+    /**
+     * Dates with biometric data that this caller can see (memoised for the
+     * request, keyed by branch + scope). Manual sessions on these dates are
+     * excluded so they are not double-counted against the materialized view.
+     *
+     * @param  list<string>  $cellIds
+     * @param  list<string>  $departmentIds
+     * @return list<string>
+     */
+    private function biometricDates(string $branchId, array $cellIds = [], array $departmentIds = []): array
+    {
+        $key = $branchId.'|'.implode(',', $cellIds).'|'.implode(',', $departmentIds);
+
+        return $this->biometricDatesCache[$key] ??= $this->biometric->coveredDates(
+            $branchId,
+            null,
+            null,
+            $cellIds,
+            $departmentIds,
+        );
     }
 }

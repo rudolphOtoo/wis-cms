@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BiometricWebhookController;
 use App\Http\Controllers\Api\BirthdayController;
 use App\Http\Controllers\Api\CellController;
 use App\Http\Controllers\Api\ChildrenController;
@@ -61,6 +62,19 @@ Route::prefix('auth')->group(function () {
 Route::post('/webhooks/member-submission',
     [MemberSubmissionWebhookController::class, 'store']
 )->middleware('throttle:intake-webhook');
+
+// ─────────────────────────────────────────────────────────────────
+// BIOMETRIC SCAN INGEST (no Sanctum — shared fleet secret)
+//
+// Entrance fingerprint scanners POST here on every scan. The named
+// 'biometric-webhook' limiter (AppServiceProvider) allows the high
+// throughput of a door queue while still capping a rogue caller.
+// The response returns as soon as the scan is queued — the DB write
+// happens on the dedicated `biometric` queue.
+// ─────────────────────────────────────────────────────────────────
+Route::post('/biometric/scans',
+    [BiometricWebhookController::class, 'store']
+)->middleware('throttle:biometric-webhook');
 
 // ─────────────────────────────────────────────────────────────────
 // PAYMENT WEBHOOKS (no Sanctum — verified via Paystack HMAC signature)
