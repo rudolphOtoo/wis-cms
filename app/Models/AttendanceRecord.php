@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,10 +22,22 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * Branch scoping is NOT applied here — the parent AttendanceSession
  * owns the branch boundary. Queries should join through the session.
+ *
+ * Biometric ingestion: records captured by a fingerprint scanner carry
+ * source='biometric', the device + verification_mode, an immutable
+ * cell_id/department_id snapshot (the member's assignment ON THE DAY),
+ * and scanned_at. The partial unique index (session_id, member_id) WHERE
+ * deleted_at IS NULL makes re-scans idempotent.
  */
 class AttendanceRecord extends Model
 {
     use HasUuids, SoftDeletes;
+
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_BIOMETRIC = 'biometric';
+
+    public const SOURCE_IMPORT = 'import';
 
     protected $keyType = 'string';
 
@@ -32,12 +45,15 @@ class AttendanceRecord extends Model
 
     protected $fillable = [
         'session_id', 'member_id', 'child_id', 'is_present',
+        'source', 'biometric_device_id', 'verification_mode',
+        'biometric_event_id', 'cell_id', 'department_id', 'scanned_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_present' => 'boolean',
+            'scanned_at' => 'datetime',
         ];
     }
 
@@ -56,5 +72,27 @@ class AttendanceRecord extends Model
     public function child(): BelongsTo
     {
         return $this->belongsTo(Children::class, 'child_id');
+    }
+
+    public function biometricDevice(): BelongsTo
+    {
+        return $this->belongsTo(BiometricDevice::class, 'biometric_device_id');
+    }
+
+    public function cell(): BelongsTo
+    {
+        return $this->belongsTo(Cell::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    // ─── Scopes ────────────────────────────────────────────────────────────
+
+    public function scopeBiometric(Builder $query): void
+    {
+        $query->where('source', self::SOURCE_BIOMETRIC);
     }
 }

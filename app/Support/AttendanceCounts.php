@@ -39,6 +39,22 @@ final class AttendanceCounts
     private function __construct() {}
 
     /**
+     * SQL predicate for sessions that count toward church-wide totals.
+     *
+     * Sessions flagged count_toward_total = false are visible in scoped
+     * listings but excluded from aggregates. Callers append this to their
+     * outer query (whereRaw(AttendanceCounts::countableWhere('s'))).
+     *
+     * The companion predicate for the biometric read model lives in
+     * BiometricAttendanceService, which reads the pre-aggregated
+     * mv_biometric_attendance_daily view instead of scanning records.
+     */
+    public static function countableWhere(string $sessionAlias = 's'): string
+    {
+        return "{$sessionAlias}.count_toward_total = true";
+    }
+
+    /**
      * The LATERAL subquery SQL, correlated against the outer sessions
      * table under the given alias.
      */

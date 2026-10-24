@@ -138,5 +138,19 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perDay(3)->by('phone:'.$normalizedPhone),
             ];
         });
+
+        // ── Biometric scan ingest ─────────────────────────────────────────────
+        //
+        // A door queue can burst hundreds of scans in minutes, so the IP limit
+        // is generous. A second, tighter per-device limit catches a single
+        // terminal spinning out of control without penalising the fleet.
+        RateLimiter::for('biometric-webhook', function (Request $request): array {
+            $device = (string) $request->input('device_serial', 'unknown');
+
+            return [
+                Limit::perMinute(600)->by($request->ip()),
+                Limit::perMinute(120)->by('biometric-device:'.$device),
+            ];
+        });
     }
 }

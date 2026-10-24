@@ -21,6 +21,11 @@ use Illuminate\Support\Facades\DB;
  */
 class AttendanceSummaryService
 {
+    /** @var array<string, list<string>> */
+    private array $biometricDatesCache = [];
+
+    public function __construct(private readonly BiometricAttendanceService $biometric) {}
+
     /**
      * Build the attendance summary dataset.
      *
@@ -72,11 +77,15 @@ class AttendanceSummaryService
             ->where('status', 'active')
             ->count();
 
+        $biometricDates = $this->biometricDates($branchId, $from, $to, $cellId);
+
         $query = DB::table('attendance_sessions as s')
             ->leftJoinLateral(AttendanceCounts::subquery('s'), 'c')
             ->join('service_types as st', 's.service_type_id', '=', 'st.id')
             ->leftJoin('cells as cell', 's.cell_id', '=', 'cell.id')
             ->where('s.branch_id', $branchId)
+            ->whereRaw(AttendanceCounts::countableWhere('s'))
+            ->when($biometricDates !== [], fn ($q) => $q->whereNotIn('s.service_date', $biometricDates))
             ->where('s.service_date', '>=', $from)
             ->where('s.service_date', '<=', $to)
             ->where(function ($q) {
@@ -101,6 +110,22 @@ class AttendanceSummaryService
         }
 
         $rows = $query->get();
+
+        // ── Pass A2: biometric rows from the materialized view ─────
+        // Biometric dates were excluded from Pass A, so totals are not
+        // double-counted. Rows arrive pre-grouped per cell and share the
+        // (service_date, cell_id, cell_name, adult_count, children_count)
+        // shape consumed below.
+        $biometricRows = $this->biometric->aggregateRows($branchId, $from, $to, $cellId ? [$cellId] : [])
+            ->map(fn ($r) => (object) [
+                'service_date' => $r->service_date,
+                'cell_id' => $r->cell_id,
+                'cell_name' => $r->cell_name,
+                'adult_count' => $r->adult_count,
+                'children_count' => $r->children_count,
+            ]);
+
+        $rows = $rows->concat($biometricRows);
 
         // ── Pass B: per-cell member counts + welfare distribution ──
         $cellMembers = Member::where('branch_id', $branchId)
@@ -312,5 +337,24 @@ class AttendanceSummaryService
                 ],
             ],
         ];
+    }
+
+    /**
+     * Dates with biometric data for the visible scope (memoised). Manual
+     * sessions on these dates are excluded so the materialized-view rows
+     * merged in Pass A2 are not double-counted.
+     *
+     * @return list<string>
+     */
+    private function biometricDates(string $branchId, ?Carbon $from, ?Carbon $to, ?string $cellId = null): array
+    {
+        $key = $branchId.'|'.$from.'|'.$to.'|'.$cellId;
+
+        return $this->biometricDatesCache[$key] ??= $this->biometric->coveredDates(
+            $branchId,
+            $from,
+            $to,
+            $cellId ? [$cellId] : [],
+        );
     }
 }
