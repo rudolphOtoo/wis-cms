@@ -189,8 +189,11 @@ if [ "$1" = "php-fpm" ]; then
     php artisan sms:sync-rolling-automations || echo "WARNING: SMS sync skipped (will retry on next cron cycle)"
 
     # Drain any pushes that failed previously (network down at last boot).
-    # Non-fatal: the every-5-minutes cron retries this continuously.
-    php artisan sync:pending-schedules || echo "WARNING: pending schedule drain skipped"
+    # Bounded to keep boot under the container healthcheck window when
+    # thousands of old cancellation retries are queued; the every-5-minutes
+    # cron drains the rest continuously.
+    # Non-fatal: the cron retries this anyway.
+    php artisan sync:pending-schedules --limit=25 || echo "WARNING: pending schedule drain skipped"
 
     # Reconcile past-due SMS with mNotify's actual delivery report.
     # Determines whether messages were sent, failed (e.g. insufficient
