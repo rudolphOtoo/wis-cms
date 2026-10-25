@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Exceptions\TransientSmsException;
 use App\Models\Payment;
 use Carbon\Carbon;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -339,6 +341,76 @@ class MnotifySmsService
         return $this->fetchScheduledJobs();
     }
 
+    /**
+     * Build the canonical lock key for one recipient on one calendar day.
+     *
+     * Shared by the rolling scheduler, dispatch job, and tooling so every
+     * code path contends on the same recipient-day slot.
+     */
+    public static function recipientDayLockKey(string $phone, Carbon $scheduledAt): string
+    {
+        return 'sms_recipient_day:'.md5(self::normalise($phone).'|'.$scheduledAt->format('Y-m-d'));
+    }
+
+    /**
+     * Acquire the recipient-day lock used immediately before a remote push.
+     */
+    public function recipientDayLock(string $phone, Carbon $scheduledAt, int $seconds = 10): Lock
+    {
+        return Cache::lock(self::recipientDayLockKey($phone, $scheduledAt), $seconds);
+    }
+
+    /**
+     * Is this remote job still waiting to be sent?
+     */
+    public function isPendingScheduledJob(array $job): bool
+    {
+        $status = strtolower(trim((string) ($job['status'] ?? 'pending')));
+
+        return $status === '' || in_array($status, ['pending', 'scheduled', 'queued', 'active'], true);
+    }
+
+    /**
+     * Has a failed cancel already parked this job in the year 2099?
+     */
+    public function isDefusedScheduledJob(array $job): bool
+    {
+        if (str_starts_with((string) ($job['date_time'] ?? ''), '2099')) {
+            return true;
+        }
+
+        $message = strtolower(trim((string) ($job['message'] ?? '')));
+
+        return in_array($message, ['(cancelled)', '(canceled)'], true);
+    }
+
+    /**
+     * Is the job's target datetime still in the future?
+     */
+    public function isFutureScheduledJob(array $job): bool
+    {
+        $dateTime = $job['date_time'] ?? null;
+        if (! is_string($dateTime) || trim($dateTime) === '') {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($dateTime)->isFuture();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Is this a pending job that could still deliver a real message?
+     */
+    public function isDeliverableScheduledJob(array $job): bool
+    {
+        return $this->isPendingScheduledJob($job)
+            && ! $this->isDefusedScheduledJob($job)
+            && $this->isFutureScheduledJob($job);
+    }
+
     /** @var list<array<string, mixed>> */
     protected array $remoteScheduleCache = [];
 
@@ -634,7 +706,7 @@ class MnotifySmsService
                 ->connectTimeout(5)
                 ->timeout(10)
                 ->post($endpoint, [
-                    'recipient' => [$this->normalise($phone)],
+                    'recipient' => [self::normalise($phone)],
                     'sender' => config('services.mnotify.sender_id'),
                     'message' => $message,
                     'is_schedule' => $isSchedule,
@@ -789,7 +861,7 @@ class MnotifySmsService
      *   +233241234567  -> 0241234567
      *   0241234567     -> 0241234567 (unchanged)
      */
-    protected function normalise(string $phone): string
+    protected static function normalise(string $phone): string
     {
         $p = preg_replace('/[^0-9]/', '', $phone);
         if (str_starts_with($p, '233')) {

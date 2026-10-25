@@ -171,6 +171,64 @@ class RecurringSmsScheduler
         return $ids;
     }
 
+    /**
+     * Collapse newly-collected pending rows to one delivery per recipient
+     * and target day before any of them reach mNotify.
+     *
+     * The collectors already use recipient-day guards, but two simultaneous
+     * sync runs or an overlapping birthday/reminder batch can still enqueue
+     * more than one unsent row. Cancelling the extras here guarantees a
+     * re-run can never push the same member twice for the same day. Rows
+     * already backed by an mNotify job are left untouched for the normal
+     * cancellation/reconciliation path.
+     *
+     * @param  list<string>  $deliveryIds
+     * @return list<string>
+     */
+    public function dedupePendingRecipientDays(array $deliveryIds): array
+    {
+        $kept = [];
+        $seen = [];
+        $cancelled = 0;
+
+        foreach ($deliveryIds as $deliveryId) {
+            $delivery = ScheduledSmsDelivery::find($deliveryId);
+
+            if (! $delivery) {
+                continue;
+            }
+
+            $isUnpushed = $delivery->status === ScheduledSmsDelivery::STATUS_PENDING_API
+                && ($delivery->mnotify_job_id === null || $delivery->mnotify_job_id === '');
+
+            if (! $isUnpushed) {
+                $kept[] = $deliveryId;
+
+                continue;
+            }
+
+            $slot = $delivery->phone.'|'.$delivery->scheduled_at->format('Y-m-d');
+
+            if (isset($seen[$slot])) {
+                $delivery->markCancelled();
+                $cancelled++;
+
+                continue;
+            }
+
+            $seen[$slot] = true;
+            $kept[] = $deliveryId;
+        }
+
+        if ($cancelled > 0) {
+            Log::warning('RecurringSmsScheduler: cancelled duplicate pending recipient-day deliveries before push', [
+                'cancelled' => $cancelled,
+            ]);
+        }
+
+        return $kept;
+    }
+
     // ─── Configure-time resync (observers) ─────────────────────────
 
     /**
@@ -661,22 +719,11 @@ class RecurringSmsScheduler
                     return;
                 }
                 // Check for existing active delivery for same phone+date
-                $exists = ScheduledSmsDelivery::query()
-                    ->where('phone', $delivery->phone)
-                    ->whereDate('scheduled_at', $delivery->scheduled_at)
-                    ->where('id', '!=', $delivery->id)
-                    ->where(function ($q) {
-                        $q->whereIn('status', [
-                            ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
-                            ScheduledSmsDelivery::STATUS_DISPATCHED,
-                        ])->orWhere(function ($q2) {
-                            $q2->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
-                                ->whereNotNull('mnotify_job_id')
-                                ->where('mnotify_job_id', '<>', '');
-                        });
-                    })
-                    ->exists();
-                if ($exists) {
+                if (ScheduledSmsDelivery::recipientDayAlreadyScheduled(
+                    $delivery->phone,
+                    $delivery->scheduled_at,
+                    $delivery->id,
+                )) {
                     $delivery->markCancelled();
 
                     return;
