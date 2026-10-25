@@ -718,11 +718,13 @@ class RecurringSmsScheduler
                 if (! $delivery || $delivery->status !== ScheduledSmsDelivery::STATUS_PENDING_API) {
                     return;
                 }
-                // Check for existing active delivery for same phone+date
+                // Check for an existing active delivery of the same source
+                // for this phone+date. Cross-source collisions are allowed.
                 if (ScheduledSmsDelivery::recipientDayAlreadyScheduled(
                     $delivery->phone,
                     $delivery->scheduled_at,
                     $delivery->id,
+                    $delivery->source_type,
                 )) {
                     $delivery->markCancelled();
 

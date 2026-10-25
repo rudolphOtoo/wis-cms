@@ -72,13 +72,16 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
                 return;
             }
 
-            // Local pre-push idempotency: another delivery already scheduled/active for same phone+date
+            // Local pre-push idempotency: another delivery of the same source
+            // already scheduled/active for this phone+date. A birthday and a
+            // reminder may intentionally share the day.
             if (ScheduledSmsDelivery::recipientDayAlreadyScheduled(
                 $delivery->phone,
                 $delivery->scheduled_at,
                 $delivery->id,
+                $delivery->source_type,
             )) {
-                Log::warning("Scheduled SMS #{$delivery->id} skipped: duplicate already exists for {$delivery->phone} on ".$delivery->scheduled_at->toDateString());
+                Log::warning("Scheduled SMS #{$delivery->id} skipped: duplicate {$delivery->source_type} already exists for {$delivery->phone} on ".$delivery->scheduled_at->toDateString());
                 $delivery->markCancelled();
 
                 return;
