@@ -25,11 +25,12 @@ class SyncPendingRemoteSchedules extends Command
 {
     protected $signature = 'sync:pending-schedules
                             {--dry-run : Show what would be synced without dispatching}
-                            {--force : Run even when APP_ENV is local or testing}';
+                            {--force : Run even when APP_ENV is local or testing}
+                            {--limit=100 : Maximum queued operations to process in one run}';
 
     protected $description = 'Retry failed mNotify API calls from the offline queue';
 
-    public function handle(): int
+    public function handle(MnotifySmsService $sms): int
     {
         // Live-SMS deployments set MNOTIFY_DRY_RUN=false explicitly. When
         // configured for real sends, offline retries must never silently
@@ -45,7 +46,14 @@ class SyncPendingRemoteSchedules extends Command
             return self::SUCCESS;
         }
 
-        $pending = PendingRemoteSchedule::forSync()->get();
+        // A hard-killed container can leave one row in "processing" forever.
+        // Reset those before selecting work; every operation is idempotent.
+        PendingRemoteSchedule::query()
+            ->where('status', PendingRemoteSchedule::STATUS_PROCESSING)
+            ->update(['status' => PendingRemoteSchedule::STATUS_PENDING]);
+
+        $limit = max(1, (int) $this->option('limit'));
+        $pending = PendingRemoteSchedule::forSync()->limit($limit)->get();
 
         if ($pending->isEmpty()) {
             $this->info('No pending schedules to sync.');
@@ -53,7 +61,7 @@ class SyncPendingRemoteSchedules extends Command
             return self::SUCCESS;
         }
 
-        $this->info("Found {$pending->count()} pending schedule(s) to sync.");
+        $this->info("Processing {$pending->count()} of ".PendingRemoteSchedule::forSync()->count().' pending schedule(s).');
 
         $synced = 0;
         $failed = 0;
@@ -72,9 +80,9 @@ class SyncPendingRemoteSchedules extends Command
 
             try {
                 match ($item->action) {
-                    PendingRemoteSchedule::ACTION_SCHEDULE => $this->retrySchedule($item),
-                    PendingRemoteSchedule::ACTION_CANCEL => $this->retryCancel($item),
-                    PendingRemoteSchedule::ACTION_UPDATE => $this->retryUpdate($item),
+                    PendingRemoteSchedule::ACTION_SCHEDULE => $this->retrySchedule($item, $sms),
+                    PendingRemoteSchedule::ACTION_CANCEL => $this->retryCancel($item, $sms),
+                    PendingRemoteSchedule::ACTION_UPDATE => $this->retryUpdate($item, $sms),
                     default => null,
                 };
 
@@ -96,10 +104,9 @@ class SyncPendingRemoteSchedules extends Command
         return self::SUCCESS;
     }
 
-    protected function retrySchedule(PendingRemoteSchedule $item): void
+    protected function retrySchedule(PendingRemoteSchedule $item, MnotifySmsService $sms): void
     {
         $payload = $item->payload;
-        $sms = app(MnotifySmsService::class);
 
         $scheduledAt = Carbon::parse($payload['scheduled_at']);
         $mnotifyJobId = $sms->schedule($payload['phone'], $payload['message_body'], $scheduledAt);
@@ -112,10 +119,9 @@ class SyncPendingRemoteSchedules extends Command
         }
     }
 
-    protected function retryCancel(PendingRemoteSchedule $item): void
+    protected function retryCancel(PendingRemoteSchedule $item, MnotifySmsService $sms): void
     {
         $payload = $item->payload;
-        $sms = app(MnotifySmsService::class);
         $jobId = (string) $payload['mnotify_job_id'];
 
         // Resolve the authoritative remote listing handle (push-time
@@ -173,10 +179,9 @@ class SyncPendingRemoteSchedules extends Command
         }
     }
 
-    protected function retryUpdate(PendingRemoteSchedule $item): void
+    protected function retryUpdate(PendingRemoteSchedule $item, MnotifySmsService $sms): void
     {
         $payload = $item->payload;
-        $sms = app(MnotifySmsService::class);
 
         $scheduledAt = Carbon::parse($payload['scheduled_at']);
         $sms->updateScheduled(
