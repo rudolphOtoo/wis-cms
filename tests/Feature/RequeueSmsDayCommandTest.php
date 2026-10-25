@@ -143,6 +143,96 @@ class RequeueSmsDayCommandTest extends TestCase
         $this->assertCount(2, Http::recorded(fn (Request $request) => str_contains($request->url(), '/sms/quick')));
     }
 
+    public function test_execute_allows_birthday_and_reminder_for_the_same_phone_on_the_same_day(): void
+    {
+        $cloud = [];
+        $this->fakeProvider($cloud);
+
+        $scheduledAt = Carbon::parse('2026-10-28 12:00:00');
+
+        $reminder = ScheduledSmsDelivery::create([
+            'branch_id' => $this->branch->id,
+            'phone' => '0240000009',
+            'message_body' => 'Midweek service reminder',
+            'scheduled_at' => $scheduledAt,
+            'status' => ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+            'source_type' => 'reminder',
+            'source_id' => $this->branch->id,
+            'mnotify_job_id' => 'old-reminder',
+        ]);
+
+        $birthday = ScheduledSmsDelivery::create([
+            'branch_id' => $this->branch->id,
+            'phone' => '0240000009',
+            'message_body' => 'Happy birthday from your church family',
+            'scheduled_at' => $scheduledAt,
+            'status' => ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+            'source_type' => 'birthday',
+            'source_id' => $this->branch->id,
+            'mnotify_job_id' => 'old-birthday',
+        ]);
+
+        $exitCode = Artisan::call('sms:requeue-day', ['date' => '2026-10-28', '--execute' => true]);
+        $output = Artisan::output();
+
+        $this->assertSame(0, $exitCode, $output);
+        $this->assertStringContainsString('Pushed: 2', $output);
+        $this->assertStringContainsString('Not scheduled: 0', $output);
+        $this->assertSame(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, $reminder->fresh()->status);
+        $this->assertSame(ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE, $birthday->fresh()->status);
+        $this->assertCount(2, Http::recorded(fn (Request $request) => str_contains($request->url(), '/sms/quick')));
+    }
+
+    public function test_execute_still_blocks_a_second_reminder_for_the_same_phone_and_day(): void
+    {
+        $cloud = [];
+        $this->fakeProvider($cloud);
+
+        $scheduledAt = Carbon::parse('2026-10-28 12:00:00');
+
+        $first = ScheduledSmsDelivery::create([
+            'branch_id' => $this->branch->id,
+            'phone' => '0240000010',
+            'message_body' => 'Midweek service reminder',
+            'scheduled_at' => $scheduledAt,
+            'status' => ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+            'source_type' => 'reminder',
+            'source_id' => $this->branch->id,
+            'mnotify_job_id' => 'old-first',
+        ]);
+
+        $second = ScheduledSmsDelivery::create([
+            'branch_id' => $this->branch->id,
+            'phone' => '0240000010',
+            'message_body' => 'Midweek service reminder (duplicate wording)',
+            'scheduled_at' => $scheduledAt,
+            'status' => ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
+            'source_type' => 'reminder',
+            'source_id' => $this->branch->id,
+            'mnotify_job_id' => 'old-second',
+        ]);
+
+        $exitCode = Artisan::call('sms:requeue-day', ['date' => '2026-10-28', '--execute' => true]);
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode, $output);
+        $this->assertStringContainsString('Pushed: 1', $output);
+        $this->assertStringContainsString('Not scheduled: 1', $output);
+        $this->assertSame(
+            1,
+            collect([$first->fresh(), $second->fresh()])
+                ->where('status', ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE)
+                ->count(),
+        );
+        $this->assertSame(
+            1,
+            collect([$first->fresh(), $second->fresh()])
+                ->where('status', ScheduledSmsDelivery::STATUS_CANCELLED)
+                ->count(),
+        );
+        $this->assertCount(1, Http::recorded(fn (Request $request) => str_contains($request->url(), '/sms/quick')));
+    }
+
     public function test_it_refuses_to_requeue_when_mnotify_already_holds_a_job_for_that_date(): void
     {
         $cloud = [[

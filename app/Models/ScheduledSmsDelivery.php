@@ -358,20 +358,24 @@ class ScheduledSmsDelivery extends Model
     }
 
     /**
-     * Has this recipient already been claimed for this target day by any
-     * automation or manual delivery?
+     * Has this recipient already been claimed for this target day by a
+     * delivery of the same source?
      *
-     * This is the final pre-push guard: it spans every source, so a
-     * birthday, service reminder, and manual bulk schedule cannot all
-     * reach mNotify for the same phone on the same day. Provider-backed
-     * rows always count; a pending row only counts once it has a job ID,
-     * because an orphan without one has not reached the member and must
-     * remain reclaimable.
+     * This is the final pre-push guard. Birthday greetings and service
+     * reminders are allowed to reach the same phone on the same day, so
+     * the rule is per source type: two reminders or two birthdays are
+     * still blocked, while one of each is not. Passing a null source
+     * keeps the old cross-source behavior for legacy callers.
+     *
+     * Provider-backed rows always count; a pending row only counts once
+     * it has a job ID, because an orphan without one has not reached the
+     * member and must remain reclaimable.
      */
     public static function recipientDayAlreadyScheduled(
         string $phone,
         Carbon $scheduledAt,
         ?string $excludeId = null,
+        ?string $sourceType = null,
     ): bool {
         if ($phone === '') {
             return false;
@@ -383,6 +387,7 @@ class ScheduledSmsDelivery extends Model
             ->where('phone', $phone)
             ->where('scheduled_at', '>=', $start)
             ->where('scheduled_at', '<', $start->copy()->addDay())
+            ->when($sourceType !== null, fn (Builder $q) => $q->where('source_type', $sourceType))
             ->when($excludeId !== null, fn (Builder $q) => $q->where('id', '!=', $excludeId))
             ->where(fn (Builder $q) => $q
                 ->whereIn('status', [
