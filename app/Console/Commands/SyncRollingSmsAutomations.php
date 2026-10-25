@@ -135,7 +135,18 @@ class SyncRollingSmsAutomations extends Command
         // Query mNotify balance before pushing any jobs to prevent
         // silent delivery failures when credits are depleted.
         $sms = app(MnotifySmsService::class);
-        $deliveryIds = array_merge($birthdayIds, $reminderIds);
+        $deliveryIds = $this->scheduler->dedupePendingRecipientDays(
+            array_merge($birthdayIds, $reminderIds),
+        );
+
+        if (count($deliveryIds) < $totalDeliveries) {
+            $this->line('  Skipped '.(($totalDeliveries - count($deliveryIds))).' duplicate recipient-day delivery/deliveries.');
+        }
+
+        $keptIds = array_fill_keys($deliveryIds, true);
+        $birthdayIds = array_values(array_filter($birthdayIds, fn (string $id) => isset($keptIds[$id])));
+        $reminderIds = array_values(array_filter($reminderIds, fn (string $id) => isset($keptIds[$id])));
+
         $guardResult = $this->validateCreditsBeforeDispatch($sms, $deliveryIds);
 
         if ($guardResult === false) {

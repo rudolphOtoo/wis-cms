@@ -7,11 +7,11 @@ use App\Models\PendingRemoteSchedule;
 use App\Models\ScheduledSmsDelivery;
 use App\Services\MnotifySmsService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -52,16 +52,18 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
             return;
         }
 
-        // Prevent duplicate pushes for the same member on the same target date
-        $lockKey = 'sms_dispatch_'.md5($delivery->phone.'|'.$delivery->scheduled_at->format('Y-m-d'));
-        $lock = Cache::lock($lockKey, 10);
+        // Prevent duplicate pushes for the same member on the same target date.
+        // Every scheduler and command uses the service's key so they all
+        // contend on the same recipient-day slot.
+        try {
+            $lock = $sms->recipientDayLock($delivery->phone, $delivery->scheduled_at);
+            $lock->block(5);
+        } catch (LockTimeoutException) {
+            // Another process is pushing this recipient-day right now. Leave
+            // the delivery pending so a later run can re-check safely.
+            Log::warning("Scheduled SMS #{$delivery->id} left pending: recipient-day lock held for {$delivery->phone} on ".$delivery->scheduled_at->toDateString());
 
-        if (! $lock->get()) {
-            // Another dispatch is in progress; re-check state
-            $delivery->refresh();
-            if ($delivery->status !== ScheduledSmsDelivery::STATUS_PENDING_API) {
-                return;
-            }
+            return;
         }
 
         try {
@@ -71,23 +73,11 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
             }
 
             // Local pre-push idempotency: another delivery already scheduled/active for same phone+date
-            $existingActive = ScheduledSmsDelivery::query()
-                ->where('phone', $delivery->phone)
-                ->whereDate('scheduled_at', $delivery->scheduled_at)
-                ->where('id', '!=', $delivery->id)
-                ->where(function ($q) {
-                    $q->whereIn('status', [
-                        ScheduledSmsDelivery::STATUS_SCHEDULED_REMOTE,
-                        ScheduledSmsDelivery::STATUS_DISPATCHED,
-                    ])->orWhere(function ($q2) {
-                        $q2->where('status', ScheduledSmsDelivery::STATUS_PENDING_API)
-                            ->whereNotNull('mnotify_job_id')
-                            ->where('mnotify_job_id', '<>', '');
-                    });
-                })
-                ->exists();
-
-            if ($existingActive) {
+            if (ScheduledSmsDelivery::recipientDayAlreadyScheduled(
+                $delivery->phone,
+                $delivery->scheduled_at,
+                $delivery->id,
+            )) {
                 Log::warning("Scheduled SMS #{$delivery->id} skipped: duplicate already exists for {$delivery->phone} on ".$delivery->scheduled_at->toDateString());
                 $delivery->markCancelled();
 
@@ -113,12 +103,10 @@ class DispatchScheduledSmsToMnotifyJob implements ShouldQueue
             $this->createPendingSchedule($delivery, $e->getMessage());
             throw $e; // Let the queue worker handle retry logic
         } finally {
-            if (isset($lock) && method_exists($lock, 'owner') ? $lock->owner() === getmypid() || true : false) {
-                try {
-                    $lock->release();
-                } catch (\Throwable $e) {
-                    // ignore
-                }
+            try {
+                $lock->release();
+            } catch (\Throwable) {
+                // Lock already expired or released.
             }
         }
     }
