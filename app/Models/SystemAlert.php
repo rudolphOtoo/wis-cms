@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -54,9 +55,9 @@ class SystemAlert extends Model
         return $query->whereNull('acknowledged_at');
     }
 
-    public function ofType(string $type)
+    public function scopeOfType(Builder $query, string $type): Builder
     {
-        return $this->where('type', $type);
+        return $query->where('type', $type);
     }
 
     // ─── Helpers ───────────────────────────────────────────────

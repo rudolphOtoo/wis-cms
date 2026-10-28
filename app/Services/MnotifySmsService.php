@@ -821,7 +821,7 @@ class MnotifySmsService
      */
     protected function shouldDryRun(string $phone, string $message): bool
     {
-        if (config('services.mnotify.dry_run', app()->environment('local', 'testing'))) {
+        if (self::dryRunEnabled()) {
             Log::info("[DEV DRY-RUN] SMS intercepted for {$phone}: {$message}");
 
             return true;
@@ -835,7 +835,26 @@ class MnotifySmsService
      */
     protected function isDryRunMode(): bool
     {
-        return config('services.mnotify.dry_run', app()->environment('local', 'testing'));
+        return self::dryRunEnabled();
+    }
+
+    /**
+     * Whether outbound mNotify calls are suppressed.
+     *
+     * An unset MNOTIFY_DRY_RUN defaults to on in local/testing. Only an
+     * explicit false goes live — that is how church PCs running
+     * APP_ENV=local opt in — and an unparseable value fails safe to
+     * dry-run rather than live.
+     */
+    public static function dryRunEnabled(): bool
+    {
+        $setting = config('services.mnotify.dry_run');
+
+        if ($setting === null) {
+            return app()->environment('local', 'testing');
+        }
+
+        return filter_var($setting, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
     }
 
     /**

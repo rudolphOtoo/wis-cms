@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\SkipsLocalDryRun;
 use App\Jobs\SendBroadcastMessageJob;
 use App\Models\Member;
 use App\Models\Message;
@@ -29,6 +30,8 @@ use Throwable;
  */
 class SendServiceReminders extends Command
 {
+    use SkipsLocalDryRun;
+
     protected $signature = 'reminders:send
                             {--at= : Override "now" as YYYY-MM-DD HH:MM (testing)}
                             {--force : Run even when APP_ENV is local or testing}';
@@ -41,13 +44,7 @@ class SendServiceReminders extends Command
         // configured for real sends, reminders must never silently skip —
         // even under APP_ENV=local, a church PC still needs its scheduled
         // fan-out to fire at the configured service hour.
-        $dryRunSetting = config('services.mnotify.dry_run');
-        $liveSmsConfigured = $dryRunSetting !== null
-            && filter_var($dryRunSetting, FILTER_VALIDATE_BOOLEAN) === false;
-
-        if (app()->environment('local', 'testing') && ! $liveSmsConfigured && ! $this->option('force')) {
-            $this->info('Skipping: APP_ENV is local/testing without MNOTIFY_DRY_RUN=false. Use --force to override.');
-
+        if ($this->skipForLocalDryRun()) {
             return self::SUCCESS;
         }
 
