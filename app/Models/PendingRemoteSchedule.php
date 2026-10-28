@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Offline-resilience queue for mNotify API requests.
@@ -53,21 +57,21 @@ class PendingRemoteSchedule extends Model
         ];
     }
 
-    public function scheduledSmsDelivery()
+    public function scheduledSmsDelivery(): BelongsTo
     {
         return $this->belongsTo(ScheduledSmsDelivery::class, 'scheduled_sms_delivery_id');
     }
 
     // ─── Scopes ───────────────────────────────────────────────
 
-    public function scopePending($query)
+    public function scopePending(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_PENDING)
             ->where('attempts', '<', DB::raw('max_attempts'))
             ->orderBy('created_at');
     }
 
-    public function scopeForSync($query)
+    public function scopeForSync(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_PENDING)
             ->whereColumn('attempts', '<', 'max_attempts')
