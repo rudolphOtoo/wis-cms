@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Branch scoping is NOT applied here — the parent Message
@@ -34,12 +37,12 @@ class MessageRecipient extends Model
         ];
     }
 
-    public function message()
+    public function message(): BelongsTo
     {
         return $this->belongsTo(Message::class);
     }
 
-    public function member()
+    public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class);
     }

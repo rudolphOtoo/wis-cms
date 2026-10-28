@@ -8,6 +8,7 @@ use App\Enums\PaymentChannel;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Models\Concerns\BelongsToBranch;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -84,17 +85,17 @@ class Payment extends Model
 
     // ── Scopes ──────────────────────────────────────────────────────────
 
-    public function scopeByStatus($query, PaymentStatus $status)
+    public function scopeByStatus(Builder $query, PaymentStatus $status): Builder
     {
         return $query->where('status', $status);
     }
 
-    public function scopeByType($query, PaymentType $type)
+    public function scopeByType(Builder $query, PaymentType $type): Builder
     {
         return $query->where('payment_type', $type);
     }
 
-    public function scopeSuccessful($query)
+    public function scopeSuccessful(Builder $query): Builder
     {
         return $query->where('status', PaymentStatus::Success);
     }

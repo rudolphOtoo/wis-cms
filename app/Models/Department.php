@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Department extends Model
 {
@@ -24,12 +28,12 @@ class Department extends Model
         return ['is_active' => 'boolean'];
     }
 
-    public function leader()
+    public function leader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'leader_user_id');
     }
 
-    public function members()
+    public function members(): BelongsToMany
     {
         return $this->belongsToMany(Member::class, 'department_members')
             ->using(DepartmentMember::class)

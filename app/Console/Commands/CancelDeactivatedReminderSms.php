@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\SkipsLocalDryRun;
 use App\Jobs\CancelScheduledSmsJob;
 use App\Models\ScheduledSmsDelivery;
 use App\Models\ServiceReminderSettings;
@@ -24,6 +25,8 @@ use Illuminate\Console\Command;
  */
 class CancelDeactivatedReminderSms extends Command
 {
+    use SkipsLocalDryRun;
+
     protected $signature = 'sms:cancel-deactivated-reminders
                             {--force : Run even when APP_ENV is local or testing}';
 
@@ -36,13 +39,7 @@ class CancelDeactivatedReminderSms extends Command
         // even under APP_ENV=local, ghost schedules on mNotify must be
         // cancelled so members don't receive unwanted texts while the
         // system is powered off.
-        $dryRunSetting = config('services.mnotify.dry_run');
-        $liveSmsConfigured = $dryRunSetting !== null
-            && filter_var($dryRunSetting, FILTER_VALIDATE_BOOLEAN) === false;
-
-        if (app()->environment('local', 'testing') && ! $liveSmsConfigured && ! $this->option('force')) {
-            $this->info('Skipping: APP_ENV is local/testing without MNOTIFY_DRY_RUN=false. Use --force to override.');
-
+        if ($this->skipForLocalDryRun()) {
             return self::SUCCESS;
         }
 

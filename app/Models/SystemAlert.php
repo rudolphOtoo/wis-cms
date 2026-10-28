@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Persistent admin-facing system alert.
@@ -42,21 +46,21 @@ class SystemAlert extends Model
         ];
     }
 
-    public function acknowledger()
+    public function acknowledger(): BelongsTo
     {
         return $this->belongsTo(User::class, 'acknowledged_by');
     }
 
     // ─── Scopes ───────────────────────────────────────────────
 
-    public function scopeUnread($query)
+    public function scopeUnread(Builder $query): Builder
     {
         return $query->whereNull('acknowledged_at');
     }
 
-    public function ofType(string $type)
+    public function scopeOfType(Builder $query, string $type): Builder
     {
-        return $this->where('type', $type);
+        return $query->where('type', $type);
     }
 
     // ─── Helpers ───────────────────────────────────────────────

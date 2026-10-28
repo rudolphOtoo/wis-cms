@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Diocese\Modules\Confirmations\Http\Controllers\ConfirmationController;
 use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Support\Facades\Route;
