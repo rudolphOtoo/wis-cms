@@ -18,6 +18,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
@@ -631,30 +632,30 @@ class ReportsController extends Controller
     // ──────────────────────────────────────────────────────────────────
 
     // GET /api/reports/finance/income-by-category/export-pdf
-    public function incomeByCategoryPdf(Request $request)
+    public function incomeByCategoryPdf(Request $request): Response
     {
         return $this->financeCategoryPdf($request, 'income');
     }
 
     // GET /api/reports/finance/income-by-category/export-xlsx
-    public function incomeByCategoryXlsx(Request $request)
+    public function incomeByCategoryXlsx(Request $request): StreamedResponse
     {
         return $this->streamXlsx($request, 'income');
     }
 
     // GET /api/reports/finance/expense-by-category/export-pdf
-    public function expenseByCategoryPdf(Request $request)
+    public function expenseByCategoryPdf(Request $request): Response
     {
         return $this->financeCategoryPdf($request, 'expense');
     }
 
     // GET /api/reports/finance/expense-by-category/export-xlsx
-    public function expenseByCategoryXlsx(Request $request)
+    public function expenseByCategoryXlsx(Request $request): StreamedResponse
     {
         return $this->streamXlsx($request, 'expense');
     }
 
-    private function financeCategoryPdf(Request $request, string $type)
+    private function financeCategoryPdf(Request $request, string $type): Response
     {
         $data = $this->buildTransactionCategoryData($request, $type);
         $branch = Branch::find($request->user()->branch_id);
@@ -819,7 +820,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/attendance/trends/export-pdf
-    public function attendanceTrendsPdf(Request $request)
+    public function attendanceTrendsPdf(Request $request): Response
     {
         $data = $this->buildAttendanceTrendsData($request);
         $branch = Branch::find($request->user()->branch_id);
@@ -838,7 +839,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/attendance/trends/export-xlsx
-    public function attendanceTrendsXlsx(Request $request)
+    public function attendanceTrendsXlsx(Request $request): StreamedResponse
     {
         $data = $this->buildAttendanceTrendsData($request);
         $from = $data['period']['from'];
@@ -881,7 +882,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/cells/comparison/export-pdf
-    public function cellComparisonPdf(Request $request)
+    public function cellComparisonPdf(Request $request): Response
     {
         $data = $this->buildCellComparisonData($request);
         $branch = Branch::find($request->user()->branch_id);
@@ -899,7 +900,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/cells/comparison/export-xlsx
-    public function cellComparisonXlsx(Request $request)
+    public function cellComparisonXlsx(Request $request): StreamedResponse
     {
         $data = $this->buildCellComparisonData($request);
         $today = now()->format('Y-m-d');
@@ -993,7 +994,7 @@ class ReportsController extends Controller
     // ──────────────────────────────────────────────────────────────────
 
     // GET /api/reports/attendance/summary/export-pdf
-    public function attendanceSummaryPdf(Request $request)
+    public function attendanceSummaryPdf(Request $request): Response
     {
         $data = $this->buildAttendanceSummaryData($request);
         $branch = Branch::find($request->user()->branch_id);
@@ -1018,7 +1019,7 @@ class ReportsController extends Controller
     //   Tab 2: Cell Breakdown — per-Cell attendance, rates, welfare
     //   Tab 3: State of Members — welfare flag distribution
     //   Tab 4: Weekly Trend — per-Sunday attendance
-    public function attendanceSummaryXlsx(Request $request)
+    public function attendanceSummaryXlsx(Request $request): StreamedResponse
     {
         $data = $this->buildAttendanceSummaryData($request);
         $from = $data['period']['from'];
@@ -1197,7 +1198,7 @@ class ReportsController extends Controller
     // ──────────────────────────────────────────────────────────────────
 
     // GET /api/reports/members/welfare/export-pdf
-    public function memberWelfarePdf(Request $request)
+    public function memberWelfarePdf(Request $request): Response
     {
         $data = $this->buildMemberWelfareData($request);
         $branch = Branch::find($request->user()->branch_id);
@@ -1216,7 +1217,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/members/welfare/export-xlsx
-    public function memberWelfareXlsx(Request $request)
+    public function memberWelfareXlsx(Request $request): StreamedResponse
     {
         $data = $this->buildMemberWelfareData($request);
         $from = $data['period']['from'];
@@ -1358,7 +1359,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/life-events/year/export-pdf
-    public function lifeEventsYearPdf(Request $request)
+    public function lifeEventsYearPdf(Request $request): Response
     {
         $data = $this->buildLifeEventsYearData($request);
         $branch = Branch::find($request->user()->branch_id);
@@ -1374,7 +1375,7 @@ class ReportsController extends Controller
     }
 
     // GET /api/reports/life-events/year/export-xlsx
-    public function lifeEventsYearXlsx(Request $request)
+    public function lifeEventsYearXlsx(Request $request): StreamedResponse
     {
         $data = $this->buildLifeEventsYearData($request);
         $year = $data['year'];

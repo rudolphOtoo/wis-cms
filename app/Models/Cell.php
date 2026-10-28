@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cell extends Model
 {
@@ -24,21 +28,21 @@ class Cell extends Model
         return ['is_active' => 'boolean'];
     }
 
-    public function leader()
+    public function leader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'leader_user_id');
     }
 
     // A cell HAS MANY members (one-to-many) — the inverse of Member::cell().
     // This differs from Department::members() which is many-to-many.
-    public function members()
+    public function members(): HasMany
     {
         return $this->hasMany(Member::class);
     }
 
     // Children linked to this cell (used by the Children Ministry cell).
     // The inverse of Children::cell().
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(Children::class);
     }

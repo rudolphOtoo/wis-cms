@@ -6,6 +6,8 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Tracks each SMS scheduled via mNotify's remote scheduling API.
@@ -80,44 +82,44 @@ class ScheduledSmsDelivery extends Model
         ];
     }
 
-    public function branch()
+    public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
     }
 
-    public function creator()
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function pendingSchedules()
+    public function pendingSchedules(): HasMany
     {
         return $this->hasMany(PendingRemoteSchedule::class, 'scheduled_sms_delivery_id');
     }
 
     // ─── Scopes ───────────────────────────────────────────────
 
-    public function scopePendingApi($query)
+    public function scopePendingApi(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_PENDING_API);
     }
 
-    public function scopeScheduledRemote($query)
+    public function scopeScheduledRemote(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_SCHEDULED_REMOTE);
     }
 
-    public function scopeCancelledRemote($query)
+    public function scopeCancelledRemote(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_CANCELLED_REMOTE);
     }
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->whereIn('status', [self::STATUS_PENDING_API, self::STATUS_SCHEDULED_REMOTE]);
     }
 
-    public function scopeForSource($query, string $type, ?string $id = null)
+    public function scopeForSource(Builder $query, string $type, ?string $id = null): Builder
     {
         $query->where('source_type', $type);
 
