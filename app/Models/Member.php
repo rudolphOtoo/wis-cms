@@ -4,9 +4,14 @@ namespace App\Models;
 
 use App\Diocese\Contracts\MemberNumberGenerator;
 use App\Models\Concerns\BelongsToBranch;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
@@ -56,12 +61,12 @@ class Member extends Model
         });
     }
 
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(Children::class, 'guardian_member_id');
     }
 
-    public function cell()
+    public function cell(): BelongsTo
     {
         // A member belongs to exactly ONE cell (or none) via cell_id.
         return $this->belongsTo(Cell::class);
@@ -72,24 +77,24 @@ class Member extends Model
      * At most one User per Member (enforced by UNIQUE constraint on
      * users.member_id). NULL for members who don't have a login.
      */
-    public function user()
+    public function user(): HasOne
     {
         return $this->hasOne(User::class);
     }
 
-    public function departments()
+    public function departments(): BelongsToMany
     {
         return $this->belongsToMany(Department::class, 'department_members')
             ->withPivot('role', 'joined_at')
             ->withTimestamps();
     }
 
-    public function transactions()
+    public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'member_id');
     }
 
-    public function pastoralNotes()
+    public function pastoralNotes(): HasMany
     {
         return $this->hasMany(PastoralNote::class);
     }
@@ -99,7 +104,7 @@ class Member extends Model
     /**
      * Active, non-soft-deleted members.
      */
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active')->whereNull('deleted_at');
     }
@@ -112,7 +117,7 @@ class Member extends Model
      * follow-ups, ad-hoc broadcasts). Any query that feeds into the
      * SMS dispatch pipeline MUST use this scope.
      */
-    public function scopeEligibleForSms($query)
+    public function scopeEligibleForSms(Builder $query): Builder
     {
         return $query->where('status', 'active')
             ->whereNotNull('phone')
@@ -124,7 +129,7 @@ class Member extends Model
      * Deceased members — kept for historical records but excluded from
      * all automated communications.
      */
-    public function scopeDeceased($query)
+    public function scopeDeceased(Builder $query): Builder
     {
         return $query->where('status', 'deceased');
     }

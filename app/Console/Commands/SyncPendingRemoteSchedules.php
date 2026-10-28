@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\SkipsLocalDryRun;
 use App\Exceptions\TransientSmsException;
 use App\Models\PendingRemoteSchedule;
 use App\Models\ScheduledSmsDelivery;
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Log;
  */
 class SyncPendingRemoteSchedules extends Command
 {
+    use SkipsLocalDryRun;
+
     protected $signature = 'sync:pending-schedules
                             {--dry-run : Show what would be synced without dispatching}
                             {--force : Run even when APP_ENV is local or testing}
@@ -36,13 +39,7 @@ class SyncPendingRemoteSchedules extends Command
         // configured for real sends, offline retries must never silently
         // skip — even under APP_ENV=local, queued pushes to mNotify's
         // remote queue must drain so nothing is lost while powered off.
-        $dryRunSetting = config('services.mnotify.dry_run');
-        $liveSmsConfigured = $dryRunSetting !== null
-            && filter_var($dryRunSetting, FILTER_VALIDATE_BOOLEAN) === false;
-
-        if (app()->environment('local', 'testing') && ! $liveSmsConfigured && ! $this->option('force')) {
-            $this->info('Skipping: APP_ENV is local/testing without MNOTIFY_DRY_RUN=false. Use --force to override.');
-
+        if ($this->skipForLocalDryRun()) {
             return self::SUCCESS;
         }
 

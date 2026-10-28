@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Diocese\Modules\Confirmations\Database\Seeders;
 
 use App\Diocese\Modules\Confirmations\Models\Confirmation;

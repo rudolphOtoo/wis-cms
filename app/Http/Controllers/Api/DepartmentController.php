@@ -11,6 +11,7 @@ use App\Http\Requests\Department\UpdateDepartmentRequest;
 use App\Http\Resources\DepartmentResource;
 use App\Models\Department;
 use App\Models\Member;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +22,7 @@ class DepartmentController extends Controller
      * Admin-type roles see all branch departments; a department_leader
      * sees only the department(s) they lead.
      */
-    protected function scopedQuery(Request $request)
+    protected function scopedQuery(Request $request): Builder
     {
         $user = $request->user();
 
